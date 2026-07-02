@@ -424,8 +424,23 @@ function showReceipt(transaction) {
     document.getElementById('receiptSection').style.display = 'block';
 }
 
-function showTrxLagiModal() { var modal = document.getElementById('trxLagiModal'); modal.style.display = 'flex'; }
-function tutupTrxLagiModal() { document.getElementById('trxLagiModal').style.display = 'none'; showHome(); }
+function showTrxLagiModal() { 
+    var modal = document.getElementById('trxLagiModal'); 
+    if (modal) {
+        modal.style.display = 'flex';
+        modal.style.opacity = '1';
+        modal.style.visibility = 'visible';
+    }
+}
+
+function tutupTrxLagiModal() { 
+    var modal = document.getElementById('trxLagiModal'); 
+    if (modal) {
+        modal.style.display = 'none';
+    }
+    showHome(); 
+}
+
 function pilihTopupLagi() { tutupTrxLagiModal(); if (lastDeviceId && currentAccount) showTopupFromAccount(); else { showAlert('Cari akun dulu!', 'warning'); showHome(); } }
 function pilihKurasLagi() { tutupTrxLagiModal(); if (lastDeviceId && currentAccount) showKurasFromAccount(); else { showAlert('Cari akun dulu!', 'warning'); showHome(); } }
 
