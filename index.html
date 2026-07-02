@@ -6,8 +6,7 @@
     <title>Web top up bussid</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#00bfff">
+    <meta name="theme-color" content="#0ea5e9">
 </head>
 <body>
     <div id="alert" class="alert"></div>
@@ -15,15 +14,18 @@
     <div id="expiredBanner" class="expired-banner" style="display: none;">
         <div class="expired-content">
             <button class="expired-close" onclick="closeExpiredBanner()"><i class="fas fa-times"></i></button>
-            <h3><i class="fas fa-exclamation-triangle"></i> MASA AKTIF AKUN HABIS</h3>
+            <div class="expired-icon">
+                <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <h3>MASA AKTIF AKUN HABIS</h3>
             <p>Maaf masa aktif akun anda telah habis. Silakan perpanjang akses Anda.</p>
-            <div class="expired-buttons"><button class="btn btn-whatsapp" onclick="openWhatsApp()"><i class="fab fa-whatsapp"></i> Hubungi WhatsApp</button></div>
+            <button class="btn btn-whatsapp" onclick="openWhatsApp()"><i class="fab fa-whatsapp"></i> Hubungi WhatsApp</button>
         </div>
     </div>
 
     <div id="trxLagiModal" class="modal" style="display: none;">
         <div class="modal-content" style="max-width: 400px;">
-            <h3 style="color: #00bfff; margin-bottom: 20px; text-align: center;">MAU LANJUT TRX?</h3>
+            <h3 style="color: #0ea5e9; margin-bottom: 20px; text-align: center;">MAU LANJUT TRX?</h3>
             <p style="text-align: center; margin-bottom: 30px; color: #666;">Silakan pilih jenis transaksi</p>
             <div style="display: flex; gap: 15px; margin-bottom: 20px;">
                 <button class="btn btn-success" onclick="pilihTopupLagi()" style="flex: 1; padding: 15px;">TOP UP</button>
@@ -64,13 +66,13 @@
             </div>
 
             <div id="accountInfo" class="card" style="display: none;">
-                <div class="card-header"><h2><i class="fas fa-user-circle"></i> INFORMASI AKUN BUSSID</h2><button class="btn-icon" onclick="refreshAccountInfo()" id="refreshAccountBtn"><i class="fas fa-sync-alt"></i> Refresh</button></div>
+                <div class="card-header"><h2><i class="fas fa-user-circle"></i> INFORMASI AKUN BUSSID</h2><button class="btn-icon" onclick="refreshAccountInfo()"><i class="fas fa-sync-alt"></i> Refresh</button></div>
                 <div class="card-body">
                     <div class="account-profile"><div class="profile-photo-container"><div class="profile-photo" id="profilePhoto"><i class="fas fa-user"></i></div></div><div class="profile-info"><h3 id="accountName">-</h3><p class="account-balance" id="accountBalance">Rp 0</p></div></div>
                     <div class="facebook-info-section"><h4><i class="fab fa-facebook" style="color: #1877F2;"></i> INFORMASI AKUN FACEBOOK</h4><div class="facebook-info-details" id="facebookDetails"><div class="fb-info-row"><span class="fb-info-label"><i class="fab fa-facebook"></i> Status:</span><span class="fb-info-value">Memuat data Facebook...</span></div></div></div>
                     <div class="bussid-info-section"><h4><i class="fas fa-bus" style="color: #00bfff;"></i> INFORMASI BUSSID</h4><div class="bussid-info-details"><div class="info-row"><span class="info-label">PlayFab ID:</span><span class="info-value playfab-id-full" id="playfabId">-</span></div><div class="info-row"><span class="info-label">Status:</span><span class="info-value status-active">AKTIF</span></div></div></div>
                     <div class="account-actions"><button class="btn btn-success action-btn" onclick="showTopupFromAccount()"><i class="fas fa-arrow-up"></i> TOP UP</button><button class="btn btn-warning action-btn" onclick="showKurasFromAccount()"><i class="fas fa-arrow-down"></i> KURAS</button></div>
-                    <button class="btn btn-primary btn-block home-btn" onclick="showHome()"><i class="fas fa-home"></i> KEMBALI KE HOME</button>
+                    <button class="btn btn-primary btn-block" onclick="showHome()"><i class="fas fa-home"></i> KEMBALI KE HOME</button>
                     <div class="change-name-section">
                         <h3><i class="fas fa-user-edit"></i> Ganti Nama Akun</h3>
                         <div class="form-group"><label><i class="fas fa-user-plus"></i> Nama Baru (Maks 25 karakter)</label><div class="input-with-button"><input type="text" id="newAccountName" placeholder="Masukkan nama baru untuk akun BUSSID" class="form-input" maxlength="25"><button class="btn btn-primary" onclick="checkNameAvailability()"><i class="fas fa-search"></i> Cek</button></div><div class="name-availability" id="nameAvailability" style="display: none;"></div></div>
@@ -86,7 +88,7 @@
                     <div class="form-group"><label for="topupAmount"><i class="fas fa-coins"></i> Jumlah Top Up <span class="max-badge">MAX: 2.147M</span></label><input type="text" id="topupAmount" placeholder="Contoh: 2M, 1M, 500JT, MAX" class="form-input" oninput="validateTopupAmount()"><div id="amountPreview" class="amount-preview" style="display: none;"><div class="label">Jumlah Top Up</div><div class="value" id="amountPreviewValue">Rp 0</div></div></div>
                     <div class="quick-amounts"></div>
                     <button class="btn btn-success btn-block" onclick="processTopup()"><i class="fas fa-check-circle"></i> PROSES TOP UP</button>
-                    <button class="btn btn-primary btn-block home-btn" onclick="showHome()"><i class="fas fa-home"></i> KEMBALI KE HOME</button>
+                    <button class="btn btn-primary btn-block" onclick="showHome()"><i class="fas fa-home"></i> KEMBALI KE HOME</button>
                 </div>
             </div>
 
@@ -96,7 +98,7 @@
                     <div class="current-account-info"><p><i class="fas fa-user"></i> <strong>Akun:</strong> <span id="kurasAccountName">-</span></p><p><i class="fas fa-coins"></i> <strong>Saldo Saat Ini:</strong> <span id="kurasCurrentBalance">Rp 0</span></p></div>
                     <div class="form-group"><label for="kurasAmount"><i class="fas fa-coins"></i> Jumlah Kuras</label><input type="text" id="kurasAmount" placeholder="Kosongkan untuk kuras semua" class="form-input"><small class="form-hint">Biarkan kosong untuk menguras semua saldo</small></div>
                     <button class="btn btn-warning btn-block" onclick="processKuras()"><i class="fas fa-bolt"></i> PROSES KURAS</button>
-                    <button class="btn btn-primary btn-block home-btn" onclick="showHome()"><i class="fas fa-home"></i> KEMBALI KE HOME</button>
+                    <button class="btn btn-primary btn-block" onclick="showHome()"><i class="fas fa-home"></i> KEMBALI KE HOME</button>
                 </div>
             </div>
 
@@ -113,12 +115,11 @@
                         <div class="profile-item"><span class="profile-label"><i class="fas fa-user"></i> Nama:</span><span class="profile-value highlight-black" id="profileName">-</span></div>
                         <div class="profile-item"><span class="profile-label"><i class="fas fa-user-tag"></i> Role:</span><span class="profile-value role-biru" id="profileRole">-</span></div>
                         <div class="profile-item"><span class="profile-label"><i class="fas fa-calendar-alt"></i> Masa Aktif:</span><span class="profile-value" id="profileExpiry">-</span></div>
-                        <div class="profile-item"><span class="profile-label"><i class="fas fa-sign-in-alt"></i> Login Terakhir:</span><span class="profile-value" id="profileLastLogin">-</span></div>
                     </div>
                     <div class="settings-divider"><h3><i class="fas fa-key"></i> Ganti Password</h3></div>
-                    <p style="text-align: center; color: #666; padding: 15px; font-size: 14px;"><i class="fas fa-info-circle"></i> Jika ingin mengganti password, silakan hubungi admin via WhatsApp</p>
+                    <p style="text-align: center; color: #64748b; padding: 15px; font-size: 14px;"><i class="fas fa-info-circle"></i> Jika ingin mengganti password, silakan hubungi admin via WhatsApp</p>
                     <button class="btn btn-whatsapp btn-block" onclick="openWhatsApp()"><i class="fab fa-whatsapp"></i> Hubungi Admin</button>
-                    <button class="btn btn-danger btn-block" onclick="logout()" style="margin-top: 30px;"><i class="fas fa-sign-out-alt"></i> LOGOUT</button>
+                    <button class="btn btn-danger btn-block" onclick="logout()" style="margin-top: 20px;"><i class="fas fa-sign-out-alt"></i> LOGOUT</button>
                 </div>
             </div>
 
