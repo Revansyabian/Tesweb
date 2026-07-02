@@ -71,7 +71,7 @@ body{background:#f0f4f8;min-height:100vh;color:#1a1a2e}
 .account-balance{color:#0ea5e9;font-size:28px;font-weight:700}
 
 .facebook-info-section{background:#f0f9ff;border-radius:12px;padding:18px;margin-bottom:18px;border-left:4px solid #0ea5e9}
-.facebook-info-section h4{color:#0c4a6e;margin-bottom:12px;font-size:16px;font-weight:600;display:flex;align-items:center;gap:8px}
+.facebook-info-section h4{color:#0c4a6e;margin-bottom:12px;font-size:16px;font-weight:600}
 .facebook-info-details{display:flex;flex-direction:column;gap:10px}
 .fb-info-row{display:flex;align-items:flex-start;gap:10px;padding:6px 0;border-bottom:1px solid #e0f2fe}
 .fb-info-row:last-child{border-bottom:none}
@@ -79,7 +79,7 @@ body{background:#f0f4f8;min-height:100vh;color:#1a1a2e}
 .fb-info-value{color:#1e293b;font-weight:500;font-size:13px;flex:1}
 
 .bussid-info-section{background:#f0f9ff;border-radius:12px;padding:18px;margin-bottom:20px;border-left:4px solid #0ea5e9}
-.bussid-info-section h4{color:#0c4a6e;margin-bottom:12px;font-size:16px;font-weight:600;display:flex;align-items:center;gap:8px}
+.bussid-info-section h4{color:#0c4a6e;margin-bottom:12px;font-size:16px;font-weight:600}
 .bussid-info-details{display:flex;flex-direction:column;gap:10px}
 .bussid-info-details .info-row{display:flex;align-items:flex-start;gap:10px;padding:6px 0;border-bottom:1px solid #e0f2fe}
 .bussid-info-details .info-row:last-child{border-bottom:none}
@@ -99,7 +99,7 @@ body{background:#f0f4f8;min-height:100vh;color:#1a1a2e}
 .current-account-info p:last-child{margin-bottom:0}
 
 .change-name-section{margin-top:24px;padding-top:20px;border-top:1px solid #e2e8f0}
-.change-name-section h3{color:#0c4a6e;margin-bottom:16px;font-size:16px;font-weight:600;display:flex;align-items:center;gap:8px}
+.change-name-section h3{color:#0c4a6e;margin-bottom:16px;font-size:16px;font-weight:600}
 
 .user-profile-info{background:#f8fafc;border-radius:12px;padding:20px;margin-bottom:24px}
 .profile-item{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #e2e8f0}
@@ -119,7 +119,7 @@ body{background:#f0f4f8;min-height:100vh;color:#1a1a2e}
 .masa-aktif-merah{color:#dc2626!important}
 
 .settings-divider{margin:24px 0 16px;padding-bottom:12px;border-bottom:1px solid #e2e8f0}
-.settings-divider h3{color:#0c4a6e;font-size:16px;font-weight:600;display:flex;align-items:center;gap:8px}
+.settings-divider h3{color:#0c4a6e;font-size:16px;font-weight:600}
 
 .transaction-item{background:#f8fafc;border-radius:12px;padding:16px;margin-bottom:10px;border-left:3px solid #0ea5e9;transition:all 0.2s}
 .transaction-item:hover{background:#f1f5f9}
@@ -144,11 +144,13 @@ body{background:#f0f4f8;min-height:100vh;color:#1a1a2e}
 
 .expired-banner{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,0.97);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px}
 .expired-content{background:#fff;border:1px solid #fecaca;border-radius:20px;padding:40px;max-width:500px;width:100%;position:relative;text-align:center}
-.expired-content h3{color:#dc2626;font-size:22px;margin-bottom:16px}
+.expired-content h3{color:#dc2626;font-size:22px;margin-bottom:12px}
 .expired-content p{color:#64748b;font-size:15px;margin-bottom:24px}
 .expired-close{position:absolute;top:16px;right:16px;background:#f1f5f9;border:none;color:#64748b;font-size:18px;cursor:pointer;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center}
 .expired-close:hover{background:#e2e8f0}
-.expired-buttons{display:flex;gap:12px;justify-content:center}
+.expired-icon{font-size:50px;color:#ef4444;margin-bottom:16px;animation:pulse-red 1.5s ease-in-out infinite}
+@keyframes pulse-red{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.15);opacity:0.7}}
+.expired-buttons{display:flex;gap:12px;justify-content:center;margin-top:8px}
 
 .modal{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(15,23,42,0.5);display:flex;align-items:center;justify-content:center;z-index:99999;opacity:0;visibility:hidden;transition:all 0.2s;padding:20px}
 .modal.active{opacity:1;visibility:visible}
