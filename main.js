@@ -181,7 +181,6 @@ async function login() {
             var user = result.data;
             var expiryCheck = checkAccountExpiry(user);
             if (expiryCheck.expired) { showExpiredBanner(); return; }
-            await callRevanstore('users/' + user.id, 'PATCH', { last_login: Date.now() });
             currentUser = { id: user.id, username: user.username, password: password, role: user.role || 'Operator', full_name: user.full_name || user.username, expiry_date: user.expiry_date || '', last_login: Date.now() };
             document.getElementById('loginScreen').style.display = 'none';
             document.getElementById('mainApp').style.display = 'block';
