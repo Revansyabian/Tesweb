@@ -210,7 +210,10 @@ function updateProfileInfo() {
 }
 
 function logout() {
-    currentUser = null; currentAccount = null; currentAuthToken = null; lastDeviceId = null;
+    currentUser = null;
+    currentAccount = null;
+    currentAuthToken = null;
+    lastDeviceId = null;
     document.getElementById('mainApp').style.display = 'none';
     document.getElementById('expiredBanner').style.display = 'none';
     document.getElementById('loginScreen').style.display = 'block';
@@ -492,8 +495,12 @@ document.addEventListener('DOMContentLoaded', async function() {
     var saved = localStorage.getItem('bussid_session');
     if (saved) {
         try {
-            var session = JSON.parse(saved), age = Date.now() - (session.timestamp || 0);
-            if (age > 7 * 24 * 60 * 60 * 1000) { localStorage.removeItem('bussid_session'); return; }
+            var session = JSON.parse(saved);
+            var age = Date.now() - (session.timestamp || 0);
+            if (age > 7 * 24 * 60 * 60 * 1000) {
+                localStorage.removeItem('bussid_session');
+                return;
+            }
             var result = await callRevanstore('login', 'POST', { username: session.username, password: session.password });
             if (result && result.success) {
                 var user = result.data;
@@ -504,7 +511,9 @@ document.addEventListener('DOMContentLoaded', async function() {
                 document.getElementById('mainApp').style.display = 'block';
                 showHome(); updateProfileInfo();
                 showAlert('Selamat datang kembali!', 'success');
-            } else localStorage.removeItem('bussid_session');
+            } else {
+                localStorage.removeItem('bussid_session');
+            }
         } catch(e) { localStorage.removeItem('bussid_session'); }
     }
 });
