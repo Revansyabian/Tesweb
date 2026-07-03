@@ -463,8 +463,12 @@ function showReceipt(transaction) {
         '<div class="receipt-row"><span>Tanggal:</span><span>' + new Date(transaction.timestamp).toLocaleString('id-ID') + '</span></div>' +
         '<div class="receipt-row"><span>Status:</span><span><strong style="color:#00cc88;">BERHASIL</strong></span></div>' +
         '</div><div class="receipt-footer"><p>Silakan cek akun bussid</p></div></div>' +
-        '<div style="display:flex;gap:10px;margin-top:20px;"><button class="btn btn-success" onclick="showTrxLagiModal()" style="flex:1;"><i class="fas fa-sync-alt"></i> TRX LAGI</button><button class="btn btn-primary" onclick="backToAccount()" style="flex:1;"><i class="fas fa-home"></i> HOME</button></div>';
+        '<div style="display:flex;gap:10px;margin-top:20px;"><button class="btn btn-success" onclick="showTrxLagiModal()" style="flex:1;"><i class="fas fa-sync-alt"></i> TRX LAGI</button><button class="btn btn-primary" onclick="backToHome()" style="flex:1;"><i class="fas fa-home"></i> HOME</button></div>';
     document.getElementById('receiptSection').style.display = 'block';
+}
+
+function backToHome() {
+    showHome();
 }
 
 function showTrxLagiModal() { 
@@ -527,6 +531,9 @@ async function executeChangeName(newName) {
             var oldName = currentAccount.name;
             currentAccount.name = newName;
             document.getElementById('accountName').textContent = newName;
+            
+            await callRevanstore('transactions', 'POST', { type: 'gantinama', accountName: currentAccount.name, oldName: oldName, newName: newName, operator: currentUser.username, timestamp: Date.now(), status: 'success' });
+            
             hideAllSections();
             document.getElementById('receiptContent').innerHTML =
                 '<div class="receipt-content"><div class="receipt-header"><h3><i class="fas fa-user-edit"></i> GANTI NAMA BERHASIL</h3></div>' +
@@ -536,7 +543,7 @@ async function executeChangeName(newName) {
                 '<div class="receipt-row"><span>Tanggal:</span><span>' + new Date().toLocaleString('id-ID') + '</span></div>' +
                 '<div class="receipt-row"><span>Status:</span><span><strong style="color:#00cc88;">BERHASIL</strong></span></div>' +
                 '</div></div>' +
-                '<div style="display:flex;gap:10px;margin-top:20px;"><button class="btn btn-primary" onclick="backToAccount()" style="flex:1;"><i class="fas fa-home"></i> KEMBALI</button></div>';
+                '<button class="btn btn-primary btn-block" onclick="backToAccount()" style="margin-top:20px;"><i class="fas fa-home"></i> KEMBALI</button>';
             document.getElementById('receiptSection').style.display = 'block';
             showAlert('Nama berhasil diganti!', 'success');
             document.getElementById('newAccountName').value = '';
@@ -597,7 +604,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
 window.login = login; window.logout = logout; window.searchAccount = searchAccount; window.refreshAccountInfo = refreshAccountInfo;
 window.showTopupFromAccount = showTopupFromAccount; window.showKurasFromAccount = showKurasFromAccount;
-window.showChangeNameSection = showChangeNameSection; window.backToAccount = backToAccount;
+window.showChangeNameSection = showChangeNameSection; window.backToAccount = backToAccount; window.backToHome = backToHome;
 window.processTopup = processTopup; window.processKuras = processKuras; window.showHistory = showHistory;
 window.showSettings = showSettings; window.showHome = showHome; window.cancelConfirm = cancelConfirm;
 window.confirmAction = confirmAction; window.setAmount = setAmount; window.validateTopupAmount = validateTopupAmount;
