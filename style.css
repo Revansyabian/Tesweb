@@ -91,9 +91,10 @@ body{background:#f0f4f8;min-height:100vh;color:#1a1a2e}
 .playfab-id-full{font-family:monospace;font-size:13px;background:#f1f5f9;padding:4px 10px;border-radius:6px}
 .status-active{color:#10b981;background:#d1fae5;padding:4px 10px;border-radius:20px;display:inline-block;font-size:13px;font-weight:600}
 
-.account-actions{display:flex;flex-direction:column;gap:10px;margin:20px 0}
-.account-actions .action-btn{width:100%;padding:16px!important;font-size:16px!important}
-.account-actions .btn-purple{width:100%;padding:16px!important;font-size:16px!important}
+.account-actions{display:flex;flex-direction:column;gap:12px;margin:20px 0}
+.account-actions .action-btn{width:100%;padding:18px!important;font-size:18px!important}
+.btn-purple.btn-block{width:100%;padding:18px!important;font-size:18px!important;margin-bottom:8px}
+.home-btn{margin-top:0!important;width:100%;padding:16px!important;font-size:16px!important}
 
 .quick-amounts{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:10px;margin:20px 0}
 .current-account-info{background:#f8fafc;padding:16px;border-radius:12px;margin-bottom:20px;border-left:3px solid #0ea5e9}
