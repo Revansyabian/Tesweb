@@ -12,6 +12,9 @@ var pendingAction = null;
 var pendingData = null;
 var lastDeviceId = null;
 
+var loginAttempts = 0;
+var blockedUntil = null;
+
 function sanitize(str) {
     if (!str) return '';
     return String(str).replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#x27;');
@@ -186,12 +189,26 @@ async function deleteAllHistory() {
 }
 
 async function login() {
+    if (blockedUntil && Date.now() < blockedUntil) {
+        var remaining = Math.ceil((blockedUntil - Date.now()) / 60000);
+        showAlert('Terlalu banyak percobaan. Coba lagi dalam ' + remaining + ' menit.', 'error');
+        return;
+    }
+    
+    var honeypot = document.getElementById('hiddenField');
+    if (honeypot && honeypot.value !== '') {
+        showAlert('Akses ditolak.', 'error');
+        return;
+    }
+    
     var username = sanitize(document.getElementById('username').value.trim()), password = document.getElementById('password').value.trim();
     if (!username || !password) { showAlert('Isi username dan password!', 'error'); return; }
     showAlert('Sedang login...', 'info');
     try {
         var result = await callRevanstore('login', 'POST', { username: username, password: password });
         if (result && result.success) {
+            loginAttempts = 0;
+            blockedUntil = null;
             var user = result.data;
             var expiryCheck = checkAccountExpiry(user);
             if (expiryCheck.expired) { showExpiredBanner(); return; }
@@ -203,7 +220,13 @@ async function login() {
             updateProfileInfo();
             localStorage.setItem('bussid_session', JSON.stringify({ username: username, password: password, user_id: user.id, timestamp: Date.now() }));
         } else {
-            showAlert(result.error || 'Username atau password salah!', 'error');
+            loginAttempts++;
+            if (loginAttempts >= 5) {
+                blockedUntil = Date.now() + 15 * 60 * 1000;
+                showAlert('Akun diblokir 15 menit karena terlalu banyak percobaan.', 'error');
+            } else {
+                showAlert('Username atau password salah! (' + (5 - loginAttempts) + ' kesempatan lagi)', 'error');
+            }
         }
     } catch (error) { showAlert('Login gagal!', 'error'); }
 }
@@ -227,11 +250,14 @@ function logout() {
     currentAccount = null;
     currentAuthToken = null;
     lastDeviceId = null;
+    loginAttempts = 0;
+    blockedUntil = null;
     document.getElementById('mainApp').style.display = 'none';
     document.getElementById('expiredBanner').style.display = 'none';
     document.getElementById('loginScreen').style.display = 'block';
     document.getElementById('username').value = '';
     document.getElementById('password').value = '';
+    if (document.getElementById('hiddenField')) document.getElementById('hiddenField').value = '';
     localStorage.removeItem('bussid_session');
     showAlert('Logout berhasil!', 'success');
 }
@@ -538,6 +564,15 @@ function setupEventListeners() {
 
 document.addEventListener('DOMContentLoaded', async function() {
     setupEventListeners(); setupQuickAmounts();
+    
+    document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && e.key === 'I') || (e.ctrlKey && e.shiftKey && e.key === 'J') || (e.ctrlKey && e.key === 'U')) {
+            e.preventDefault();
+            return false;
+        }
+    });
+    
     var saved = localStorage.getItem('bussid_session');
     if (saved) {
         try {
