@@ -73,7 +73,7 @@ function hideAllSections() {
 }
 
 function showHome() { hideAllSections(); document.querySelector('.search-card').style.display = 'block'; }
-function backToAccount() { hideAllSections(); document.getElementById('accountInfo').style.display = 'block'; }
+function backToAccount() { if (currentAccount) { hideAllSections(); document.getElementById('accountInfo').style.display = 'block'; } else { showHome(); } }
 
 function parseDate(dateStr) {
     if (!dateStr) return null;
@@ -297,7 +297,7 @@ async function showHistory() {
         var transactions = await callRevanstore('transactions', 'GET');
         var listDiv = document.getElementById('transactionsList');
         if (!transactions || typeof transactions !== 'object') { listDiv.innerHTML = '<p style="text-align:center;color:#666;">Belum ada transaksi</p>'; return; }
-        var arr = Object.keys(transactions).map(function(k) { return { id: k, type: transactions[k].type, accountName: transactions[k].accountName, amount: transactions[k].amount, oldBalance: transactions[k].oldBalance, newBalance: transactions[k].newBalance, operator: transactions[k].operator, timestamp: transactions[k].timestamp }; }).filter(function(t) { return t.operator === currentUser.username; }).sort(function(a, b) { return b.timestamp - a.timestamp; });
+        var arr = Object.keys(transactions).map(function(k) { return { type: transactions[k].type, accountName: transactions[k].accountName, amount: transactions[k].amount, operator: transactions[k].operator, timestamp: transactions[k].timestamp }; }).filter(function(t) { return t.operator === currentUser.username; }).sort(function(a, b) { return b.timestamp - a.timestamp; });
         if (arr.length === 0) { listDiv.innerHTML = '<p style="text-align:center;color:#666;">Belum ada</p>'; return; }
         var html = '';
         arr.forEach(function(t) { html += '<div class="transaction-item ' + t.type + '"><div class="transaction-header"><div>' + sanitize(t.accountName) + '</div><div>' + (t.type==='topup'?'+':'-') + formatCurrency(t.amount) + '</div></div></div>'; });
