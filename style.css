@@ -40,6 +40,8 @@ body{background:#f0f4f8;min-height:100vh;color:#1a1a2e}
 .btn-danger:hover{background:#dc2626}
 .btn-secondary{background:#64748b}
 .btn-secondary:hover{background:#475569}
+.btn-purple{background:#6366f1;color:#fff}
+.btn-purple:hover{background:#4f46e5}
 .btn-icon{background:#f0f9ff;color:#0ea5e9;padding:10px 18px;border-radius:10px;border:1px solid #bae6fd;font-size:14px;cursor:pointer;transition:all 0.2s;display:flex;align-items:center;gap:8px}
 .btn-icon:hover{background:#e0f2fe}
 .btn-whatsapp{background:#25D366;color:#fff}
@@ -91,15 +93,11 @@ body{background:#f0f4f8;min-height:100vh;color:#1a1a2e}
 
 .account-actions{display:flex;gap:12px;margin:20px 0}
 .action-btn{flex:1;padding:16px!important;font-size:16px!important}
-.home-btn{margin-top:12px;background:#0ea5e9!important}
 
 .quick-amounts{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:10px;margin:20px 0}
 .current-account-info{background:#f8fafc;padding:16px;border-radius:12px;margin-bottom:20px;border-left:3px solid #0ea5e9}
 .current-account-info p{margin-bottom:8px;font-size:15px;color:#475569}
 .current-account-info p:last-child{margin-bottom:0}
-
-.change-name-section{margin-top:24px;padding-top:20px;border-top:1px solid #e2e8f0}
-.change-name-section h3{color:#0c4a6e;margin-bottom:16px;font-size:16px;font-weight:600}
 
 .user-profile-info{background:#f8fafc;border-radius:12px;padding:20px;margin-bottom:24px}
 .profile-item{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #e2e8f0}
@@ -114,9 +112,6 @@ body{background:#f0f4f8;min-height:100vh;color:#1a1a2e}
 .days-yellow{background:#fef3c7;color:#d97706}
 .days-red{background:#fee2e2;color:#dc2626}
 .days-permanent{background:#e0e7ff;color:#6366f1}
-.masa-aktif-hijau{color:#059669!important}
-.masa-aktif-kuning{color:#d97706!important}
-.masa-aktif-merah{color:#dc2626!important}
 
 .settings-divider{margin:24px 0 16px;padding-bottom:12px;border-bottom:1px solid #e2e8f0}
 .settings-divider h3{color:#0c4a6e;font-size:16px;font-weight:600}
@@ -150,7 +145,6 @@ body{background:#f0f4f8;min-height:100vh;color:#1a1a2e}
 .expired-close:hover{background:#e2e8f0}
 .expired-icon{font-size:50px;color:#ef4444;margin-bottom:16px;animation:pulse-red 1.5s ease-in-out infinite}
 @keyframes pulse-red{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.15);opacity:0.7}}
-.expired-buttons{display:flex;gap:12px;justify-content:center;margin-top:8px}
 
 .modal{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(15,23,42,0.5);display:flex;align-items:center;justify-content:center;z-index:99999;opacity:0;visibility:hidden;transition:all 0.2s;padding:20px}
 .modal.active{opacity:1;visibility:visible}
@@ -198,7 +192,6 @@ body{background:#f0f4f8;min-height:100vh;color:#1a1a2e}
   .input-with-button{flex-direction:column}
   .input-with-button .btn{width:100%}
 }
-
 @media(max-width:480px){
   .login-header h1{font-size:22px}
   .btn{padding:12px 18px;font-size:14px}
