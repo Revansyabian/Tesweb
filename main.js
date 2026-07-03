@@ -12,11 +12,11 @@ var pendingAction = null;
 var pendingData = null;
 var lastDeviceId = null;
 
-// ========== SISTEM BLOKIR PROGRESIF (DISIMPAN DI LOCALSTORAGE) ==========
+// ========== SISTEM BLOKIR PROGRESIF ==========
 var BLOCK_CONFIG = {
-    attempts: [5, 10, 15, 20, 25],  // percobaan ke berapa untuk naik level
-    durations: [1, 5, 15, 60, 120], // durasi blokir dalam menit (1m, 5m, 15m, 1jam, 2jam)
-    maxDuration: 120 // maksimal 2 jam
+    attempts: [5, 10, 15, 20, 25],
+    durations: [1, 5, 15, 60, 120],
+    maxDuration: 120
 };
 
 function getBlockKey(username) {
@@ -29,9 +29,7 @@ function getBlockData(username) {
     if (data) {
         try {
             var parsed = JSON.parse(data);
-            // Cek apakah blokir sudah lewat
             if (parsed.blockedUntil && Date.now() > parsed.blockedUntil) {
-                // Blokir habis, reset
                 localStorage.removeItem(key);
                 return { attempts: 0, blockedUntil: null, level: 0 };
             }
@@ -59,7 +57,8 @@ function getBlockLevel(attempts) {
 
 function getBlockDuration(attempts) {
     var level = getBlockLevel(attempts);
-    return BLOCK_CONFIG.durations[level] || BLOCK_CONFIG.maxDuration;
+    var dur = BLOCK_CONFIG.durations[level];
+    return dur || BLOCK_CONFIG.maxDuration;
 }
 
 function getRemainingBlockTime(blockedUntil) {
@@ -72,23 +71,21 @@ function getBlockMessage(attempts, blockedUntil) {
     if (!blockedUntil) return null;
     var remaining = getRemainingBlockTime(blockedUntil);
     if (remaining <= 0) return null;
-    
     var level = getBlockLevel(attempts);
     var totalAttempts = BLOCK_CONFIG.attempts[level] || 25;
     var nextLevel = level + 1;
     var nextAttempts = BLOCK_CONFIG.attempts[nextLevel] || 'lebih banyak';
+    var nextDuration = BLOCK_CONFIG.durations[nextLevel] || BLOCK_CONFIG.maxDuration;
     
-    var msg = '🔒 Akun diblokir sementara!\n';
-    msg += '⏱️ Sisa waktu: ' + remaining + ' menit\n';
+    var msg = '🔒 Terlalu banyak percobaan gagal!\n';
+    msg += '⏱️ Coba lagi dalam ' + remaining + ' menit\n';
     msg += '📊 Percobaan gagal: ' + attempts + ' kali\n';
     if (nextAttempts !== 'lebih banyak') {
-        msg += '⚠️ ' + nextAttempts + ' percobaan lagi = blokir ' + BLOCK_CONFIG.durations[nextLevel] + ' menit';
-    } else {
-        msg += '⚠️ Blokir maksimal ' + BLOCK_CONFIG.maxDuration + ' menit';
+        msg += '⚠️ ' + nextAttempts + ' percobaan lagi = blokir ' + nextDuration + ' menit';
     }
     return msg;
 }
-// ========== AKHIR SISTEM BLOKIR PROGRESIF ==========
+// ========== AKHIR SISTEM BLOKIR ==========
 
 function sanitize(str) {
     if (!str) return '';
@@ -269,12 +266,11 @@ async function login() {
     
     if (!username || !password) { showAlert('Isi username dan password!', 'error'); return; }
     
-    // Cek blokir dari localStorage
     var blockData = getBlockData(username);
     if (blockData.blockedUntil && Date.now() < blockData.blockedUntil) {
         var remaining = getRemainingBlockTime(blockData.blockedUntil);
-        var msg = getBlockMessage(blockData.attempts, blockData.blockedUntil);
-        showAlert(msg || 'Terlalu banyak percobaan. Coba lagi dalam ' + remaining + ' menit.', 'error');
+        var msg = '🔒 Terlalu banyak percobaan gagal! Coba lagi dalam ' + remaining + ' menit. (Percobaan: ' + blockData.attempts + 'x)';
+        showAlert(msg, 'error');
         return;
     }
     
@@ -288,9 +284,7 @@ async function login() {
     try {
         var result = await callRevanstore('login', 'POST', { username: username, password: password });
         if (result && result.success) {
-            // Login berhasil - reset blokir
-            var key = getBlockKey(username);
-            localStorage.removeItem(key);
+            localStorage.removeItem(getBlockKey(username));
             
             var user = result.data;
             var expiryCheck = checkAccountExpiry(user);
@@ -303,22 +297,19 @@ async function login() {
             updateProfileInfo();
             localStorage.setItem('bussid_session', JSON.stringify({ username: username, password: password, user_id: user.id, timestamp: Date.now() }));
         } else {
-            // Login gagal - tambah percobaan
             blockData.attempts += 1;
             var attempts = blockData.attempts;
-            
-            // Cek apakah perlu blokir
             var level = getBlockLevel(attempts);
-            if (level > 0) {
-                var duration = BLOCK_CONFIG.durations[level] || BLOCK_CONFIG.maxDuration;
+            
+            if (level >= 0 && attempts >= BLOCK_CONFIG.attempts[0]) {
+                var duration = getBlockDuration(attempts);
                 blockData.blockedUntil = Date.now() + duration * 60 * 1000;
                 blockData.level = level;
                 saveBlockData(username, blockData);
                 
-                var msg = getBlockMessage(attempts, blockData.blockedUntil);
-                showAlert(msg || 'Terlalu banyak percobaan! Diblokir ' + duration + ' menit.', 'error');
+                var msg = '🔒 Diblokir ' + duration + ' menit! (Percobaan gagal: ' + attempts + 'x)';
+                showAlert(msg, 'error');
             } else {
-                // Belum sampai blokir, simpan attempts
                 saveBlockData(username, blockData);
                 var remainingAttempts = BLOCK_CONFIG.attempts[0] - attempts;
                 showAlert('Username atau password salah! (' + remainingAttempts + ' kesempatan lagi sebelum diblokir)', 'error');
@@ -348,10 +339,6 @@ function logout() {
     currentAccount = null;
     currentAuthToken = null;
     lastDeviceId = null;
-    // Hapus block data untuk user ini saat logout (opsional)
-    // Jika ingin tetap mempertahankan blokir, comment baris ini
-    // var key = getBlockKey(currentUser ? currentUser.username : null);
-    // localStorage.removeItem(key);
     document.getElementById('mainApp').style.display = 'none';
     document.getElementById('expiredBanner').style.display = 'none';
     document.getElementById('loginScreen').style.display = 'block';
