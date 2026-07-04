@@ -8,9 +8,15 @@ export default async function handler(req, res) {
   const headers = { 'Content-Type': 'application/json' };
   if (authToken) headers['X-Authorization'] = authToken;
 
-  const response = await fetch(`https://4AE9.playfabapi.com${endpoint}`, {
-    method: method || 'POST', headers, body: body ? JSON.stringify(body) : undefined
-  });
-  const result = await response.json();
-  return res.status(200).json(result);
+  try {
+    const response = await fetch(`https://4AE9.playfabapi.com${endpoint}`, {
+      method: method || 'POST',
+      headers,
+      body: body ? JSON.stringify(body) : undefined
+    });
+    const result = await response.json();
+    return res.status(200).json(result);
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
 }
