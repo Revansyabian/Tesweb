@@ -1,4 +1,4 @@
-var API_REVANSTORE = '/api/revanstore';
+var API_REVANSTORE = 'https://paneladmin2.vercel.app/api/revanstore';
 var API_RVNSTORE = '/api/rvnstore';
 var API_KEY = '835a198a-7843-4e13-a085-331eb891100e';
 var WHATSAPP_NUMBER = "6285199120995";
