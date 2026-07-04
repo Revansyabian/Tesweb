@@ -1,5 +1,6 @@
 var API_REVANSTORE = '/api/revanstore';
 var API_RVNSTORE = '/api/rvnstore';
+var API_KEY = '835a198a-7843-4e13-a085-331eb891100e';
 var WHATSAPP_NUMBER = "6285199120995";
 var MAX_TOPUP_AMOUNT = 2147483647;
 var AUTO_DELETE_DAYS = 3;
@@ -11,12 +12,25 @@ var currentAuthToken = null;
 var pendingAction = null;
 var pendingData = null;
 var lastDeviceId = null;
+var fingerprint = '';
+var alertTimeout = null;
 
-// ========== SISTEM BLOKIR PROGRESIF ==========
+async function getFingerprint() {
+    var fp = '';
+    fp += navigator.userAgent || '';
+    fp += navigator.language || '';
+    fp += (screen.width || 0) + 'x' + (screen.height || 0);
+    fp += screen.colorDepth || '';
+    fp += new Date().getTimezoneOffset();
+    fp += navigator.hardwareConcurrency || '';
+    fp += navigator.deviceMemory || '';
+    fp += navigator.platform || '';
+    return CryptoJS.MD5(fp).toString();
+}
+
 var BLOCK_CONFIG = {
-    attempts: [5, 10, 15, 20, 25],
-    durations: [1, 5, 15, 60, 120],
-    maxDuration: 120
+    attempts: [5, 10, 15],
+    durations: [15, 60, 1440]
 };
 
 function getBlockKey(username) {
@@ -46,46 +60,12 @@ function saveBlockData(username, data) {
     localStorage.setItem(key, JSON.stringify(data));
 }
 
-function getBlockLevel(attempts) {
-    for (var i = BLOCK_CONFIG.attempts.length - 1; i >= 0; i--) {
-        if (attempts >= BLOCK_CONFIG.attempts[i]) {
-            return i;
-        }
-    }
+function getBlockDuration(attempts) {
+    if (attempts >= 15) return 1440;
+    if (attempts >= 10) return 60;
+    if (attempts >= 5) return 15;
     return 0;
 }
-
-function getBlockDuration(attempts) {
-    var level = getBlockLevel(attempts);
-    var dur = BLOCK_CONFIG.durations[level];
-    return dur || BLOCK_CONFIG.maxDuration;
-}
-
-function getRemainingBlockTime(blockedUntil) {
-    if (!blockedUntil) return 0;
-    var remaining = Math.ceil((blockedUntil - Date.now()) / 60000);
-    return remaining > 0 ? remaining : 0;
-}
-
-function getBlockMessage(attempts, blockedUntil) {
-    if (!blockedUntil) return null;
-    var remaining = getRemainingBlockTime(blockedUntil);
-    if (remaining <= 0) return null;
-    var level = getBlockLevel(attempts);
-    var totalAttempts = BLOCK_CONFIG.attempts[level] || 25;
-    var nextLevel = level + 1;
-    var nextAttempts = BLOCK_CONFIG.attempts[nextLevel] || 'lebih banyak';
-    var nextDuration = BLOCK_CONFIG.durations[nextLevel] || BLOCK_CONFIG.maxDuration;
-    
-    var msg = '🔒 Terlalu banyak percobaan gagal!\n';
-    msg += '⏱️ Coba lagi dalam ' + remaining + ' menit\n';
-    msg += '📊 Percobaan gagal: ' + attempts + ' kali\n';
-    if (nextAttempts !== 'lebih banyak') {
-        msg += '⚠️ ' + nextAttempts + ' percobaan lagi = blokir ' + nextDuration + ' menit';
-    }
-    return msg;
-}
-// ========== AKHIR SISTEM BLOKIR ==========
 
 function sanitize(str) {
     if (!str) return '';
@@ -93,23 +73,46 @@ function sanitize(str) {
 }
 
 async function callRevanstore(path, method, data) {
-    var res = await fetch(API_REVANSTORE, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: path, method: method || 'GET', data: data || null }) });
-    var text = await res.text(); if (!text || text === 'null') return null;
+    if (!fingerprint) fingerprint = await getFingerprint();
+    var res = await fetch(API_REVANSTORE, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': API_KEY,
+            'X-Fingerprint': fingerprint
+        },
+        body: JSON.stringify({ path: path, method: method || 'GET', data: data || null })
+    });
+    var text = await res.text();
+    if (!text || text === 'null') return null;
     return JSON.parse(text);
 }
 
 async function callRvnstore(endpoint, method, body, authToken) {
-    var res = await fetch(API_RVNSTORE, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ endpoint: endpoint, method: method || 'POST', body: body || null, authToken: authToken || null }) });
+    var res = await fetch(API_RVNSTORE, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ endpoint: endpoint, method: method || 'POST', body: body || null, authToken: authToken || null })
+    });
     return await res.json();
 }
 
 function showAlert(message, type, duration) {
-    type = type || 'info'; duration = duration || 3000;
+    type = type || 'info';
+    duration = duration || 3000;
     var alertDiv = document.getElementById('alert');
-    var icons = { success: 'fa-check-circle', error: 'fa-exclamation-circle', warning: 'fa-exclamation-triangle', info: 'fa-info-circle' };
-    alertDiv.innerHTML = '<div class="alert-content"><i class="fas ' + (icons[type] || 'fa-info-circle') + '"></i><span>' + sanitize(message) + '</span></div>';
+    var icons = { success: 'fa-check-circle', error: 'fa-exclamation-circle', warning: 'fa-exclamation-triangle', info: 'fa-info-circle', loading: 'fa-spinner fa-spin' };
+    
+    alertDiv.innerHTML = '<div class="alert-content"><div class="alert-icon"><i class="fas ' + (icons[type] || 'fa-info-circle') + '"></i></div><span>' + sanitize(message) + '</span></div>';
     alertDiv.className = 'alert ' + type + ' show';
-    setTimeout(function() { alertDiv.classList.remove('show'); }, duration);
+    
+    if (alertTimeout) clearTimeout(alertTimeout);
+    
+    if (type !== 'loading') {
+        alertTimeout = setTimeout(function() {
+            alertDiv.classList.remove('show');
+        }, duration);
+    }
 }
 
 function formatCurrency(amount) {
@@ -137,25 +140,8 @@ function validateTopupAmount() {
     if (amount > 0 && input.value.trim() !== '') {
         preview.style.display = 'block';
         previewValue.textContent = formatCurrency(amount);
-        if (input.value.toUpperCase().trim() === '2M') {
-            previewValue.innerHTML = formatCurrency(amount) + ' <span class="max-text">(Maksimal BUSSID)</span>';
-            previewValue.className = 'value max-amount';
-            input.classList.add('input-success');
-        } else if (amount > MAX_TOPUP_AMOUNT) {
-            input.classList.add('input-error');
-            previewValue.className = 'value exceeded-amount';
-            previewValue.innerHTML = formatCurrency(amount) + ' <span class="exceeded-text">(Melebihi batas maksimal)</span>';
-        } else if (amount === MAX_TOPUP_AMOUNT) {
-            input.classList.add('input-success');
-            previewValue.className = 'value max-amount';
-            previewValue.innerHTML = formatCurrency(amount) + ' <span class="max-text">(Maksimal BUSSID)</span>';
-        } else {
-            input.classList.remove('input-error', 'input-success');
-            previewValue.className = 'value normal-amount';
-        }
     } else {
         preview.style.display = 'none';
-        input.classList.remove('input-error', 'input-success');
     }
 }
 
@@ -186,8 +172,6 @@ function parseDate(dateStr) {
     if (parts.length !== 3) return null;
     var month = parseInt(parts[0], 10) - 1, day = parseInt(parts[1], 10), year = parseInt(parts[2], 10);
     if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
-    if (month < 0 || month > 11) return null;
-    if (day < 1 || day > 31) return null;
     var date = new Date(year, month, day);
     if (date.getMonth() !== month || date.getDate() !== day) return null;
     return date;
@@ -233,12 +217,7 @@ function checkAccountExpiry(user) {
 function showExpiredBanner() { document.getElementById('expiredBanner').style.display = 'flex'; document.getElementById('mainApp').style.display = 'none'; document.getElementById('loginScreen').style.display = 'none'; showAlert('Masa aktif akun telah habis!', 'error'); }
 function closeExpiredBanner() { document.getElementById('expiredBanner').style.display = 'none'; logout(); }
 function openWhatsApp() { var message = encodeURIComponent("Halo admin, saya ingin memperpanjang masa aktif akun BUSSID Top Up saya."); window.open('https://wa.me/' + WHATSAPP_NUMBER + '?text=' + message, '_blank'); }
-
-function updatePasswordCounter(fieldId) {
-    var input = document.getElementById(fieldId), counter = document.getElementById(fieldId + 'CharCount');
-    if (input && counter) counter.textContent = input.value.length + '/' + MAX_PASSWORD_LENGTH;
-}
-
+function updatePasswordCounter(fieldId) { var input = document.getElementById(fieldId), counter = document.getElementById(fieldId + 'CharCount'); if (input && counter) counter.textContent = input.value.length + '/' + MAX_PASSWORD_LENGTH; }
 function showDeleteHistoryConfirm() { document.getElementById('deleteHistoryModal').classList.add('active'); }
 function closeDeleteHistoryModal() { document.getElementById('deleteHistoryModal').classList.remove('active'); }
 
@@ -256,7 +235,6 @@ async function deleteAllHistory() {
         }
         closeDeleteHistoryModal();
         showAlert('Berhasil menghapus ' + deleteCount + ' riwayat!', 'success');
-        if (document.getElementById('historySection').style.display === 'block') showHistory();
     } catch (error) { showAlert('Gagal menghapus riwayat!', 'error'); closeDeleteHistoryModal(); }
 }
 
@@ -268,28 +246,30 @@ async function login() {
     
     var blockData = getBlockData(username);
     if (blockData.blockedUntil && Date.now() < blockData.blockedUntil) {
-        var remaining = getRemainingBlockTime(blockData.blockedUntil);
-        var msg = '🔒 Terlalu banyak percobaan gagal! Coba lagi dalam ' + remaining + ' menit. (Percobaan: ' + blockData.attempts + 'x)';
-        showAlert(msg, 'error');
+        var remaining = Math.ceil((blockData.blockedUntil - Date.now()) / 60000);
+        showAlert('🔒 Blokir ' + remaining + ' menit! Percobaan: ' + blockData.attempts + 'x', 'error');
         return;
     }
     
-    var honeypot = document.getElementById('hiddenField');
-    if (honeypot && honeypot.value !== '') {
-        showAlert('Akses ditolak.', 'error');
-        return;
-    }
+    showAlert('Sedang login...', 'loading');
     
-    showAlert('Sedang login...', 'info');
     try {
         var result = await callRevanstore('login', 'POST', { username: username, password: password });
+        
+        if (result && result.blocked) {
+            showAlert('🔒 IP/Fingerprint diblokir permanen!', 'error');
+            return;
+        }
+        
         if (result && result.success) {
             localStorage.removeItem(getBlockKey(username));
+            await callRevanstore('login_success', 'POST', {});
             
             var user = result.data;
             var expiryCheck = checkAccountExpiry(user);
             if (expiryCheck.expired) { showExpiredBanner(); return; }
-            currentUser = { id: user.id, username: user.username, password: password, role: user.role || 'Operator', full_name: user.full_name || user.username, expiry_date: user.expiry_date || '', last_login: Date.now() };
+            
+            currentUser = { id: user.id, username: user.username, password: password, role: user.role || 'Operator', full_name: user.full_name || user.username, expiry_date: user.expiry_date || '' };
             document.getElementById('loginScreen').style.display = 'none';
             document.getElementById('mainApp').style.display = 'block';
             showHome();
@@ -297,41 +277,32 @@ async function login() {
             updateProfileInfo();
             localStorage.setItem('bussid_session', JSON.stringify({ username: username, password: password, user_id: user.id, timestamp: Date.now() }));
         } else {
+            await callRevanstore('login_failed', 'POST', {});
+            
             blockData.attempts += 1;
             var attempts = blockData.attempts;
-            var level = getBlockLevel(attempts);
+            var duration = getBlockDuration(attempts);
             
-            if (level >= 0 && attempts >= BLOCK_CONFIG.attempts[0]) {
-                var duration = getBlockDuration(attempts);
+            if (duration > 0) {
                 blockData.blockedUntil = Date.now() + duration * 60 * 1000;
-                blockData.level = level;
                 saveBlockData(username, blockData);
-                
-                var msg = '🔒 Diblokir ' + duration + ' menit! (Percobaan gagal: ' + attempts + 'x)';
-                showAlert(msg, 'error');
+                showAlert('🔒 Diblokir ' + duration + ' menit! Percobaan: ' + attempts + 'x', 'error');
             } else {
                 saveBlockData(username, blockData);
-                var remainingAttempts = BLOCK_CONFIG.attempts[0] - attempts;
-                showAlert('Username atau password salah! (' + remainingAttempts + ' kesempatan lagi sebelum diblokir)', 'error');
+                showAlert('Username atau password salah!', 'error');
             }
         }
-    } catch (error) { 
-        showAlert('Login gagal!', 'error'); 
-    }
+    } catch (error) { showAlert('Login gagal!', 'error'); }
 }
 
 function updateProfileInfo() {
     if (!currentUser) return;
     var expiryCheck = checkAccountExpiry(currentUser);
     document.getElementById('profileUsername').textContent = currentUser.username;
-    document.getElementById('profileUsername').className = 'profile-value highlight-black';
     document.getElementById('profileName').textContent = currentUser.full_name || currentUser.username;
-    document.getElementById('profileName').className = 'profile-value highlight-black';
     document.getElementById('profileRole').textContent = currentUser.role || 'Operator';
-    document.getElementById('profileRole').className = 'profile-value role-biru';
     var expiryDateFormatted = currentUser.expiry_date ? currentUser.expiry_date : 'Tidak ada masa aktif';
     document.getElementById('profileExpiry').innerHTML = expiryDateFormatted + ' <span class="expiry-days-left ' + expiryCheck.daysLeftClass + '">' + expiryCheck.daysLeftText + '</span>';
-    document.getElementById('profileExpiry').className = 'profile-value ' + expiryCheck.colorClass;
 }
 
 function logout() {
@@ -344,13 +315,12 @@ function logout() {
     document.getElementById('loginScreen').style.display = 'block';
     document.getElementById('username').value = '';
     document.getElementById('password').value = '';
-    if (document.getElementById('hiddenField')) document.getElementById('hiddenField').value = '';
     localStorage.removeItem('bussid_session');
     showAlert('Logout berhasil!', 'success');
 }
 
 async function loginWithDeviceId(deviceId) {
-    showAlert('Sedang login ke BUSSID...', 'info');
+    showAlert('Sedang login ke BUSSID...', 'loading');
     try {
         var cleanInput = sanitize(deviceId.trim());
         if (cleanInput.includes('.')) {
@@ -405,7 +375,7 @@ function tampilkanFotoProfile(accountInfo) {
     var avatarUrl = accountInfo && accountInfo.facebookAvatarUrl ? accountInfo.facebookAvatarUrl : null;
     if (avatarUrl && avatarUrl !== 'null' && avatarUrl !== '') {
         var img = document.createElement('img');
-        img.src = avatarUrl; img.alt = 'Foto Profile Facebook';
+        img.src = avatarUrl; img.alt = 'Foto Profile';
         img.style.width = '100%'; img.style.height = '100%'; img.style.objectFit = 'cover'; img.style.borderRadius = '50%';
         img.onload = function() { fotoContainer.appendChild(img); };
         img.onerror = function() { fotoContainer.innerHTML = '<i class="fas fa-user"></i>'; };
@@ -449,7 +419,7 @@ function showAccountInfo(accountInfo) {
 
 function refreshAccountInfo() {
     if (!currentAccount) { showAlert('Cari akun dulu!', 'error'); return; }
-    showAlert('Merefresh...', 'info');
+    showAlert('Merefresh...', 'loading');
     setTimeout(async function() {
         var newInfo = await getUserInfoFromPlayFab();
         if (newInfo) {
@@ -479,14 +449,12 @@ async function processTopup() {
 }
 
 async function executeTopup(amount) {
-    showAlert('Memproses top up...', 'info');
+    showAlert('Memproses top up...', 'loading');
     var oldBalance = currentAccount.balance;
     var success = await addCashToAccount(amount);
     if (success) {
         var transaction = { type: 'topup', deviceId: currentAccount.deviceId, accountName: currentAccount.name, amount: amount, oldBalance: oldBalance, newBalance: currentAccount.balance, operator: currentUser.username, timestamp: Date.now(), status: 'success' };
         await callRevanstore('transactions', 'POST', transaction);
-        document.getElementById('topupAccountName').textContent = currentAccount.name;
-        document.getElementById('topupCurrentBalance').textContent = formatCurrency(currentAccount.balance);
         showReceipt(transaction);
         showAlert('Top up berhasil!', 'success');
     } else { showAlert('Top up gagal!', 'error'); }
@@ -503,14 +471,12 @@ async function processKuras() {
 }
 
 async function executeKuras(amount) {
-    showAlert('Memproses kuras...', 'info');
+    showAlert('Memproses kuras...', 'loading');
     var oldBalance = currentAccount.balance;
     var success = await addCashToAccount(-amount);
     if (success) {
         var transaction = { type: 'kuras', deviceId: currentAccount.deviceId, accountName: currentAccount.name, amount: amount, oldBalance: oldBalance, newBalance: currentAccount.balance, operator: currentUser.username, timestamp: Date.now(), status: 'success' };
         await callRevanstore('transactions', 'POST', transaction);
-        document.getElementById('kurasAccountName').textContent = currentAccount.name;
-        document.getElementById('kurasCurrentBalance').textContent = formatCurrency(currentAccount.balance);
         showReceipt(transaction);
         showAlert('Kuras berhasil!', 'success');
     } else { showAlert('Kuras gagal!', 'error'); }
@@ -550,31 +516,13 @@ function showReceipt(transaction) {
         '<div class="receipt-row"><span>Tanggal:</span><span>' + new Date(transaction.timestamp).toLocaleString('id-ID') + '</span></div>' +
         '<div class="receipt-row"><span>Status:</span><span><strong style="color:#00cc88;">BERHASIL</strong></span></div>' +
         '</div><div class="receipt-footer"><p>Silakan cek akun bussid</p></div></div>' +
-        '<div style="display:flex;gap:10px;margin-top:20px;"><button class="btn btn-success" onclick="showTrxLagiModal()" style="flex:1;"><i class="fas fa-sync-alt"></i> TRX LAGI</button><button class="btn btn-primary" onclick="backToHome()" style="flex:1;"><i class="fas fa-home"></i> HOME</button></div>';
+        '<div style="display:flex;gap:10px;margin-top:20px;"><button class="btn btn-success" onclick="showTrxLagiModal()" style="flex:1;">TRX LAGI</button><button class="btn btn-primary" onclick="backToHome()" style="flex:1;">HOME</button></div>';
     document.getElementById('receiptSection').style.display = 'block';
 }
 
-function backToHome() {
-    showHome();
-}
-
-function showTrxLagiModal() { 
-    var modal = document.getElementById('trxLagiModal'); 
-    if (modal) {
-        modal.style.display = 'flex';
-        modal.style.opacity = '1';
-        modal.style.visibility = 'visible';
-    }
-}
-
-function tutupTrxLagiModal() { 
-    var modal = document.getElementById('trxLagiModal'); 
-    if (modal) {
-        modal.style.display = 'none';
-    }
-    showHome(); 
-}
-
+function backToHome() { showHome(); }
+function showTrxLagiModal() { var modal = document.getElementById('trxLagiModal'); if (modal) { modal.style.display = 'flex'; } }
+function tutupTrxLagiModal() { var modal = document.getElementById('trxLagiModal'); if (modal) { modal.style.display = 'none'; } showHome(); }
 function pilihTopupLagi() { tutupTrxLagiModal(); if (lastDeviceId && currentAccount) showTopupFromAccount(); else { showAlert('Cari akun dulu!', 'warning'); showHome(); } }
 function pilihKurasLagi() { tutupTrxLagiModal(); if (lastDeviceId && currentAccount) showKurasFromAccount(); else { showAlert('Cari akun dulu!', 'warning'); showHome(); } }
 
@@ -589,8 +537,8 @@ async function showHistory() {
         if (arr.length === 0) { listDiv.innerHTML = '<p style="text-align:center;color:#666;">Belum ada transaksi</p>'; return; }
         var html = '';
         arr.forEach(function(t) {
-            var typeIcon = t.type === 'topup' ? 'fa-arrow-up' : 'fa-arrow-down', typeText = t.type === 'topup' ? 'TOP UP' : 'KURAS', amountSign = t.type === 'topup' ? '+' : '-';
-            html += '<div class="transaction-item ' + t.type + '"><div class="transaction-header"><div><i class="fas fa-user"></i> ' + sanitize(t.accountName) + '</div><div class="transaction-amount">' + amountSign + formatCurrency(t.amount) + '</div></div><div class="transaction-details"><div><i class="fas ' + typeIcon + '"></i> ' + typeText + '</div><div>' + new Date(t.timestamp).toLocaleString('id-ID') + '</div></div><div class="transaction-balance"><span>Sebelum: ' + formatCurrency(t.oldBalance) + '</span><span>→</span><span>Sesudah: ' + formatCurrency(t.newBalance) + '</span></div></div>';
+            var typeText = t.type === 'topup' ? 'TOP UP' : 'KURAS', amountSign = t.type === 'topup' ? '+' : '-';
+            html += '<div class="transaction-item ' + t.type + '"><div class="transaction-header"><div><i class="fas fa-user"></i> ' + sanitize(t.accountName) + '</div><div class="transaction-amount">' + amountSign + formatCurrency(t.amount) + '</div></div><div class="transaction-details"><div>' + typeText + '</div><div>' + new Date(t.timestamp).toLocaleString('id-ID') + '</div></div><div class="transaction-balance"><span>Sebelum: ' + formatCurrency(t.oldBalance) + '</span><span>→</span><span>Sesudah: ' + formatCurrency(t.newBalance) + '</span></div></div>';
         });
         listDiv.innerHTML = html;
     } catch (error) { showAlert('Gagal memuat riwayat', 'error'); }
@@ -611,30 +559,21 @@ async function changeAccountNameSimple() {
 }
 
 async function executeChangeName(newName) {
-    showAlert('Sedang mengubah nama...', 'info');
+    showAlert('Sedang mengubah nama...', 'loading');
     try {
         var result = await callRvnstore('/Client/UpdateUserTitleDisplayName', 'POST', { DisplayName: newName }, currentAuthToken);
         if (result.data && result.data.DisplayName) {
             var oldName = currentAccount.name;
             currentAccount.name = newName;
             document.getElementById('accountName').textContent = newName;
-            
             await callRevanstore('transactions', 'POST', { type: 'gantinama', accountName: currentAccount.name, oldName: oldName, newName: newName, operator: currentUser.username, timestamp: Date.now(), status: 'success' });
-            
             hideAllSections();
             document.getElementById('receiptContent').innerHTML =
                 '<div class="receipt-content"><div class="receipt-header"><h3><i class="fas fa-user-edit"></i> GANTI NAMA BERHASIL</h3></div>' +
-                '<div class="receipt-details">' +
-                '<div class="receipt-row"><span>Nama Sebelum:</span><span><strong>' + sanitize(oldName) + '</strong></span></div>' +
-                '<div class="receipt-row"><span>Nama Baru:</span><span><strong style="color:#0ea5e9;">' + sanitize(newName) + '</strong></span></div>' +
-                '<div class="receipt-row"><span>Tanggal:</span><span>' + new Date().toLocaleString('id-ID') + '</span></div>' +
-                '<div class="receipt-row"><span>Status:</span><span><strong style="color:#00cc88;">BERHASIL</strong></span></div>' +
-                '</div></div>' +
-                '<button class="btn btn-primary btn-block" onclick="backToAccount()" style="margin-top:20px;"><i class="fas fa-home"></i> KEMBALI</button>';
+                '<div class="receipt-details"><div class="receipt-row"><span>Nama Sebelum:</span><span><strong>' + sanitize(oldName) + '</strong></span></div><div class="receipt-row"><span>Nama Baru:</span><span><strong style="color:#0ea5e9;">' + sanitize(newName) + '</strong></span></div><div class="receipt-row"><span>Tanggal:</span><span>' + new Date().toLocaleString('id-ID') + '</span></div><div class="receipt-row"><span>Status:</span><span><strong style="color:#00cc88;">BERHASIL</strong></span></div></div></div>' +
+                '<button class="btn btn-primary btn-block" onclick="backToAccount()" style="margin-top:20px;">KEMBALI</button>';
             document.getElementById('receiptSection').style.display = 'block';
             showAlert('Nama berhasil diganti!', 'success');
-            document.getElementById('newAccountName').value = '';
-            document.getElementById('nameAvailability').style.display = 'none';
         } else { showAlert('Gagal mengubah nama!', 'error'); }
     } catch (error) { showAlert('Gagal mengubah nama!', 'error'); }
 }
@@ -661,7 +600,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     
     document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
     document.addEventListener('keydown', function(e) {
-        if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && e.key === 'I') || (e.ctrlKey && e.shiftKey && e.key === 'J') || (e.ctrlKey && e.key === 'U')) {
+        if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && e.key === 'I') || (e.ctrlKey && e.key === 'U')) {
             e.preventDefault();
             return false;
         }
@@ -677,28 +616,12 @@ document.addEventListener('DOMContentLoaded', async function() {
                 var user = result.data;
                 var expiryCheck = checkAccountExpiry(user);
                 if (expiryCheck.expired) { showExpiredBanner(); return; }
-                currentUser = { id: user.id, username: user.username, password: session.password, role: user.role || 'Operator', full_name: user.full_name || user.username, expiry_date: user.expiry_date || '', last_login: user.last_login || null };
+                currentUser = { id: user.id, username: user.username, password: session.password, role: user.role || 'Operator', full_name: user.full_name || user.username, expiry_date: user.expiry_date || '' };
                 document.getElementById('loginScreen').style.display = 'none';
                 document.getElementById('mainApp').style.display = 'block';
                 showHome(); updateProfileInfo();
                 showAlert('Selamat datang kembali!', 'success');
-            } else {
-                localStorage.removeItem('bussid_session');
-            }
+            } else { localStorage.removeItem('bussid_session'); }
         } catch(e) { localStorage.removeItem('bussid_session'); }
     }
 });
-
-window.login = login; window.logout = logout; window.searchAccount = searchAccount; window.refreshAccountInfo = refreshAccountInfo;
-window.showTopupFromAccount = showTopupFromAccount; window.showKurasFromAccount = showKurasFromAccount;
-window.showChangeNameSection = showChangeNameSection; window.backToAccount = backToAccount; window.backToHome = backToHome;
-window.processTopup = processTopup; window.processKuras = processKuras; window.showHistory = showHistory;
-window.showSettings = showSettings; window.showHome = showHome; window.cancelConfirm = cancelConfirm;
-window.confirmAction = confirmAction; window.setAmount = setAmount; window.validateTopupAmount = validateTopupAmount;
-window.checkNameAvailability = checkNameAvailability; window.changeAccountNameSimple = changeAccountNameSimple;
-window.showTrxLagiModal = showTrxLagiModal; window.tutupTrxLagiModal = tutupTrxLagiModal;
-window.pilihTopupLagi = pilihTopupLagi; window.pilihKurasLagi = pilihKurasLagi;
-window.closeExpiredBanner = closeExpiredBanner; window.openWhatsApp = openWhatsApp;
-window.updatePasswordCounter = updatePasswordCounter; window.closeDeleteHistoryModal = closeDeleteHistoryModal;
-window.deleteAllHistory = deleteAllHistory; window.showDeleteHistoryConfirm = showDeleteHistoryConfirm;
-window.closeNameChangeModal = closeNameChangeModal; window.showNameChangeModal = showNameChangeModal;
