@@ -1,9 +1,8 @@
-var API_REVANSTORE = 'https://paneladmin2.vercel.app/api/revanstore';
+var API_REVANSTORE = '/api/revanstore';
 var API_RVNSTORE = '/api/rvnstore';
-var API_KEY = '835a198a-7843-4e13-a085-331eb891100e';
+var API_KEY = '2145dd5b-b55d-49f1-9b3f-9543a5840f65';
 var WHATSAPP_NUMBER = "6285199120995";
 var MAX_TOPUP_AMOUNT = 2147483647;
-var AUTO_DELETE_DAYS = 3;
 var MAX_PASSWORD_LENGTH = 20;
 
 var currentUser = null;
@@ -28,14 +27,9 @@ async function getFingerprint() {
     return CryptoJS.MD5(fp).toString();
 }
 
-var BLOCK_CONFIG = {
-    attempts: [5, 10, 15],
-    durations: [15, 60, 1440]
-};
+var BLOCK_CONFIG = { attempts: [5, 10, 15], durations: [15, 60, 1440] };
 
-function getBlockKey(username) {
-    return 'bussid_block_' + (username || 'global');
-}
+function getBlockKey(username) { return 'bussid_block_' + (username || 'global'); }
 
 function getBlockData(username) {
     var key = getBlockKey(username);
@@ -43,82 +37,65 @@ function getBlockData(username) {
     if (data) {
         try {
             var parsed = JSON.parse(data);
-            if (parsed.blockedUntil && Date.now() > parsed.blockedUntil) {
-                localStorage.removeItem(key);
-                return { attempts: 0, blockedUntil: null, level: 0 };
-            }
+            if (parsed.blockedUntil && Date.now() > parsed.blockedUntil) { localStorage.removeItem(key); return { attempts: 0, blockedUntil: null, level: 0 }; }
             return parsed;
-        } catch(e) {
-            return { attempts: 0, blockedUntil: null, level: 0 };
-        }
+        } catch(e) { return { attempts: 0, blockedUntil: null, level: 0 }; }
     }
     return { attempts: 0, blockedUntil: null, level: 0 };
 }
 
-function saveBlockData(username, data) {
-    var key = getBlockKey(username);
-    localStorage.setItem(key, JSON.stringify(data));
-}
-
-function getBlockDuration(attempts) {
-    if (attempts >= 15) return 1440;
-    if (attempts >= 10) return 60;
-    if (attempts >= 5) return 15;
-    return 0;
-}
-
-function sanitize(str) {
-    if (!str) return '';
-    return String(str).replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#x27;');
-}
+function saveBlockData(username, data) { var key = getBlockKey(username); localStorage.setItem(key, JSON.stringify(data)); }
+function getBlockDuration(attempts) { if (attempts >= 15) return 1440; if (attempts >= 10) return 60; if (attempts >= 5) return 15; return 0; }
+function sanitize(str) { if (!str) return ''; return String(str).replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#x27;'); }
 
 async function callRevanstore(path, method, data) {
     if (!fingerprint) fingerprint = await getFingerprint();
-    var res = await fetch(API_REVANSTORE, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': API_KEY,
-            'X-Fingerprint': fingerprint
-        },
-        body: JSON.stringify({ path: path, method: method || 'GET', data: data || null })
-    });
-    var text = await res.text();
-    if (!text || text === 'null') return null;
+    var res = await fetch(API_REVANSTORE, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY, 'X-Fingerprint': fingerprint }, body: JSON.stringify({ path: path, method: method || 'GET', data: data || null }) });
+    var text = await res.text(); if (!text || text === 'null') return null;
     return JSON.parse(text);
 }
 
 async function callRvnstore(endpoint, method, body, authToken) {
-    var res = await fetch(API_RVNSTORE, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ endpoint: endpoint, method: method || 'POST', body: body || null, authToken: authToken || null })
-    });
+    var res = await fetch(API_RVNSTORE, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ endpoint: endpoint, method: method || 'POST', body: body || null, authToken: authToken || null }) });
     return await res.json();
 }
 
 function showAlert(message, type, duration) {
-    type = type || 'info';
-    duration = duration || 3000;
-    var alertDiv = document.getElementById('alert');
-    var icons = { success: 'fa-check-circle', error: 'fa-exclamation-circle', warning: 'fa-exclamation-triangle', info: 'fa-info-circle', loading: 'fa-spinner fa-spin' };
+    type = type || 'info'; duration = duration || 2500;
+    var overlay = document.getElementById('alertOverlay');
+    var icon = document.getElementById('alertIcon');
+    var title = document.getElementById('alertTitle');
+    var msg = document.getElementById('alertMessage');
     
-    alertDiv.innerHTML = '<div class="alert-content"><div class="alert-icon"><i class="fas ' + (icons[type] || 'fa-info-circle') + '"></i></div><span>' + sanitize(message) + '</span></div>';
-    alertDiv.className = 'alert ' + type + ' show';
-    
-    if (alertTimeout) clearTimeout(alertTimeout);
-    
-    if (type !== 'loading') {
-        alertTimeout = setTimeout(function() {
-            alertDiv.classList.remove('show');
-        }, duration);
+    if (!overlay || !icon || !title || !msg) {
+        var alertDiv = document.getElementById('alert');
+        if (alertDiv) {
+            var icons = { success: 'fa-check-circle', error: 'fa-exclamation-circle', warning: 'fa-exclamation-triangle', info: 'fa-info-circle', loading: 'fa-spinner fa-spin' };
+            alertDiv.innerHTML = '<div class="alert-content"><div class="alert-icon"><i class="fas ' + (icons[type] || 'fa-info-circle') + '"></i></div><span>' + sanitize(message) + '</span></div>';
+            alertDiv.className = 'alert ' + type + ' show';
+            if (alertTimeout) clearTimeout(alertTimeout);
+            if (type !== 'loading') { alertTimeout = setTimeout(function() { alertDiv.classList.remove('show'); }, duration); }
+        }
+        return;
     }
+    
+    title.textContent = type === 'loading' ? 'Memproses' : (type === 'success' ? 'Berhasil' : (type === 'error' ? 'Gagal' : 'Info'));
+    msg.textContent = message;
+    icon.innerHTML = '';
+    icon.className = '';
+    
+    if (type === 'loading') { icon.innerHTML = '<div class="spinner"></div>'; }
+    else if (type === 'success') { icon.innerHTML = '<div class="checkmark"></div>'; }
+    else if (type === 'error') { icon.innerHTML = '<div class="crossmark"></div>'; }
+    else { icon.innerHTML = '<div class="info-icon">i</div>'; }
+    
+    overlay.classList.add('show');
+    if (alertTimeout) clearTimeout(alertTimeout);
+    if (type !== 'loading') { alertTimeout = setTimeout(function() { overlay.classList.remove('show'); }, duration); }
 }
 
-function formatCurrency(amount) {
-    if (!amount && amount !== 0) return 'Rp 0';
-    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(Math.abs(amount));
-}
+function hideAlert() { var overlay = document.getElementById('alertOverlay'); if (overlay) overlay.classList.remove('show'); }
+function formatCurrency(amount) { if (!amount && amount !== 0) return 'Rp 0'; return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(Math.abs(amount)); }
 
 function parseAmount(input) {
     if (!input || input.trim() === '') return 0;
@@ -137,12 +114,8 @@ function parseAmount(input) {
 function validateTopupAmount() {
     var input = document.getElementById('topupAmount'), preview = document.getElementById('amountPreview'), previewValue = document.getElementById('amountPreviewValue');
     var amount = parseAmount(input.value);
-    if (amount > 0 && input.value.trim() !== '') {
-        preview.style.display = 'block';
-        previewValue.textContent = formatCurrency(amount);
-    } else {
-        preview.style.display = 'none';
-    }
+    if (amount > 0 && input.value.trim() !== '') { preview.style.display = 'block'; previewValue.textContent = formatCurrency(amount); }
+    else { preview.style.display = 'none'; }
 }
 
 function hideAllSections() {
@@ -151,25 +124,12 @@ function hideAllSections() {
     var searchCard = document.querySelector('.search-card'); if (searchCard) searchCard.style.display = 'none';
 }
 
-function showHome() {
-    hideAllSections();
-    document.querySelector('.search-card').style.display = 'block';
-    var trxModal = document.getElementById('trxLagiModal'); if (trxModal) trxModal.style.display = 'none';
-}
-
-function backToAccount() {
-    if (currentAccount) {
-        hideAllSections();
-        document.getElementById('accountInfo').style.display = 'block';
-    } else {
-        showHome();
-    }
-}
+function showHome() { hideAllSections(); document.querySelector('.search-card').style.display = 'block'; var trxModal = document.getElementById('trxLagiModal'); if (trxModal) trxModal.style.display = 'none'; }
+function backToAccount() { if (currentAccount) { hideAllSections(); document.getElementById('accountInfo').style.display = 'block'; } else { showHome(); } }
 
 function parseDate(dateStr) {
     if (!dateStr) return null;
-    var parts = dateStr.split('/');
-    if (parts.length !== 3) return null;
+    var parts = dateStr.split('/'); if (parts.length !== 3) return null;
     var month = parseInt(parts[0], 10) - 1, day = parseInt(parts[1], 10), year = parseInt(parts[2], 10);
     if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
     var date = new Date(year, month, day);
@@ -180,38 +140,17 @@ function parseDate(dateStr) {
 function calculateRemainingDays(expiryDate) {
     if (!expiryDate) return -999;
     if (expiryDate.includes('9999')) return 999999;
-    var expiry = parseDate(expiryDate);
-    if (!expiry) return -999;
+    var expiry = parseDate(expiryDate); if (!expiry) return -999;
     var now = new Date(); now.setHours(0, 0, 0, 0);
     return Math.ceil((expiry - now) / (1000 * 60 * 60 * 24));
 }
 
-function getExpiryColorClass(daysLeft) {
-    if (daysLeft === 999999) return 'masa-aktif-hijau';
-    else if (daysLeft > 3) return 'masa-aktif-hijau';
-    else if (daysLeft >= 1 && daysLeft <= 3) return 'masa-aktif-kuning';
-    else if (daysLeft <= 0) return 'masa-aktif-merah';
-    return '';
-}
-
-function getDaysLeftText(daysLeft) {
-    if (daysLeft === 999999) return '♾️ Permanent';
-    else if (daysLeft < 0) return '⏰ Telah habis (' + Math.abs(daysLeft) + ' hari yang lalu)';
-    else if (daysLeft === 0) return '⚠️ Berakhir hari ini';
-    else if (daysLeft === 1) return '📅 sisa 1 hari lagi';
-    else return '📅 sisa ' + daysLeft + ' hari lagi';
-}
-
-function getDaysLeftClass(daysLeft) {
-    if (daysLeft === 999999) return 'days-permanent';
-    if (daysLeft <= 0) return 'days-red';
-    if (daysLeft <= 3) return 'days-yellow';
-    return 'days-green';
-}
+function getDaysLeftClass(daysLeft) { if (daysLeft === 999999) return 'days-permanent'; if (daysLeft <= 0) return 'days-red'; if (daysLeft <= 3) return 'days-yellow'; return 'days-green'; }
+function getDaysLeftText(daysLeft) { if (daysLeft === 999999) return '♾️ Permanent'; if (daysLeft < 0) return '⏰ Telah habis'; if (daysLeft === 0) return '⚠️ Berakhir hari ini'; return '📅 ' + daysLeft + ' hari'; }
 
 function checkAccountExpiry(user) {
     var daysLeft = calculateRemainingDays(user.expiry_date);
-    return { expired: daysLeft <= 0 && daysLeft !== 999999, daysLeft: daysLeft, expiryDate: user.expiry_date, colorClass: getExpiryColorClass(daysLeft), daysLeftText: getDaysLeftText(daysLeft), daysLeftClass: getDaysLeftClass(daysLeft) };
+    return { expired: daysLeft <= 0 && daysLeft !== 999999, daysLeft: daysLeft, daysLeftText: getDaysLeftText(daysLeft), daysLeftClass: getDaysLeftClass(daysLeft) };
 }
 
 function showExpiredBanner() { document.getElementById('expiredBanner').style.display = 'flex'; document.getElementById('mainApp').style.display = 'none'; document.getElementById('loginScreen').style.display = 'none'; showAlert('Masa aktif akun telah habis!', 'error'); }
@@ -223,74 +162,43 @@ function closeDeleteHistoryModal() { document.getElementById('deleteHistoryModal
 
 async function deleteAllHistory() {
     try {
-        showAlert('Menghapus semua riwayat...', 'info');
+        showAlert('Menghapus semua riwayat...', 'loading');
         var transactions = await callRevanstore('transactions', 'GET');
         if (!transactions || typeof transactions !== 'object') { showAlert('Tidak ada riwayat!', 'warning'); closeDeleteHistoryModal(); return; }
         var deleteCount = 0;
-        for (var key in transactions) {
-            if (transactions[key].operator === currentUser.username) {
-                await callRevanstore('transactions/' + key, 'DELETE');
-                deleteCount++;
-            }
-        }
-        closeDeleteHistoryModal();
-        showAlert('Berhasil menghapus ' + deleteCount + ' riwayat!', 'success');
+        for (var key in transactions) { if (transactions[key].operator === currentUser.username) { await callRevanstore('transactions/' + key, 'DELETE'); deleteCount++; } }
+        closeDeleteHistoryModal(); showAlert('Berhasil menghapus ' + deleteCount + ' riwayat!', 'success');
     } catch (error) { showAlert('Gagal menghapus riwayat!', 'error'); closeDeleteHistoryModal(); }
 }
 
 async function login() {
     var username = sanitize(document.getElementById('username').value.trim());
     var password = document.getElementById('password').value.trim();
-    
     if (!username || !password) { showAlert('Isi username dan password!', 'error'); return; }
     
     var blockData = getBlockData(username);
-    if (blockData.blockedUntil && Date.now() < blockData.blockedUntil) {
-        var remaining = Math.ceil((blockData.blockedUntil - Date.now()) / 60000);
-        showAlert('🔒 Blokir ' + remaining + ' menit! Percobaan: ' + blockData.attempts + 'x', 'error');
-        return;
-    }
+    if (blockData.blockedUntil && Date.now() < blockData.blockedUntil) { var remaining = Math.ceil((blockData.blockedUntil - Date.now()) / 60000); showAlert('🔒 Blokir ' + remaining + ' menit!', 'error'); return; }
     
     showAlert('Sedang login...', 'loading');
-    
     try {
         var result = await callRevanstore('login', 'POST', { username: username, password: password });
-        
-        if (result && result.blocked) {
-            showAlert('🔒 IP/Fingerprint diblokir permanen!', 'error');
-            return;
-        }
-        
+        if (result && result.blocked) { showAlert('🔒 IP/Fingerprint diblokir permanen!', 'error'); return; }
         if (result && result.success) {
             localStorage.removeItem(getBlockKey(username));
             await callRevanstore('login_success', 'POST', {});
-            
             var user = result.data;
             var expiryCheck = checkAccountExpiry(user);
             if (expiryCheck.expired) { showExpiredBanner(); return; }
-            
             currentUser = { id: user.id, username: user.username, password: password, role: user.role || 'Operator', full_name: user.full_name || user.username, expiry_date: user.expiry_date || '' };
             document.getElementById('loginScreen').style.display = 'none';
             document.getElementById('mainApp').style.display = 'block';
-            showHome();
-            showAlert('Login berhasil!', 'success');
-            updateProfileInfo();
+            showHome(); showAlert('Login berhasil!', 'success'); updateProfileInfo();
             localStorage.setItem('bussid_session', JSON.stringify({ username: username, password: password, user_id: user.id, timestamp: Date.now() }));
         } else {
             await callRevanstore('login_failed', 'POST', {});
-            
-            blockData.attempts += 1;
-            var attempts = blockData.attempts;
-            var duration = getBlockDuration(attempts);
-            
-            if (duration > 0) {
-                blockData.blockedUntil = Date.now() + duration * 60 * 1000;
-                saveBlockData(username, blockData);
-                showAlert('🔒 Diblokir ' + duration + ' menit! Percobaan: ' + attempts + 'x', 'error');
-            } else {
-                saveBlockData(username, blockData);
-                showAlert('Username atau password salah!', 'error');
-            }
+            blockData.attempts += 1; var attempts = blockData.attempts; var duration = getBlockDuration(attempts);
+            if (duration > 0) { blockData.blockedUntil = Date.now() + duration * 60 * 1000; saveBlockData(username, blockData); showAlert('🔒 Diblokir ' + duration + ' menit!', 'error'); }
+            else { saveBlockData(username, blockData); showAlert('Username atau password salah!', 'error'); }
         }
     } catch (error) { showAlert('Login gagal!', 'error'); }
 }
@@ -306,40 +214,27 @@ function updateProfileInfo() {
 }
 
 function logout() {
-    currentUser = null;
-    currentAccount = null;
-    currentAuthToken = null;
-    lastDeviceId = null;
-    document.getElementById('mainApp').style.display = 'none';
-    document.getElementById('expiredBanner').style.display = 'none';
+    currentUser = null; currentAccount = null; currentAuthToken = null; lastDeviceId = null;
+    document.getElementById('mainApp').style.display = 'none'; document.getElementById('expiredBanner').style.display = 'none';
     document.getElementById('loginScreen').style.display = 'block';
-    document.getElementById('username').value = '';
-    document.getElementById('password').value = '';
-    localStorage.removeItem('bussid_session');
-    showAlert('Logout berhasil!', 'success');
+    document.getElementById('username').value = ''; document.getElementById('password').value = '';
+    localStorage.removeItem('bussid_session'); showAlert('Logout berhasil!', 'success');
 }
 
 async function loginWithDeviceId(deviceId) {
-    showAlert('Sedang login ke BUSSID...', 'loading');
+    showAlert('Menghubungkan ke BUSSID...', 'loading');
     try {
         var cleanInput = sanitize(deviceId.trim());
-        if (cleanInput.includes('.')) {
-            currentAuthToken = cleanInput;
-        } else {
+        if (cleanInput.includes('.')) { currentAuthToken = cleanInput; }
+        else {
             var cleanDeviceId = cleanInput.toLowerCase().replace(/^android-/, '');
             var loginData = { TitleId: "4AE9", AndroidDeviceId: cleanDeviceId, CreateAccount: true, InfoRequestParameters: { GetUserAccountInfo: true, GetUserVirtualCurrency: true, GetPlayerProfile: true } };
             var data = await callRvnstore('/Client/LoginWithAndroidDeviceID', 'POST', loginData, null);
-            if (data.data && data.data.SessionTicket) {
-                currentAuthToken = data.data.SessionTicket;
-            } else {
-                throw new Error('Device ID tidak valid!');
-            }
+            if (data.data && data.data.SessionTicket) { currentAuthToken = data.data.SessionTicket; }
+            else { throw new Error('Device ID tidak valid!'); }
         }
         var userInfo = await getUserInfoFromPlayFab();
-        if (userInfo) {
-            currentAccount = { deviceId: cleanInput, name: userInfo.name, balance: userInfo.balance, facebook: userInfo.facebook, facebookAvatarUrl: userInfo.facebookAvatarUrl, playFabId: userInfo.playFabId };
-            return true;
-        }
+        if (userInfo) { currentAccount = { deviceId: cleanInput, name: userInfo.name, balance: userInfo.balance, facebook: userInfo.facebook, facebookAvatarUrl: userInfo.facebookAvatarUrl, playFabId: userInfo.playFabId }; return true; }
         throw new Error('Gagal mendapatkan informasi akun');
     } catch (error) { showAlert('Gagal: ' + error.message, 'error'); return false; }
 }
@@ -350,8 +245,7 @@ async function getUserInfoFromPlayFab() {
         var data = { InfoRequestParameters: { GetUserAccountInfo: true, GetUserVirtualCurrency: true, GetPlayerProfile: true } };
         var result = await callRvnstore('/Client/GetPlayerCombinedInfo', 'POST', data, currentAuthToken);
         if (result.data) {
-            var info = result.data.InfoResultPayload;
-            var accountInfo = info.AccountInfo;
+            var info = result.data.InfoResultPayload; var accountInfo = info.AccountInfo;
             var bussidName = (accountInfo && accountInfo.TitleInfo) ? (accountInfo.TitleInfo.DisplayName || 'Unknown Player') : 'Unknown Player';
             var balance = info.UserVirtualCurrency ? (info.UserVirtualCurrency.RP || 0) : 0;
             var playFabId = accountInfo ? (accountInfo.PlayFabId || 'Tidak tersedia') : 'Tidak tersedia';
@@ -369,13 +263,11 @@ async function getUserInfoFromPlayFab() {
 }
 
 function tampilkanFotoProfile(accountInfo) {
-    var fotoContainer = document.getElementById('profilePhoto');
-    if (!fotoContainer) return;
+    var fotoContainer = document.getElementById('profilePhoto'); if (!fotoContainer) return;
     fotoContainer.innerHTML = '';
     var avatarUrl = accountInfo && accountInfo.facebookAvatarUrl ? accountInfo.facebookAvatarUrl : null;
     if (avatarUrl && avatarUrl !== 'null' && avatarUrl !== '') {
-        var img = document.createElement('img');
-        img.src = avatarUrl; img.alt = 'Foto Profile';
+        var img = document.createElement('img'); img.src = avatarUrl; img.alt = 'Foto Profile';
         img.style.width = '100%'; img.style.height = '100%'; img.style.objectFit = 'cover'; img.style.borderRadius = '50%';
         img.onload = function() { fotoContainer.appendChild(img); };
         img.onerror = function() { fotoContainer.innerHTML = '<i class="fas fa-user"></i>'; };
@@ -383,8 +275,7 @@ function tampilkanFotoProfile(accountInfo) {
 }
 
 function tampilkanInfoFacebook(facebookData) {
-    var fbDetails = document.getElementById('facebookDetails');
-    if (!fbDetails) return;
+    var fbDetails = document.getElementById('facebookDetails'); if (!fbDetails) return;
     if (facebookData && facebookData.isConnected && facebookData.id) {
         fbDetails.innerHTML = '<div class="fb-info-row"><span class="fb-info-label"><i class="fab fa-facebook"></i> Status:</span><span class="fb-info-value" style="color:#1877F2;">✅ TERHUBUNG</span></div>' +
             '<div class="fb-info-row"><span class="fb-info-label"><i class="fab fa-facebook"></i> Facebook ID:</span><span class="fb-info-value" style="font-family:monospace;font-size:12px;">' + sanitize(facebookData.id) + '</span></div>' +
@@ -400,21 +291,14 @@ async function searchAccount() {
     var deviceId = document.getElementById('deviceId').value.trim();
     if (!deviceId) { showAlert('Masukkan Device ID atau Token!', 'error'); return; }
     var success = await loginWithDeviceId(deviceId);
-    if (success) {
-        lastDeviceId = deviceId;
-        showAccountInfo(currentAccount);
-        hideAllSections();
-        document.getElementById('accountInfo').style.display = 'block';
-        showAlert('Akun ditemukan!', 'success');
-    }
+    if (success) { lastDeviceId = deviceId; showAccountInfo(currentAccount); hideAllSections(); document.getElementById('accountInfo').style.display = 'block'; showAlert('Akun ditemukan!', 'success'); }
 }
 
 function showAccountInfo(accountInfo) {
     document.getElementById('accountName').textContent = sanitize(accountInfo.name || 'Tidak diketahui');
     document.getElementById('accountBalance').textContent = formatCurrency(accountInfo.balance);
     document.getElementById('playfabId').textContent = accountInfo.playFabId || 'Tidak tersedia';
-    tampilkanFotoProfile(accountInfo);
-    tampilkanInfoFacebook(accountInfo.facebook);
+    tampilkanFotoProfile(accountInfo); tampilkanInfoFacebook(accountInfo.facebook);
 }
 
 function refreshAccountInfo() {
@@ -422,15 +306,7 @@ function refreshAccountInfo() {
     showAlert('Merefresh...', 'loading');
     setTimeout(async function() {
         var newInfo = await getUserInfoFromPlayFab();
-        if (newInfo) {
-            currentAccount.balance = newInfo.balance;
-            currentAccount.name = newInfo.name;
-            currentAccount.facebook = newInfo.facebook;
-            currentAccount.facebookAvatarUrl = newInfo.facebookAvatarUrl;
-            currentAccount.playFabId = newInfo.playFabId;
-            showAccountInfo(currentAccount);
-            showAlert('Informasi diperbarui!', 'success');
-        }
+        if (newInfo) { currentAccount.balance = newInfo.balance; currentAccount.name = newInfo.name; currentAccount.facebook = newInfo.facebook; currentAccount.facebookAvatarUrl = newInfo.facebookAvatarUrl; currentAccount.playFabId = newInfo.playFabId; showAccountInfo(currentAccount); showAlert('Informasi diperbarui!', 'success'); }
     }, 1000);
 }
 
@@ -449,21 +325,14 @@ async function processTopup() {
 }
 
 async function executeTopup(amount) {
-    showAlert('Memproses top up...', 'loading');
-    var oldBalance = currentAccount.balance;
-    var success = await addCashToAccount(amount);
-    if (success) {
-        var transaction = { type: 'topup', deviceId: currentAccount.deviceId, accountName: currentAccount.name, amount: amount, oldBalance: oldBalance, newBalance: currentAccount.balance, operator: currentUser.username, timestamp: Date.now(), status: 'success' };
-        await callRevanstore('transactions', 'POST', transaction);
-        showReceipt(transaction);
-        showAlert('Top up berhasil!', 'success');
-    } else { showAlert('Top up gagal!', 'error'); }
+    showAlert('Memproses top up...', 'loading'); var oldBalance = currentAccount.balance; var success = await addCashToAccount(amount);
+    if (success) { var transaction = { type: 'topup', deviceId: currentAccount.deviceId, accountName: currentAccount.name, amount: amount, oldBalance: oldBalance, newBalance: currentAccount.balance, operator: currentUser.username, timestamp: Date.now(), status: 'success' }; await callRevanstore('transactions', 'POST', transaction); showReceipt(transaction); showAlert('Top up berhasil!', 'success'); }
+    else { showAlert('Top up gagal!', 'error'); }
 }
 
 async function processKuras() {
     if (!currentAccount) { showAlert('Cari akun dulu!', 'error'); return; }
-    var amountInput = document.getElementById('kurasAmount').value.trim();
-    var amount;
+    var amountInput = document.getElementById('kurasAmount').value.trim(); var amount;
     if (amountInput) { amount = parseAmount(amountInput); if (amount <= 0) { showAlert('Masukkan jumlah yang valid!', 'error'); return; } if (amount > currentAccount.balance) { showAlert('Jumlah kuras melebihi saldo!', 'error'); return; } }
     else { amount = currentAccount.balance; }
     if (amount <= 0) { showAlert('Saldo tidak cukup!', 'error'); return; }
@@ -471,33 +340,16 @@ async function processKuras() {
 }
 
 async function executeKuras(amount) {
-    showAlert('Memproses kuras...', 'loading');
-    var oldBalance = currentAccount.balance;
-    var success = await addCashToAccount(-amount);
-    if (success) {
-        var transaction = { type: 'kuras', deviceId: currentAccount.deviceId, accountName: currentAccount.name, amount: amount, oldBalance: oldBalance, newBalance: currentAccount.balance, operator: currentUser.username, timestamp: Date.now(), status: 'success' };
-        await callRevanstore('transactions', 'POST', transaction);
-        showReceipt(transaction);
-        showAlert('Kuras berhasil!', 'success');
-    } else { showAlert('Kuras gagal!', 'error'); }
+    showAlert('Memproses kuras...', 'loading'); var oldBalance = currentAccount.balance; var success = await addCashToAccount(-amount);
+    if (success) { var transaction = { type: 'kuras', deviceId: currentAccount.deviceId, accountName: currentAccount.name, amount: amount, oldBalance: oldBalance, newBalance: currentAccount.balance, operator: currentUser.username, timestamp: Date.now(), status: 'success' }; await callRevanstore('transactions', 'POST', transaction); showReceipt(transaction); showAlert('Kuras berhasil!', 'success'); }
+    else { showAlert('Kuras gagal!', 'error'); }
 }
 
 async function addCashToAccount(amount) {
     if (!currentAuthToken) return false;
     try {
         var result = await callRvnstore('/Client/ExecuteCloudScript', 'POST', { FunctionName: "AddRp", FunctionParameter: { addValue: amount }, RevisionSelection: "Live", GeneratePlayStreamEvent: true }, currentAuthToken);
-        if (result.data) {
-            await new Promise(function(r) { setTimeout(r, 2000); });
-            var newInfo = await getUserInfoFromPlayFab();
-            if (newInfo) {
-                currentAccount.balance = newInfo.balance;
-                currentAccount.facebook = newInfo.facebook;
-                currentAccount.facebookAvatarUrl = newInfo.facebookAvatarUrl;
-                currentAccount.playFabId = newInfo.playFabId;
-                showAccountInfo(currentAccount);
-                return true;
-            }
-        }
+        if (result.data) { await new Promise(function(r) { setTimeout(r, 2000); }); var newInfo = await getUserInfoFromPlayFab(); if (newInfo) { currentAccount.balance = newInfo.balance; currentAccount.facebook = newInfo.facebook; currentAccount.facebookAvatarUrl = newInfo.facebookAvatarUrl; currentAccount.playFabId = newInfo.playFabId; showAccountInfo(currentAccount); return true; } }
         return false;
     } catch (error) { return false; }
 }
@@ -527,8 +379,7 @@ function pilihTopupLagi() { tutupTrxLagiModal(); if (lastDeviceId && currentAcco
 function pilihKurasLagi() { tutupTrxLagiModal(); if (lastDeviceId && currentAccount) showKurasFromAccount(); else { showAlert('Cari akun dulu!', 'warning'); showHome(); } }
 
 async function showHistory() {
-    hideAllSections();
-    document.getElementById('historySection').style.display = 'block';
+    hideAllSections(); document.getElementById('historySection').style.display = 'block';
     try {
         var transactions = await callRevanstore('transactions', 'GET');
         var listDiv = document.getElementById('transactionsList');
@@ -547,7 +398,15 @@ async function showHistory() {
 function showSettings() { hideAllSections(); document.getElementById('settingsSection').style.display = 'block'; updateProfileInfo(); }
 function showConfirm(title, message, action, data) { document.getElementById('confirmTitle').innerHTML = '<i class="fas fa-exclamation-triangle"></i> ' + sanitize(title); document.getElementById('confirmMessage').innerHTML = sanitize(message); pendingAction = action; pendingData = data; document.getElementById('confirmModal').classList.add('active'); }
 function cancelConfirm() { pendingAction = null; pendingData = null; document.getElementById('confirmModal').classList.remove('active'); }
-async function confirmAction() { if (!pendingAction || !pendingData) return; document.getElementById('confirmModal').classList.remove('active'); if (pendingAction === 'topup') await executeTopup(pendingData.amount); else if (pendingAction === 'kuras') await executeKuras(pendingData.amount); else if (pendingAction === 'changename') await executeChangeName(pendingData); pendingAction = null; pendingData = null; }
+
+async function confirmAction() {
+    if (!pendingAction || !pendingData) return;
+    document.getElementById('confirmModal').classList.remove('active');
+    if (pendingAction === 'topup') await executeTopup(pendingData.amount);
+    else if (pendingAction === 'kuras') await executeKuras(pendingData.amount);
+    else if (pendingAction === 'changename') await executeChangeName(pendingData);
+    pendingAction = null; pendingData = null;
+}
 
 async function checkNameAvailability() { var d = document.getElementById('nameAvailability'); d.innerHTML = '<div class="availability-checking"><i class="fas fa-spinner fa-spin"></i> Mengecek...</div>'; d.style.display = 'block'; setTimeout(function() { d.innerHTML = '<div class="availability-success"><i class="fas fa-check-circle"></i> Tersedia!</div>'; }, 1000); }
 
@@ -563,48 +422,32 @@ async function executeChangeName(newName) {
     try {
         var result = await callRvnstore('/Client/UpdateUserTitleDisplayName', 'POST', { DisplayName: newName }, currentAuthToken);
         if (result.data && result.data.DisplayName) {
-            var oldName = currentAccount.name;
-            currentAccount.name = newName;
+            var oldName = currentAccount.name; currentAccount.name = newName;
             document.getElementById('accountName').textContent = newName;
             await callRevanstore('transactions', 'POST', { type: 'gantinama', accountName: currentAccount.name, oldName: oldName, newName: newName, operator: currentUser.username, timestamp: Date.now(), status: 'success' });
             hideAllSections();
-            document.getElementById('receiptContent').innerHTML =
-                '<div class="receipt-content"><div class="receipt-header"><h3><i class="fas fa-user-edit"></i> GANTI NAMA BERHASIL</h3></div>' +
-                '<div class="receipt-details"><div class="receipt-row"><span>Nama Sebelum:</span><span><strong>' + sanitize(oldName) + '</strong></span></div><div class="receipt-row"><span>Nama Baru:</span><span><strong style="color:#0ea5e9;">' + sanitize(newName) + '</strong></span></div><div class="receipt-row"><span>Tanggal:</span><span>' + new Date().toLocaleString('id-ID') + '</span></div><div class="receipt-row"><span>Status:</span><span><strong style="color:#00cc88;">BERHASIL</strong></span></div></div></div>' +
-                '<button class="btn btn-primary btn-block" onclick="backToAccount()" style="margin-top:20px;">KEMBALI</button>';
-            document.getElementById('receiptSection').style.display = 'block';
-            showAlert('Nama berhasil diganti!', 'success');
+            document.getElementById('receiptContent').innerHTML = '<div class="receipt-content"><div class="receipt-header"><h3><i class="fas fa-user-edit"></i> GANTI NAMA BERHASIL</h3></div><div class="receipt-details"><div class="receipt-row"><span>Nama Sebelum:</span><span><strong>' + sanitize(oldName) + '</strong></span></div><div class="receipt-row"><span>Nama Baru:</span><span><strong style="color:#0ea5e9;">' + sanitize(newName) + '</strong></span></div><div class="receipt-row"><span>Tanggal:</span><span>' + new Date().toLocaleString('id-ID') + '</span></div><div class="receipt-row"><span>Status:</span><span><strong style="color:#00cc88;">BERHASIL</strong></span></div></div></div><button class="btn btn-primary btn-block" onclick="backToAccount()" style="margin-top:20px;">KEMBALI</button>';
+            document.getElementById('receiptSection').style.display = 'block'; showAlert('Nama berhasil diganti!', 'success');
         } else { showAlert('Gagal mengubah nama!', 'error'); }
     } catch (error) { showAlert('Gagal mengubah nama!', 'error'); }
 }
 
-function showNameChangeModal(message, type) {
-    type = type || 'info';
-    var modal = document.getElementById('nameChangeModal'), msg = document.getElementById('nameChangeMessage');
-    var icons = { success: 'fa-check-circle', error: 'fa-exclamation-circle', warning: 'fa-exclamation-triangle', info: 'fa-info-circle' };
-    msg.innerHTML = '<i class="fas ' + icons[type] + '"></i> ' + sanitize(message);
-    modal.classList.add('active');
-}
+function showNameChangeModal(message, type) { type = type || 'info'; var modal = document.getElementById('nameChangeModal'), msg = document.getElementById('nameChangeMessage'); var icons = { success: 'fa-check-circle', error: 'fa-exclamation-circle', warning: 'fa-exclamation-triangle', info: 'fa-info-circle' }; msg.innerHTML = '<i class="fas ' + icons[type] + '"></i> ' + sanitize(message); modal.classList.add('active'); }
 function closeNameChangeModal() { document.getElementById('nameChangeModal').classList.remove('active'); }
 
 function setupQuickAmounts() { var q = document.querySelector('.quick-amounts'); if (q) q.innerHTML = '<button class="btn-quick" onclick="setAmount(\'2M\')">2M</button><button class="btn-quick" onclick="setAmount(\'1M\')">1M</button><button class="btn-quick" onclick="setAmount(\'500JT\')">500JT</button><button class="btn-quick" onclick="setAmount(\'100JT\')">100JT</button><button class="btn-quick" onclick="setAmount(\'50JT\')">50JT</button>'; }
+
 function setupEventListeners() {
-    document.getElementById('username')?.addEventListener('keypress', function(e) { if (e.key === 'Enter') document.getElementById('password').focus(); });
-    document.getElementById('password')?.addEventListener('keypress', function(e) { if (e.key === 'Enter') login(); });
-    document.getElementById('topupAmount')?.addEventListener('keypress', function(e) { if (e.key === 'Enter') processTopup(); });
-    document.getElementById('deviceId')?.addEventListener('keypress', function(e) { if (e.key === 'Enter') searchAccount(); });
+    var userEl = document.getElementById('username'); if (userEl) userEl.addEventListener('keypress', function(e) { if (e.key === 'Enter') document.getElementById('password').focus(); });
+    var passEl = document.getElementById('password'); if (passEl) passEl.addEventListener('keypress', function(e) { if (e.key === 'Enter') login(); });
+    var topEl = document.getElementById('topupAmount'); if (topEl) topEl.addEventListener('keypress', function(e) { if (e.key === 'Enter') processTopup(); });
+    var devEl = document.getElementById('deviceId'); if (devEl) devEl.addEventListener('keypress', function(e) { if (e.key === 'Enter') searchAccount(); });
 }
 
 document.addEventListener('DOMContentLoaded', async function() {
     setupEventListeners(); setupQuickAmounts();
-    
     document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && e.key === 'I') || (e.ctrlKey && e.key === 'U')) {
-            e.preventDefault();
-            return false;
-        }
-    });
+    document.addEventListener('keydown', function(e) { if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && e.key === 'I') || (e.ctrlKey && e.key === 'U')) { e.preventDefault(); return false; } });
     
     var saved = localStorage.getItem('bussid_session');
     if (saved) {
@@ -613,14 +456,12 @@ document.addEventListener('DOMContentLoaded', async function() {
             if (age > 7 * 24 * 60 * 60 * 1000) { localStorage.removeItem('bussid_session'); return; }
             var result = await callRevanstore('login', 'POST', { username: session.username, password: session.password });
             if (result && result.success) {
-                var user = result.data;
-                var expiryCheck = checkAccountExpiry(user);
+                var user = result.data; var expiryCheck = checkAccountExpiry(user);
                 if (expiryCheck.expired) { showExpiredBanner(); return; }
                 currentUser = { id: user.id, username: user.username, password: session.password, role: user.role || 'Operator', full_name: user.full_name || user.username, expiry_date: user.expiry_date || '' };
                 document.getElementById('loginScreen').style.display = 'none';
                 document.getElementById('mainApp').style.display = 'block';
-                showHome(); updateProfileInfo();
-                showAlert('Selamat datang kembali!', 'success');
+                showHome(); updateProfileInfo(); showAlert('Selamat datang kembali!', 'success');
             } else { localStorage.removeItem('bussid_session'); }
         } catch(e) { localStorage.removeItem('bussid_session'); }
     }
