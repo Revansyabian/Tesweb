@@ -85,9 +85,7 @@ function showLoading(message) {
 
 function hideLoading() {
     var overlay = document.getElementById('loadingOverlay');
-    if (overlay) {
-        overlay.style.display = 'none';
-    }
+    if (overlay) overlay.style.display = 'none';
 }
 
 function formatCurrency(amount) { if (!amount && amount !== 0) return 'Rp 0'; return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(Math.abs(amount)); }
@@ -365,16 +363,39 @@ function showReceipt(trx) {
     html += '<div class="receipt-row"><span>Tanggal:</span><span>' + new Date(trx.timestamp).toLocaleString('id-ID') + '</span></div>';
     html += '<div class="receipt-row"><span>Status:</span><span style="color:#10b981;">BERHASIL</span></div></div></div>';
     html += '<div style="display:flex;gap:8px;margin-top:20px;">';
-    html += '<a class="btn btn-success" style="flex:1;text-decoration:none;cursor:pointer;z-index:99;" onclick="window._topupLagi()">TOP UP LAGI</a>';
-    html += '<a class="btn btn-warning" style="flex:1;text-decoration:none;cursor:pointer;z-index:99;" onclick="window._kurasLagi()">KURAS</a>';
-    html += '<a class="btn btn-primary" style="flex:1;text-decoration:none;cursor:pointer;z-index:99;" onclick="window._goHome()">HOME</a>';
+    html += '<button class="btn btn-primary" onclick="window._showTrxModal()" style="flex:1;">TRX LAGI</button>';
+    html += '<button class="btn btn-secondary" onclick="window._goHome()" style="flex:1;">HOME</button>';
     html += '</div>';
     document.getElementById('receiptContent').innerHTML = html;
     document.getElementById('receiptSection').style.display = 'block';
 }
 
-window._topupLagi = function() { showTopupFromAccount(); };
-window._kurasLagi = function() { showKurasFromAccount(); };
+window._showTrxModal = function() {
+    var modal = document.getElementById('trxLagiModal');
+    if (modal) {
+        modal.style.display = 'flex';
+        modal.style.opacity = '1';
+        modal.style.visibility = 'visible';
+    }
+};
+
+window._tutupTrxModal = function() {
+    var modal = document.getElementById('trxLagiModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+};
+
+window._pilihTopup = function() {
+    window._tutupTrxModal();
+    showTopupFromAccount();
+};
+
+window._pilihKuras = function() {
+    window._tutupTrxModal();
+    showKurasFromAccount();
+};
+
 window._goHome = function() { showHome(); };
 
 function backToHome() { showHome(); }
