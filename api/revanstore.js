@@ -6,17 +6,12 @@ const ADMIN_KEY = process.env.ADMIN_KEY;
 if (!admin.apps.length) {
   const key = process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n');
   admin.initializeApp({
-    credential: admin.credential.cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: key
-    }),
+    credential: admin.credential.cert({ projectId: process.env.FIREBASE_PROJECT_ID, clientEmail: process.env.FIREBASE_CLIENT_EMAIL, privateKey: key }),
     databaseURL: process.env.FIREBASE_DATABASE_URL
   });
 }
 
 const db = admin.database();
-
 const rateLimitMap = new Map();
 const RATE_LIMIT_MAX = 20;
 const RATE_LIMIT_WINDOW = 60000;
@@ -48,8 +43,7 @@ async function decryptData(raw) {
   if (raw.data) {
     try {
       const dec = CryptoJS.AES.decrypt(raw.data, ADMIN_KEY).toString(CryptoJS.enc.Utf8);
-      const decData = JSON.parse(dec);
-      return { ...raw, ...decData };
+      return { ...raw, ...JSON.parse(dec) };
     } catch(e) { return raw; }
   }
   return raw;
@@ -58,11 +52,10 @@ async function decryptData(raw) {
 async function isIPBlocked(ip) {
   const snap = await db.ref('blocked_ips/' + ip.replace(/\./g, '_')).once('value');
   const raw = snap.val();
-  if (raw && raw.data) {
+  if (raw?.data) {
     try {
       const dec = CryptoJS.AES.decrypt(raw.data, ADMIN_KEY).toString(CryptoJS.enc.Utf8);
-      const data = JSON.parse(dec);
-      if (data && data.blocked) return true;
+      if (JSON.parse(dec)?.blocked) return true;
     } catch(e) {}
   }
   return false;
@@ -71,18 +64,17 @@ async function isIPBlocked(ip) {
 async function isFPBlocked(fp) {
   const snap = await db.ref('blocked_fp/' + fp).once('value');
   const raw = snap.val();
-  if (raw && raw.data) {
+  if (raw?.data) {
     try {
       const dec = CryptoJS.AES.decrypt(raw.data, ADMIN_KEY).toString(CryptoJS.enc.Utf8);
-      const data = JSON.parse(dec);
-      if (data && data.blocked) return true;
+      if (JSON.parse(dec)?.blocked) return true;
     } catch(e) {}
   }
   return false;
 }
 
 async function blockIP(ip) {
-  const enc = CryptoJS.AES.encrypt(JSON.stringify({ ip: ip, blocked: true, blocked_at: new Date().toISOString() }), ADMIN_KEY).toString();
+  const enc = CryptoJS.AES.encrypt(JSON.stringify({ ip, blocked: true, blocked_at: new Date().toISOString() }), ADMIN_KEY).toString();
   await db.ref('blocked_ips/' + ip.replace(/\./g, '_')).set({ data: enc });
 }
 
@@ -99,10 +91,9 @@ async function trackLoginAttempt(ip, fp) {
   const now = Date.now();
   let attempts = 0, lastAttempt = 0;
   
-  if (raw && raw.data) {
+  if (raw?.data) {
     try {
-      const dec = CryptoJS.AES.decrypt(raw.data, ADMIN_KEY).toString(CryptoJS.enc.Utf8);
-      const data = JSON.parse(dec);
+      const data = JSON.parse(CryptoJS.AES.decrypt(raw.data, ADMIN_KEY).toString(CryptoJS.enc.Utf8));
       attempts = data.count || 0;
       lastAttempt = data.last_attempt || 0;
       
@@ -122,24 +113,19 @@ async function trackLoginAttempt(ip, fp) {
 }
 
 async function resetLoginAttempt(ip, fp) {
-  const key = ip.replace(/\./g, '_') + '_' + (fp || 'nofp');
-  await db.ref('login_attempts/' + key).remove();
+  await db.ref('login_attempts/' + ip.replace(/\./g, '_') + '_' + (fp || 'nofp')).remove();
 }
 
 async function cleanupOldAttempts() {
   const snap = await db.ref('login_attempts').once('value');
   const data = snap.val();
   if (!data) return;
-  
   const now = Date.now();
   for (const key in data) {
-    if (data[key] && data[key].data) {
+    if (data[key]?.data) {
       try {
-        const dec = CryptoJS.AES.decrypt(data[key].data, ADMIN_KEY).toString(CryptoJS.enc.Utf8);
-        const parsed = JSON.parse(dec);
-        if (now - (parsed.last_attempt || 0) > 86400000) {
-          await db.ref('login_attempts/' + key).remove();
-        }
+        const parsed = JSON.parse(CryptoJS.AES.decrypt(data[key].data, ADMIN_KEY).toString(CryptoJS.enc.Utf8));
+        if (now - (parsed.last_attempt || 0) > 86400000) await db.ref('login_attempts/' + key).remove();
       } catch(e) {}
     }
   }
@@ -149,11 +135,8 @@ export default async function handler(req, res) {
   const allowedOrigins = (process.env.ALLOWED_ORIGINS || '*').split(',');
   const origin = req.headers.origin;
   
-  if (origin && allowedOrigins.includes(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-  } else if (allowedOrigins.includes('*')) {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-  }
+  if (origin && allowedOrigins.includes(origin)) res.setHeader('Access-Control-Allow-Origin', origin);
+  else if (allowedOrigins.includes('*')) res.setHeader('Access-Control-Allow-Origin', '*');
   
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-API-Key, X-Fingerprint');
@@ -165,27 +148,18 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   
   const apiKey = req.headers['x-api-key'];
-  if (!apiKey || apiKey !== process.env.API_KEY) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
+  if (!apiKey || apiKey !== process.env.API_KEY) return res.status(401).json({ error: 'Unauthorized' });
   
   const ip = req.headers['x-forwarded-for'] || 'unknown';
   const fp = req.headers['x-fingerprint'] || '';
   
-  if (!checkRateLimit(ip)) {
-    return res.status(429).json({ error: 'Terlalu banyak request. Coba lagi nanti.' });
-  }
+  if (!checkRateLimit(ip)) return res.status(429).json({ error: 'Terlalu banyak request. Coba lagi nanti.' });
 
   try {
     const { path, method, data } = req.body;
     
-    if (!checkRequestDelay(ip, path)) {
-      return res.status(429).json({ error: 'Request terlalu cepat. Harap tunggu.' });
-    }
-    
-    if (!path || typeof path !== 'string' || path.length > 200) {
-      return res.status(400).json({ error: 'Invalid path' });
-    }
+    if (!checkRequestDelay(ip, path)) return res.status(429).json({ error: 'Request terlalu cepat. Harap tunggu.' });
+    if (!path || typeof path !== 'string' || path.length > 200) return res.status(400).json({ error: 'Invalid path' });
     
     const ref = db.ref(path);
 
@@ -196,20 +170,13 @@ export default async function handler(req, res) {
     }
 
     if (path === 'login' && method === 'POST') {
-      const ipBlocked = await isIPBlocked(ip);
-      const fpBlocked = fp ? await isFPBlocked(fp) : false;
-      if (ipBlocked || fpBlocked) return res.status(200).json({ blocked: true });
-      
+      if (await isIPBlocked(ip) || (fp && await isFPBlocked(fp))) return res.status(200).json({ blocked: true });
       const snap = await db.ref('users').once('value');
       const users = snap.val();
-      
       for (const key in users) {
         const decryptedUser = await decryptData({ ...users[key], id: key });
         if (decryptedUser.username === data.username && decryptedUser.password === data.password) {
-          return res.status(200).json({
-            success: true,
-            data: { id: key, username: decryptedUser.username, role: decryptedUser.role || 'User', full_name: decryptedUser.full_name || '', expiry_date: decryptedUser.expiry_date || '' }
-          });
+          return res.status(200).json({ success: true, data: { id: key, username: decryptedUser.username, role: decryptedUser.role || 'User', full_name: decryptedUser.full_name || '', expiry_date: decryptedUser.expiry_date || '' } });
         }
       }
       return res.status(200).json({ success: false });
@@ -219,29 +186,12 @@ export default async function handler(req, res) {
       const attempts = await trackLoginAttempt(ip, fp);
       await new Promise(r => setTimeout(r, attempts * 500));
       if (attempts >= 5) { await blockIP(ip); if (fp) await blockFP(fp); return res.status(200).json({ blocked: true }); }
-      return res.status(200).json({ attempts: attempts });
+      return res.status(200).json({ attempts });
     }
 
-    if (path === 'login_success' && method === 'POST') {
-      await resetLoginAttempt(ip, fp);
-      return res.status(200).json({ success: true });
-    }
-
-    if (method === 'GET') {
-      const snap = await ref.once('value');
-      const raw = snap.val();
-      const result = {};
-      if (raw) {
-        for (const key in raw) {
-          const decrypted = await decryptData({ ...raw[key], id: key });
-          result[key] = decrypted;
-          result[key].id = key;
-        }
-      }
-      return res.status(200).json(result);
-    }
-
-    if (method === 'POST') { const newRef = ref.push(); await newRef.set(data); return res.status(200).json({ success: true, id: newRef.key }); }
+    if (path === 'login_success' && method === 'POST') { await resetLoginAttempt(ip, fp); return res.status(200).json({ success: true }); }
+    if (method === 'GET') { const snap = await ref.once('value'); const raw = snap.val(); const result = {}; if (raw) for (const key in raw) { const d = await decryptData({ ...raw[key], id: key }); result[key] = d; result[key].id = key; } return res.status(200).json(result); }
+    if (method === 'POST') { const r = ref.push(); await r.set(data); return res.status(200).json({ success: true, id: r.key }); }
     if (method === 'PUT') { await ref.set(data); return res.status(200).json({ success: true }); }
     if (method === 'PATCH') { await ref.update(data); return res.status(200).json({ success: true }); }
     if (method === 'DELETE') { await ref.remove(); return res.status(200).json({ success: true }); }
