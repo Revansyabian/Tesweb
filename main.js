@@ -129,28 +129,50 @@ function backToAccount() { if (currentAccount) { hideAllSections(); document.get
 
 function parseDate(dateStr) {
     if (!dateStr) return null;
-    var parts = dateStr.split('/'); if (parts.length !== 3) return null;
-    var month = parseInt(parts[0], 10) - 1, day = parseInt(parts[1], 10), year = parseInt(parts[2], 10);
+    var parts = dateStr.split('/');
+    if (parts.length !== 3) return null;
+    var month = parseInt(parts[0], 10) - 1;
+    var day = parseInt(parts[1], 10);
+    var year = parseInt(parts[2], 10);
     if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
-    var date = new Date(year, month, day);
-    if (date.getMonth() !== month || date.getDate() !== day) return null;
-    return date;
+    return new Date(year, month, day);
 }
 
 function calculateRemainingDays(expiryDate) {
     if (!expiryDate) return -999;
     if (expiryDate.includes('9999')) return 999999;
-    var expiry = parseDate(expiryDate); if (!expiry) return -999;
-    var now = new Date(); now.setHours(0, 0, 0, 0);
+    var expiry = parseDate(expiryDate);
+    if (!expiry) return -999;
+    var now = new Date();
+    now.setHours(0, 0, 0, 0);
     return Math.ceil((expiry - now) / (1000 * 60 * 60 * 24));
 }
 
-function getDaysLeftClass(daysLeft) { if (daysLeft === 999999) return 'days-permanent'; if (daysLeft <= 0) return 'days-red'; if (daysLeft <= 3) return 'days-yellow'; return 'days-green'; }
-function getDaysLeftText(daysLeft) { if (daysLeft === 999999) return '♾️ Permanent'; if (daysLeft < 0) return '⏰ Telah habis'; if (daysLeft === 0) return '⚠️ Berakhir hari ini'; return '📅 ' + daysLeft + ' hari'; }
+function getDaysLeftClass(daysLeft) {
+    if (daysLeft === 999999) return 'days-permanent';
+    if (daysLeft <= 0) return 'days-red';
+    if (daysLeft <= 3) return 'days-yellow';
+    return 'days-green';
+}
+
+function getDaysLeftText(daysLeft) {
+    if (daysLeft === 999999) return '♾️ Permanent';
+    if (daysLeft < 0) return '⏰ Telah habis ' + Math.abs(daysLeft) + ' hari';
+    if (daysLeft === 0) return '⚠️ Berakhir hari ini';
+    if (daysLeft === 1) return '📅 1 hari tersisa';
+    return '📅 ' + daysLeft + ' hari tersisa';
+}
 
 function checkAccountExpiry(user) {
+    if (!user || !user.expiry_date) return { expired: false, daysLeft: 999999, daysLeftText: '♾️ Permanent', daysLeftClass: 'days-permanent' };
     var daysLeft = calculateRemainingDays(user.expiry_date);
-    return { expired: daysLeft <= 0 && daysLeft !== 999999, daysLeft: daysLeft, daysLeftText: getDaysLeftText(daysLeft), daysLeftClass: getDaysLeftClass(daysLeft) };
+    var expired = daysLeft <= 0 && daysLeft !== 999999;
+    return {
+        expired: expired,
+        daysLeft: daysLeft,
+        daysLeftText: getDaysLeftText(daysLeft),
+        daysLeftClass: getDaysLeftClass(daysLeft)
+    };
 }
 
 function showExpiredBanner() { document.getElementById('expiredBanner').style.display = 'flex'; document.getElementById('mainApp').style.display = 'none'; document.getElementById('loginScreen').style.display = 'none'; showAlert('Masa aktif akun telah habis!', 'error'); }
@@ -166,7 +188,7 @@ async function deleteAllHistory() {
         var transactions = await callRevanstore('transactions', 'GET');
         if (!transactions || typeof transactions !== 'object') { showAlert('Tidak ada riwayat!', 'warning'); closeDeleteHistoryModal(); return; }
         var deleteCount = 0;
-        for (var key in transactions) { if (transactions[key].operator === currentUser.username) { await callRevanstore('transactions/' + key, 'DELETE'); deleteCount++; } }
+        for (var key in transactions) { if (transactions[key] && transactions[key].operator === currentUser.username) { await callRevanstore('transactions/' + key, 'DELETE'); deleteCount++; } }
         closeDeleteHistoryModal(); showAlert('Berhasil menghapus ' + deleteCount + ' riwayat!', 'success');
     } catch (error) { showAlert('Gagal menghapus riwayat!', 'error'); closeDeleteHistoryModal(); }
 }
@@ -177,12 +199,12 @@ async function login() {
     if (!username || !password) { showAlert('Isi username dan password!', 'error'); return; }
     
     var blockData = getBlockData(username);
-    if (blockData.blockedUntil && Date.now() < blockData.blockedUntil) { var remaining = Math.ceil((blockData.blockedUntil - Date.now()) / 60000); showAlert('🔒 Blokir ' + remaining + ' menit!', 'error'); return; }
+    if (blockData.blockedUntil && Date.now() < blockData.blockedUntil) { var remaining = Math.ceil((blockData.blockedUntil - Date.now()) / 60000); showAlert('Blokir ' + remaining + ' menit!', 'error'); return; }
     
     showAlert('Sedang login...', 'loading');
     try {
         var result = await callRevanstore('login', 'POST', { username: username, password: password });
-        if (result && result.blocked) { showAlert('🔒 IP/Fingerprint diblokir permanen!', 'error'); return; }
+        if (result && result.blocked) { showAlert('IP/Fingerprint diblokir permanen!', 'error'); return; }
         if (result && result.success) {
             localStorage.removeItem(getBlockKey(username));
             await callRevanstore('login_success', 'POST', {});
@@ -197,7 +219,7 @@ async function login() {
         } else {
             await callRevanstore('login_failed', 'POST', {});
             blockData.attempts += 1; var attempts = blockData.attempts; var duration = getBlockDuration(attempts);
-            if (duration > 0) { blockData.blockedUntil = Date.now() + duration * 60 * 1000; saveBlockData(username, blockData); showAlert('🔒 Diblokir ' + duration + ' menit!', 'error'); }
+            if (duration > 0) { blockData.blockedUntil = Date.now() + duration * 60 * 1000; saveBlockData(username, blockData); showAlert('Diblokir ' + duration + ' menit!', 'error'); }
             else { saveBlockData(username, blockData); showAlert('Username atau password salah!', 'error'); }
         }
     } catch (error) { showAlert('Login gagal!', 'error'); }
@@ -209,7 +231,7 @@ function updateProfileInfo() {
     document.getElementById('profileUsername').textContent = currentUser.username;
     document.getElementById('profileName').textContent = currentUser.full_name || currentUser.username;
     document.getElementById('profileRole').textContent = currentUser.role || 'Operator';
-    var expiryDateFormatted = currentUser.expiry_date ? currentUser.expiry_date : 'Tidak ada masa aktif';
+    var expiryDateFormatted = currentUser.expiry_date ? currentUser.expiry_date : 'Permanent';
     document.getElementById('profileExpiry').innerHTML = expiryDateFormatted + ' <span class="expiry-days-left ' + expiryCheck.daysLeftClass + '">' + expiryCheck.daysLeftText + '</span>';
 }
 
