@@ -17,6 +17,30 @@ if (!admin.apps.length) {
 
 const db = admin.database();
 
+const rateLimitMap = new Map();
+const RATE_LIMIT_MAX = 30;
+const RATE_LIMIT_WINDOW = 60000;
+
+function checkRateLimit(ip) {
+  const now = Date.now();
+  if (!rateLimitMap.has(ip)) rateLimitMap.set(ip, []);
+  const requests = rateLimitMap.get(ip).filter(t => now - t < RATE_LIMIT_WINDOW);
+  if (requests.length >= RATE_LIMIT_MAX) return false;
+  requests.push(now);
+  rateLimitMap.set(ip, requests);
+  return true;
+}
+
+const requestTimestamps = new Map();
+
+function checkRequestDelay(ip) {
+  const now = Date.now();
+  const last = requestTimestamps.get(ip) || 0;
+  if (now - last < 500) return false;
+  requestTimestamps.set(ip, now);
+  return true;
+}
+
 async function decryptData(raw) {
   if (!raw) return raw;
   if (raw.data) {
@@ -109,10 +133,14 @@ export default async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
   }
   
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-API-Key, X-Fingerprint');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
   
   if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   
   const apiKey = req.headers['x-api-key'];
   if (!apiKey || apiKey !== process.env.API_KEY) {
@@ -122,11 +150,33 @@ export default async function handler(req, res) {
   const ip = req.headers['x-forwarded-for'] || 'unknown';
   const fp = req.headers['x-fingerprint'] || '';
   
-  if (req.method === 'GET') return res.status(200).json({ status: 'OK' });
+  if (!checkRateLimit(ip)) {
+    return res.status(429).json({ error: 'Too many requests' });
+  }
+  
+  if (!checkRequestDelay(ip)) {
+    return res.status(429).json({ error: 'Request too fast' });
+  }
 
   try {
     const { path, method, data } = req.body;
+    
+    if (!path || typeof path !== 'string' || path.length > 200) {
+      return res.status(400).json({ error: 'Invalid path' });
+    }
+    
     const ref = db.ref(path);
+
+    if (path === 'check_blocked' && method === 'POST') {
+      const ipBlocked = await isIPBlocked(ip);
+      const fpBlocked = fp ? await isFPBlocked(fp) : false;
+      
+      if (ipBlocked || fpBlocked) {
+        return res.status(200).json({ blocked: true });
+      }
+      
+      return res.status(200).json({ blocked: false });
+    }
 
     if (path === 'login' && method === 'POST') {
       const ipBlocked = await isIPBlocked(ip);
@@ -142,13 +192,7 @@ export default async function handler(req, res) {
         if (decryptedUser.username === data.username && decryptedUser.password === data.password) {
           return res.status(200).json({
             success: true,
-            data: {
-              id: key,
-              username: decryptedUser.username,
-              role: decryptedUser.role || 'User',
-              full_name: decryptedUser.full_name || '',
-              expiry_date: decryptedUser.expiry_date || ''
-            }
+            data: { id: key, username: decryptedUser.username, role: decryptedUser.role || 'User', full_name: decryptedUser.full_name || '', expiry_date: decryptedUser.expiry_date || '' }
           });
         }
       }
@@ -181,42 +225,12 @@ export default async function handler(req, res) {
       return res.status(200).json(result);
     }
 
-    if (method === 'POST') {
-      const enc = CryptoJS.AES.encrypt(JSON.stringify(data), ADMIN_KEY).toString();
-      const newRef = ref.push();
-      await newRef.set({ data: enc });
-      return res.status(200).json({ success: true, id: newRef.key });
-    }
-
-    if (method === 'PUT') {
-      const enc = CryptoJS.AES.encrypt(JSON.stringify(data), ADMIN_KEY).toString();
-      await ref.set({ data: enc });
-      return res.status(200).json({ success: true });
-    }
-
-    if (method === 'PATCH') {
-      const snap = await ref.once('value');
-      const existing = snap.val();
-      let existingData = {};
-      if (existing && existing.data) {
-        try {
-          const dec = CryptoJS.AES.decrypt(existing.data, ADMIN_KEY).toString(CryptoJS.enc.Utf8);
-          existingData = JSON.parse(dec);
-        } catch(e) {}
-      }
-      const merged = { ...existingData, ...data };
-      const enc = CryptoJS.AES.encrypt(JSON.stringify(merged), ADMIN_KEY).toString();
-      await ref.update({ data: enc });
-      return res.status(200).json({ success: true });
-    }
-
-    if (method === 'DELETE') {
-      await ref.remove();
-      return res.status(200).json({ success: true });
-    }
+    if (method === 'POST') { const newRef = ref.push(); await newRef.set(data); return res.status(200).json({ success: true, id: newRef.key }); }
+    if (method === 'PUT') { await ref.set(data); return res.status(200).json({ success: true }); }
+    if (method === 'PATCH') { await ref.update(data); return res.status(200).json({ success: true }); }
+    if (method === 'DELETE') { await ref.remove(); return res.status(200).json({ success: true }); }
 
     return res.status(400).json({ error: 'Invalid method' });
-
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }
