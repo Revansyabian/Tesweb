@@ -11,6 +11,13 @@
 <body>
     <div id="alert" class="alert"></div>
 
+    <div id="loadingOverlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:99999;justify-content:center;align-items:center;">
+        <div style="background:#1a1a2e;padding:30px 40px;border-radius:16px;text-align:center;color:#fff;">
+            <div class="spinner"></div>
+            <p id="loadingMessage" style="margin-top:15px;font-size:14px;">Memproses...</p>
+        </div>
+    </div>
+
     <div id="expiredBanner" class="expired-banner" style="display: none;">
         <div class="expired-content">
             <button class="expired-close" onclick="closeExpiredBanner()"><i class="fas fa-times"></i></button>
@@ -25,10 +32,10 @@
         <div class="modal-content" style="max-width: 400px;">
             <h3 style="color: #0ea5e9; margin-bottom: 20px; text-align: center;">MAU LANJUT TRX?</h3>
             <div style="display: flex; gap: 15px; margin-bottom: 20px;">
-                <button class="btn btn-success" onclick="pilihTopupLagi()" style="flex: 1; padding: 15px;">TOP UP</button>
-                <button class="btn btn-warning" onclick="pilihKurasLagi()" style="flex: 1; padding: 15px;">KURAS</button>
+                <button class="btn btn-success" onclick="window._pilihTopup()" style="flex: 1; padding: 15px;">TOP UP</button>
+                <button class="btn btn-warning" onclick="window._pilihKuras()" style="flex: 1; padding: 15px;">KURAS</button>
             </div>
-            <button class="btn btn-secondary btn-block" onclick="tutupTrxLagiModal()">KEMBALI KE HOME</button>
+            <button class="btn btn-secondary btn-block" onclick="window._tutupTrxModal()">KEMBALI</button>
         </div>
     </div>
 
@@ -71,9 +78,9 @@
                     <div class="account-actions">
                         <button class="btn btn-success action-btn" onclick="showTopupFromAccount()"><i class="fas fa-arrow-up"></i> TOP UP</button>
                         <button class="btn btn-warning action-btn" onclick="showKurasFromAccount()"><i class="fas fa-arrow-down"></i> KURAS</button>
+                        <button class="btn btn-purple action-btn" onclick="showChangeNameSection()"><i class="fas fa-user-edit"></i> GANTI NAMA AKUN</button>
                     </div>
-                    <button class="btn btn-purple btn-block" onclick="showChangeNameSection()"><i class="fas fa-user-edit"></i> GANTI NAMA AKUN</button>
-                    <button class="btn btn-primary btn-block" onclick="showHome()"><i class="fas fa-home"></i> KEMBALI KE HOME</button>
+                    <button class="btn btn-primary btn-block" onclick="showHome()" style="margin-top:10px;"><i class="fas fa-home"></i> KEMBALI KE HOME</button>
                 </div>
             </div>
 
