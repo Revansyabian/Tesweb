@@ -13,6 +13,8 @@ var pendingData = null;
 var lastDeviceId = null;
 var fingerprint = '';
 var alertTimeout = null;
+var isBlocked = false;
+var blockedChecked = false;
 
 async function getFingerprint() {
     var fp = '';
@@ -48,9 +50,39 @@ function saveBlockData(username, data) { var key = getBlockKey(username); localS
 function getBlockDuration(attempts) { if (attempts >= 15) return 1440; if (attempts >= 10) return 60; if (attempts >= 5) return 15; return 0; }
 function sanitize(str) { if (!str) return ''; return String(str).replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#x27;'); }
 
+async function checkIfBlocked() {
+    if (blockedChecked) return isBlocked;
+    if (!fingerprint) fingerprint = await getFingerprint();
+    try {
+        var result = await callRevanstore('check_blocked', 'POST', { fingerprint: fingerprint });
+        if (result && result.blocked) {
+            isBlocked = true;
+            localStorage.setItem('bussid_blocked', 'true');
+        } else {
+            isBlocked = false;
+            localStorage.removeItem('bussid_blocked');
+        }
+        blockedChecked = true;
+    } catch(e) {
+        isBlocked = localStorage.getItem('bussid_blocked') === 'true';
+        blockedChecked = true;
+    }
+    return isBlocked;
+}
+
 async function callRevanstore(path, method, data) {
     if (!fingerprint) fingerprint = await getFingerprint();
+    
+    if (isBlocked && path !== 'check_blocked') {
+        throw new Error('Akses ditolak');
+    }
+    
     var res = await fetch(API_REVANSTORE, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY, 'X-Fingerprint': fingerprint }, body: JSON.stringify({ path: path, method: method || 'GET', data: data || null }) });
+    
+    if (res.status === 429) {
+        throw new Error('Terlalu banyak request, coba lagi nanti');
+    }
+    
     var text = await res.text(); if (!text || text === 'null') return null;
     return JSON.parse(text);
 }
@@ -218,17 +250,29 @@ async function deleteAllHistory() {
 }
 
 async function login() {
+    var blocked = await checkIfBlocked();
+    if (blocked) {
+        showAlert('🔒 Akses ditolak!', 'error');
+        return;
+    }
+    
     var username = sanitize(document.getElementById('username').value.trim());
     var password = document.getElementById('password').value.trim();
     if (!username || !password) { showAlert('Isi username dan password!', 'error'); return; }
     
     var blockData = getBlockData(username);
-    if (blockData.blockedUntil && Date.now() < blockData.blockedUntil) { var r = Math.ceil((blockData.blockedUntil - Date.now()) / 60000); showAlert('Blokir ' + r + ' menit!', 'error'); return; }
+    if (blockData.blockedUntil && Date.now() < blockData.blockedUntil) { var r = Math.ceil((blockData.blockedUntil - Date.now()) / 60000); showAlert('🔒 Akses ditolak! Coba lagi nanti.', 'error'); return; }
     
     showLoading('Login...');
     try {
         var result = await callRevanstore('login', 'POST', { username: username, password: password });
-        if (result && result.blocked) { hideLoading(); showAlert('Diblokir permanen!', 'error'); return; }
+        if (result && result.blocked) {
+            isBlocked = true;
+            localStorage.setItem('bussid_blocked', 'true');
+            hideLoading(); 
+            showAlert('🔒 Akses ditolak!', 'error'); 
+            return; 
+        }
         if (result && result.success) {
             localStorage.removeItem(getBlockKey(username));
             await callRevanstore('login_success', 'POST', {});
@@ -244,8 +288,8 @@ async function login() {
             await callRevanstore('login_failed', 'POST', {});
             blockData.attempts += 1; var a = blockData.attempts; var d = getBlockDuration(a);
             hideLoading();
-            if (d > 0) { blockData.blockedUntil = Date.now() + d * 60 * 1000; saveBlockData(username, blockData); showAlert('Blokir ' + d + ' menit!', 'error'); }
-            else { saveBlockData(username, blockData); showAlert('Username/password salah!', 'error'); }
+            if (d > 0) { blockData.blockedUntil = Date.now() + d * 60 * 1000; saveBlockData(username, blockData); showAlert('🔒 Akses ditolak! Coba lagi nanti.', 'error'); }
+            else { saveBlockData(username, blockData); showAlert('Username atau password salah!', 'error'); }
         }
     } catch (error) { hideLoading(); showAlert('Login gagal!', 'error'); }
 }
@@ -268,6 +312,9 @@ function logout() {
 }
 
 async function loginWithDeviceId(deviceId) {
+    var blocked = await checkIfBlocked();
+    if (blocked) { showAlert('🔒 Akses ditolak!', 'error'); return false; }
+    
     showLoading('Menghubungkan ke BUSSID...');
     try {
         var cleanInput = sanitize(deviceId.trim());
@@ -508,7 +555,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 currentUser = { id: user.id, username: user.username, password: session.password, role: user.role || 'Operator', full_name: user.full_name || user.username, expiry_date: user.expiry_date || '' };
                 document.getElementById('loginScreen').style.display = 'none';
                 document.getElementById('mainApp').style.display = 'block';
-                showHome(); updateProfileInfo(); showAlert('Welcome back!', 'success');
+                showHome(); updateProfileInfo(); showAlert('Selamat datang kembali!', 'success');
             } else { localStorage.removeItem('bussid_session'); }
         } catch(e) { localStorage.removeItem('bussid_session'); }
     }
