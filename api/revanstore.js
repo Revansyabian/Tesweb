@@ -33,10 +33,11 @@ function checkRateLimit(ip) {
 
 const requestTimestamps = new Map();
 
-function checkRequestDelay(ip) {
+function checkRequestDelay(ip, path) {
+  if (path === 'login_success' || path === 'login_failed' || path === 'check_blocked') return true;
   const now = Date.now();
   const last = requestTimestamps.get(ip) || 0;
-  if (now - last < 500) return false;
+  if (now - last < 300) return false;
   requestTimestamps.set(ip, now);
   return true;
 }
@@ -103,24 +104,44 @@ async function trackLoginAttempt(ip, fp) {
       const data = JSON.parse(dec);
       attempts = data.count || 0;
       lastAttempt = data.last_attempt || 0;
+      
+      if (now - lastAttempt > 3600000) {
+        await ref.remove();
+        const enc = CryptoJS.AES.encrypt(JSON.stringify({ count: 1, last_attempt: now, fingerprint: fp }), ADMIN_KEY).toString();
+        await ref.set({ data: enc });
+        return 1;
+      }
     } catch(e) {}
-  }
-  
-  if (now - lastAttempt > 3600000) {
-    const enc = CryptoJS.AES.encrypt(JSON.stringify({ count: 1, last_attempt: now, fingerprint: fp }), ADMIN_KEY).toString();
-    await ref.set({ data: enc });
-    return 1;
   }
   
   const newCount = attempts + 1;
   const enc = CryptoJS.AES.encrypt(JSON.stringify({ count: newCount, last_attempt: now, fingerprint: fp }), ADMIN_KEY).toString();
-  await ref.update({ data: enc });
+  await ref.set({ data: enc });
   return newCount;
 }
 
 async function resetLoginAttempt(ip, fp) {
   const key = ip.replace(/\./g, '_') + '_' + (fp || 'nofp');
   await db.ref('login_attempts/' + key).remove();
+}
+
+async function cleanupOldAttempts() {
+  const snap = await db.ref('login_attempts').once('value');
+  const data = snap.val();
+  if (!data) return;
+  
+  const now = Date.now();
+  for (const key in data) {
+    if (data[key] && data[key].data) {
+      try {
+        const dec = CryptoJS.AES.decrypt(data[key].data, ADMIN_KEY).toString(CryptoJS.enc.Utf8);
+        const parsed = JSON.parse(dec);
+        if (now - (parsed.last_attempt || 0) > 86400000) {
+          await db.ref('login_attempts/' + key).remove();
+        }
+      } catch(e) {}
+    }
+  }
 }
 
 export default async function handler(req, res) {
@@ -153,13 +174,13 @@ export default async function handler(req, res) {
   if (!checkRateLimit(ip)) {
     return res.status(429).json({ error: 'Too many requests' });
   }
-  
-  if (!checkRequestDelay(ip)) {
-    return res.status(429).json({ error: 'Request too fast' });
-  }
 
   try {
     const { path, method, data } = req.body;
+    
+    if (!checkRequestDelay(ip, path)) {
+      return res.status(429).json({ error: 'Request too fast' });
+    }
     
     if (!path || typeof path !== 'string' || path.length > 200) {
       return res.status(400).json({ error: 'Invalid path' });
@@ -170,12 +191,7 @@ export default async function handler(req, res) {
     if (path === 'check_blocked' && method === 'POST') {
       const ipBlocked = await isIPBlocked(ip);
       const fpBlocked = fp ? await isFPBlocked(fp) : false;
-      
-      if (ipBlocked || fpBlocked) {
-        return res.status(200).json({ blocked: true });
-      }
-      
-      return res.status(200).json({ blocked: false });
+      return res.status(200).json({ blocked: ipBlocked || fpBlocked });
     }
 
     if (path === 'login' && method === 'POST') {
@@ -188,7 +204,6 @@ export default async function handler(req, res) {
       
       for (const key in users) {
         const decryptedUser = await decryptData({ ...users[key], id: key });
-        
         if (decryptedUser.username === data.username && decryptedUser.password === data.password) {
           return res.status(200).json({
             success: true,
