@@ -17,6 +17,18 @@ if (!admin.apps.length) {
 
 const db = admin.database();
 
+async function decryptData(raw) {
+  if (!raw) return raw;
+  if (raw.data) {
+    try {
+      const dec = CryptoJS.AES.decrypt(raw.data, ADMIN_KEY).toString(CryptoJS.enc.Utf8);
+      const decData = JSON.parse(dec);
+      return { ...raw, ...decData };
+    } catch(e) { return raw; }
+  }
+  return raw;
+}
+
 async function isIPBlocked(ip) {
   const snap = await db.ref('blocked_ips/' + ip.replace(/\./g, '_')).once('value');
   const raw = snap.val();
@@ -125,23 +137,18 @@ export default async function handler(req, res) {
       const users = snap.val();
       
       for (const key in users) {
-        const user = users[key];
-        let username = user.username;
-        let password = user.password;
+        const decryptedUser = await decryptData({ ...users[key], id: key });
         
-        if (user.data) {
-          try {
-            const dec = CryptoJS.AES.decrypt(user.data, ADMIN_KEY).toString(CryptoJS.enc.Utf8);
-            const decData = JSON.parse(dec);
-            username = decData.username;
-            password = decData.password;
-          } catch(e) {}
-        }
-        
-        if (username === data.username && password === data.password) {
+        if (decryptedUser.username === data.username && decryptedUser.password === data.password) {
           return res.status(200).json({
             success: true,
-            data: { id: key, username: username, role: user.role || 'User', full_name: user.full_name || '', expiry_date: user.expiry_date || '' }
+            data: {
+              id: key,
+              username: decryptedUser.username,
+              role: decryptedUser.role || 'User',
+              full_name: decryptedUser.full_name || '',
+              expiry_date: decryptedUser.expiry_date || ''
+            }
           });
         }
       }
@@ -166,20 +173,50 @@ export default async function handler(req, res) {
       const result = {};
       if (raw) {
         for (const key in raw) {
-          if (raw[key] && raw[key].data) {
-            try { const dec = CryptoJS.AES.decrypt(raw[key].data, ADMIN_KEY).toString(CryptoJS.enc.Utf8); result[key] = JSON.parse(dec); result[key].id = key; } catch(e) {}
-          } else if (raw[key]) { result[key] = raw[key]; result[key].id = key; }
+          const decrypted = await decryptData({ ...raw[key], id: key });
+          result[key] = decrypted;
+          result[key].id = key;
         }
       }
       return res.status(200).json(result);
     }
 
-    if (method === 'POST') { const newRef = ref.push(); await newRef.set(data); return res.status(200).json({ success: true, id: newRef.key }); }
-    if (method === 'PUT') { await ref.set(data); return res.status(200).json({ success: true }); }
-    if (method === 'PATCH') { await ref.update(data); return res.status(200).json({ success: true }); }
-    if (method === 'DELETE') { await ref.remove(); return res.status(200).json({ success: true }); }
+    if (method === 'POST') {
+      const enc = CryptoJS.AES.encrypt(JSON.stringify(data), ADMIN_KEY).toString();
+      const newRef = ref.push();
+      await newRef.set({ data: enc });
+      return res.status(200).json({ success: true, id: newRef.key });
+    }
+
+    if (method === 'PUT') {
+      const enc = CryptoJS.AES.encrypt(JSON.stringify(data), ADMIN_KEY).toString();
+      await ref.set({ data: enc });
+      return res.status(200).json({ success: true });
+    }
+
+    if (method === 'PATCH') {
+      const snap = await ref.once('value');
+      const existing = snap.val();
+      let existingData = {};
+      if (existing && existing.data) {
+        try {
+          const dec = CryptoJS.AES.decrypt(existing.data, ADMIN_KEY).toString(CryptoJS.enc.Utf8);
+          existingData = JSON.parse(dec);
+        } catch(e) {}
+      }
+      const merged = { ...existingData, ...data };
+      const enc = CryptoJS.AES.encrypt(JSON.stringify(merged), ADMIN_KEY).toString();
+      await ref.update({ data: enc });
+      return res.status(200).json({ success: true });
+    }
+
+    if (method === 'DELETE') {
+      await ref.remove();
+      return res.status(200).json({ success: true });
+    }
 
     return res.status(400).json({ error: 'Invalid method' });
+
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }
