@@ -167,12 +167,12 @@ function showExpiredBanner() { document.getElementById('expiredBanner').style.di
 function closeExpiredBanner() { document.getElementById('expiredBanner').style.display = 'none'; logout(); }
 
 function openWhatsApp() { 
-    var msg = encodeURIComponent("Halo admin, saya ingin memperpanjang masa aktif akun BUSSID Top Up saya."); 
+    var msg = encodeURIComponent("Assalamualaikum admin, saya ingin memperpanjang masa aktif akun BUSSID Top Up saya. Username: " + (currentUser ? currentUser.username : '')); 
     window.open('https://wa.me/' + WHATSAPP_NUMBER + '?text=' + msg, '_blank'); 
 }
 
 function openWhatsAppPassword() { 
-    var msg = encodeURIComponent("Halo admin, saya ingin mengubah password akun BUSSID Top Up saya. Username: " + (currentUser ? currentUser.username : '')); 
+    var msg = encodeURIComponent("Assalamualaikum admin, saya ingin mengubah password akun BUSSID Top Up saya. Username: " + (currentUser ? currentUser.username : '')); 
     window.open('https://wa.me/' + WHATSAPP_NUMBER + '?text=' + msg, '_blank'); 
 }
 
