@@ -167,18 +167,70 @@ function showExpiredBanner() { document.getElementById('expiredBanner').style.di
 function closeExpiredBanner() { document.getElementById('expiredBanner').style.display = 'none'; logout(); }
 function openWhatsApp() { var msg = encodeURIComponent("Halo admin, perpanjang masa aktif."); window.open('https://wa.me/' + WHATSAPP_NUMBER + '?text=' + msg, '_blank'); }
 function updatePasswordCounter(fieldId) { var input = document.getElementById(fieldId), counter = document.getElementById(fieldId + 'CharCount'); if (input && counter) counter.textContent = input.value.length + '/' + MAX_PASSWORD_LENGTH; }
-function showDeleteHistoryConfirm() { document.getElementById('deleteHistoryModal').classList.add('active'); }
-function closeDeleteHistoryModal() { document.getElementById('deleteHistoryModal').classList.remove('active'); }
+
+function showDeleteHistoryConfirm() {
+    var overlay = document.getElementById('confirmOverlay');
+    var msg = document.getElementById('confirmMessage');
+    var yesBtn = document.getElementById('confirmYes');
+    var noBtn = document.getElementById('confirmNo');
+    var title = document.getElementById('confirmTitle');
+    
+    if (overlay && msg && yesBtn && noBtn) {
+        if (title) title.innerHTML = '<i class="fas fa-trash"></i> HAPUS SEMUA RIWAYAT';
+        msg.textContent = 'Yakin hapus semua riwayat? Tindakan ini tidak bisa dibatalkan!';
+        overlay.style.display = 'flex';
+        
+        yesBtn.textContent = 'HAPUS SEMUA';
+        yesBtn.className = 'confirm-btn confirm-yes';
+        
+        yesBtn.onclick = function() {
+            overlay.style.display = 'none';
+            deleteAllHistory();
+        };
+        
+        noBtn.onclick = function() {
+            overlay.style.display = 'none';
+        };
+        
+        overlay.onclick = function(e) {
+            if (e.target === overlay) overlay.style.display = 'none';
+        };
+    } else {
+        document.getElementById('deleteHistoryModal').classList.add('active');
+    }
+}
+
+function closeDeleteHistoryModal() {
+    var overlay = document.getElementById('confirmOverlay');
+    if (overlay) overlay.style.display = 'none';
+    document.getElementById('deleteHistoryModal').classList.remove('active');
+}
 
 async function deleteAllHistory() {
+    showLoading('Menghapus semua riwayat...');
     try {
-        showLoading('Menghapus riwayat...');
         var transactions = await callRevanstore('transactions', 'GET');
-        if (!transactions || typeof transactions !== 'object') { hideLoading(); showAlert('Tidak ada riwayat!', 'warning'); closeDeleteHistoryModal(); return; }
+        if (!transactions || typeof transactions !== 'object') { 
+            hideLoading(); 
+            showAlert('Tidak ada riwayat!', 'warning'); 
+            return; 
+        }
         var count = 0;
-        for (var key in transactions) { if (transactions[key] && transactions[key].operator === currentUser.username) { await callRevanstore('transactions/' + key, 'DELETE'); count++; } }
-        hideLoading(); closeDeleteHistoryModal(); showAlert(count + ' riwayat dihapus!', 'success');
-    } catch (error) { hideLoading(); showAlert('Gagal!', 'error'); closeDeleteHistoryModal(); }
+        for (var key in transactions) { 
+            if (transactions[key] && transactions[key].operator === currentUser.username) { 
+                await callRevanstore('transactions/' + key, 'DELETE'); 
+                count++; 
+            } 
+        }
+        hideLoading(); 
+        showAlert(count + ' riwayat berhasil dihapus!', 'success');
+        if (document.getElementById('historySection').style.display === 'block') {
+            showHistory();
+        }
+    } catch (error) { 
+        hideLoading(); 
+        showAlert('Gagal menghapus riwayat!', 'error'); 
+    }
 }
 
 async function login() {
@@ -372,30 +424,14 @@ function showReceipt(trx) {
 
 window._showTrxModal = function() {
     var modal = document.getElementById('trxLagiModal');
-    if (modal) {
-        modal.style.display = 'flex';
-        modal.style.opacity = '1';
-        modal.style.visibility = 'visible';
-    }
+    if (modal) { modal.style.display = 'flex'; modal.style.opacity = '1'; modal.style.visibility = 'visible'; }
 };
-
 window._tutupTrxModal = function() {
     var modal = document.getElementById('trxLagiModal');
-    if (modal) {
-        modal.style.display = 'none';
-    }
+    if (modal) { modal.style.display = 'none'; }
 };
-
-window._pilihTopup = function() {
-    window._tutupTrxModal();
-    showTopupFromAccount();
-};
-
-window._pilihKuras = function() {
-    window._tutupTrxModal();
-    showKurasFromAccount();
-};
-
+window._pilihTopup = function() { window._tutupTrxModal(); showTopupFromAccount(); };
+window._pilihKuras = function() { window._tutupTrxModal(); showKurasFromAccount(); };
 window._goHome = function() { showHome(); };
 
 function backToHome() { showHome(); }
@@ -413,7 +449,7 @@ async function showHistory() {
         var html = '';
         arr.forEach(function(t) {
             var typeText = t.type === 'topup' ? 'TOP UP' : 'KURAS', sign = t.type === 'topup' ? '+' : '-';
-            html += '<div class="transaction-item ' + t.type + '"><div class="transaction-header"><div>' + sanitize(t.accountName) + '</div><div class="transaction-amount">' + sign + formatCurrency(t.amount) + '</div></div><div class="transaction-details"><div>' + typeText + '</div><div>' + new Date(t.timestamp).toLocaleString('id-ID') + '</div></div></div>';
+            html += '<div class="transaction-item ' + t.type + '"><div class="transaction-header"><div>' + sanitize(t.accountName) + '</div><div class="transaction-amount">' + sign + formatCurrency(t.amount) + '</div></div><div class="transaction-details"><div>' + typeText + '</div><div>' + new Date(t.timestamp).toLocaleString('id-ID') + '</div></div><div class="transaction-balance"><span>Sebelum: ' + formatCurrency(t.oldBalance) + '</span><span>→</span><span>Sesudah: ' + formatCurrency(t.newBalance) + '</span></div></div>';
         });
         list.innerHTML = html;
         hideLoading();
