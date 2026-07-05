@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Akses Ditolak</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
     <style>
         *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif}
         body{background:linear-gradient(135deg,#e0f2fe 0%,#bae6fd 50%,#7dd3fc 100%);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
@@ -33,63 +32,7 @@
         <p class="loading-text" id="loadingText"><i class="fas fa-spinner fa-spin"></i> Memeriksa...</p>
     </div>
 
-    <script>
-        var API_REVANSTORE = 'api/revanstore';
-        var API_KEY = '2145dd5b-b55d-49f1-9b3f-9543a5840f65';
-        var isBlocked = true;
-
-        async function getFingerprint() {
-            var fp = '';
-            fp += navigator.userAgent || '';
-            fp += navigator.language || '';
-            fp += (screen.width || 0) + 'x' + (screen.height || 0);
-            fp += screen.colorDepth || '';
-            fp += new Date().getTimezoneOffset();
-            fp += navigator.hardwareConcurrency || '';
-            fp += navigator.deviceMemory || '';
-            fp += navigator.platform || '';
-            return CryptoJS.MD5(fp).toString();
-        }
-
-        async function checkBlocked() {
-            var fp = await getFingerprint();
-            try {
-                var res = await fetch(API_REVANSTORE, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY, 'X-Fingerprint': fp },
-                    body: JSON.stringify({ path: 'check_blocked', method: 'POST', data: { fingerprint: fp } })
-                });
-                var result = await res.json();
-                
-                if (result && result.blocked) {
-                    isBlocked = true;
-                    document.getElementById('statusText').textContent = 'Maaf, akses Anda masih diblokir.';
-                    document.getElementById('btnHome').disabled = true;
-                    document.getElementById('btnHomeText').textContent = 'Akses Diblokir';
-                } else {
-                    isBlocked = false;
-                    document.getElementById('statusText').textContent = 'Akses Anda sudah dibuka! Silakan kembali.';
-                    document.getElementById('btnHome').disabled = false;
-                    document.getElementById('btnHomeText').textContent = 'Kembali ke Home';
-                }
-            } catch(e) {
-                document.getElementById('statusText').textContent = 'Gagal memeriksa status. Coba lagi nanti.';
-            }
-            document.getElementById('loadingText').style.display = 'none';
-        }
-
-        function checkAndGoHome() {
-            if (!isBlocked) {
-                window.location.href = '/';
-            } else {
-                alert('Akses Anda masih diblokir!');
-                checkBlocked();
-            }
-        }
-
-        checkBlocked();
-
-        setInterval(checkBlocked, 30000);
-    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
+    <script src="main.js"></script>
 </body>
 </html>
