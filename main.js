@@ -165,7 +165,17 @@ function checkAccountExpiry(user) {
 
 function showExpiredBanner() { document.getElementById('expiredBanner').style.display = 'flex'; document.getElementById('mainApp').style.display = 'none'; }
 function closeExpiredBanner() { document.getElementById('expiredBanner').style.display = 'none'; logout(); }
-function openWhatsApp() { var msg = encodeURIComponent("Halo admin, perpanjang masa aktif."); window.open('https://wa.me/' + WHATSAPP_NUMBER + '?text=' + msg, '_blank'); }
+
+function openWhatsApp() { 
+    var msg = encodeURIComponent("Halo admin, saya ingin memperpanjang masa aktif akun BUSSID Top Up saya."); 
+    window.open('https://wa.me/' + WHATSAPP_NUMBER + '?text=' + msg, '_blank'); 
+}
+
+function openWhatsAppPassword() { 
+    var msg = encodeURIComponent("Halo admin, saya ingin mengubah password akun BUSSID Top Up saya. Username: " + (currentUser ? currentUser.username : '')); 
+    window.open('https://wa.me/' + WHATSAPP_NUMBER + '?text=' + msg, '_blank'); 
+}
+
 function updatePasswordCounter(fieldId) { var input = document.getElementById(fieldId), counter = document.getElementById(fieldId + 'CharCount'); if (input && counter) counter.textContent = input.value.length + '/' + MAX_PASSWORD_LENGTH; }
 
 function showDeleteHistoryConfirm() {
@@ -179,22 +189,11 @@ function showDeleteHistoryConfirm() {
         if (title) title.innerHTML = '<i class="fas fa-trash"></i> HAPUS SEMUA RIWAYAT';
         msg.textContent = 'Yakin hapus semua riwayat? Tindakan ini tidak bisa dibatalkan!';
         overlay.style.display = 'flex';
-        
         yesBtn.textContent = 'HAPUS SEMUA';
         yesBtn.className = 'confirm-btn confirm-yes';
-        
-        yesBtn.onclick = function() {
-            overlay.style.display = 'none';
-            deleteAllHistory();
-        };
-        
-        noBtn.onclick = function() {
-            overlay.style.display = 'none';
-        };
-        
-        overlay.onclick = function(e) {
-            if (e.target === overlay) overlay.style.display = 'none';
-        };
+        yesBtn.onclick = function() { overlay.style.display = 'none'; deleteAllHistory(); };
+        noBtn.onclick = function() { overlay.style.display = 'none'; };
+        overlay.onclick = function(e) { if (e.target === overlay) overlay.style.display = 'none'; };
     } else {
         document.getElementById('deleteHistoryModal').classList.add('active');
     }
@@ -210,27 +209,12 @@ async function deleteAllHistory() {
     showLoading('Menghapus semua riwayat...');
     try {
         var transactions = await callRevanstore('transactions', 'GET');
-        if (!transactions || typeof transactions !== 'object') { 
-            hideLoading(); 
-            showAlert('Tidak ada riwayat!', 'warning'); 
-            return; 
-        }
+        if (!transactions || typeof transactions !== 'object') { hideLoading(); showAlert('Tidak ada riwayat!', 'warning'); return; }
         var count = 0;
-        for (var key in transactions) { 
-            if (transactions[key] && transactions[key].operator === currentUser.username) { 
-                await callRevanstore('transactions/' + key, 'DELETE'); 
-                count++; 
-            } 
-        }
-        hideLoading(); 
-        showAlert(count + ' riwayat berhasil dihapus!', 'success');
-        if (document.getElementById('historySection').style.display === 'block') {
-            showHistory();
-        }
-    } catch (error) { 
-        hideLoading(); 
-        showAlert('Gagal menghapus riwayat!', 'error'); 
-    }
+        for (var key in transactions) { if (transactions[key] && transactions[key].operator === currentUser.username) { await callRevanstore('transactions/' + key, 'DELETE'); count++; } }
+        hideLoading(); showAlert(count + ' riwayat berhasil dihapus!', 'success');
+        if (document.getElementById('historySection').style.display === 'block') { showHistory(); }
+    } catch (error) { hideLoading(); showAlert('Gagal menghapus riwayat!', 'error'); }
 }
 
 async function login() {
@@ -457,7 +441,7 @@ async function showHistory() {
 }
 
 function showSettings() { hideAllSections(); document.getElementById('settingsSection').style.display = 'block'; updateProfileInfo(); }
-function showConfirm(title, message, action, data) { document.getElementById('confirmTitle').innerHTML = sanitize(title); document.getElementById('confirmMessage').innerHTML = sanitize(message); pendingAction = action; pendingData = data; document.getElementById('confirmModal').classList.add('active'); }
+function showConfirm(title, message, action, data) { document.getElementById('modalConfirmTitle').innerHTML = sanitize(title); document.getElementById('modalConfirmMessage').innerHTML = sanitize(message); pendingAction = action; pendingData = data; document.getElementById('confirmModal').classList.add('active'); }
 function cancelConfirm() { pendingAction = null; pendingData = null; document.getElementById('confirmModal').classList.remove('active'); }
 
 async function confirmAction() {
