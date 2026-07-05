@@ -18,7 +18,7 @@ if (!admin.apps.length) {
 const db = admin.database();
 
 const rateLimitMap = new Map();
-const RATE_LIMIT_MAX = 30;
+const RATE_LIMIT_MAX = 20;
 const RATE_LIMIT_WINDOW = 60000;
 
 function checkRateLimit(ip) {
@@ -32,12 +32,13 @@ function checkRateLimit(ip) {
 }
 
 const requestTimestamps = new Map();
+const MIN_REQUEST_DELAY = 800;
 
 function checkRequestDelay(ip, path) {
   if (path === 'login_success' || path === 'login_failed' || path === 'check_blocked') return true;
   const now = Date.now();
   const last = requestTimestamps.get(ip) || 0;
-  if (now - last < 300) return false;
+  if (now - last < MIN_REQUEST_DELAY) return false;
   requestTimestamps.set(ip, now);
   return true;
 }
@@ -172,14 +173,14 @@ export default async function handler(req, res) {
   const fp = req.headers['x-fingerprint'] || '';
   
   if (!checkRateLimit(ip)) {
-    return res.status(429).json({ error: 'Too many requests' });
+    return res.status(429).json({ error: 'Terlalu banyak request. Coba lagi nanti.' });
   }
 
   try {
     const { path, method, data } = req.body;
     
     if (!checkRequestDelay(ip, path)) {
-      return res.status(429).json({ error: 'Request too fast' });
+      return res.status(429).json({ error: 'Request terlalu cepat. Harap tunggu.' });
     }
     
     if (!path || typeof path !== 'string' || path.length > 200) {
