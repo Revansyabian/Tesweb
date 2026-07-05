@@ -254,10 +254,13 @@ async function login() {
     
     var username = sanitize(document.getElementById('username').value.trim());
     var password = document.getElementById('password').value.trim();
-    if (!username || !password) { showAlert('🔒 Akses ditolak!', 'error'); return; }
+    if (!username || !password) { showAlert('Harap isi username dan password!', 'warning'); return; }
     
     var blockData = getBlockData(username);
-    if (blockData.blockedUntil && Date.now() < blockData.blockedUntil) { showAlert('🔒 Akses ditolak!', 'error'); return; }
+    if (blockData.blockedUntil && Date.now() < blockData.blockedUntil) { 
+        showAlert('🔒 Terlalu banyak percobaan! Akses ditolak.', 'error'); 
+        return; 
+    }
     
     showLoading('Login...');
     try {
@@ -284,10 +287,16 @@ async function login() {
             await callRevanstore('login_failed', 'POST', {});
             blockData.attempts += 1; var a = blockData.attempts; var d = getBlockDuration(a);
             hideLoading();
-            if (d > 0) { blockData.blockedUntil = Date.now() + d * 60 * 1000; saveBlockData(username, blockData); showAlert('🔒 Akses ditolak!', 'error'); }
-            else { saveBlockData(username, blockData); showAlert('🔒 Akses ditolak!', 'error'); }
+            if (d > 0) { 
+                blockData.blockedUntil = Date.now() + d * 60 * 1000; 
+                saveBlockData(username, blockData); 
+                showAlert('🔒 Terlalu banyak percobaan! Akses ditolak.', 'error'); 
+            } else { 
+                saveBlockData(username, blockData); 
+                showAlert('Username atau password salah!', 'error'); 
+            }
         }
-    } catch (error) { hideLoading(); showAlert('🔒 Akses ditolak!', 'error'); }
+    } catch (error) { hideLoading(); showAlert('Gagal menghubungi server!', 'error'); }
 }
 
 function updateProfileInfo() {
@@ -305,6 +314,7 @@ function logout() {
     document.getElementById('loginScreen').style.display = 'block';
     document.getElementById('username').value = ''; document.getElementById('password').value = '';
     localStorage.removeItem('bussid_session'); showAlert('Logout!', 'success');
+    window.scrollTo(0, 0);
 }
 
 async function loginWithDeviceId(deviceId) {
