@@ -24,7 +24,7 @@
             <div class="expired-icon"><i class="fas fa-exclamation-triangle"></i></div>
             <h3>MASA AKTIF AKUN HABIS</h3>
             <p>Maaf masa aktif akun anda telah habis. Silakan perpanjang akses Anda.</p>
-            <button class="btn btn-whatsapp" onclick="openWhatsApp()"><i class="fab fa-whatsapp"></i> Hubungi WhatsApp</button>
+            <button class="btn btn-whatsapp" onclick="openWhatsApp()"><i class="fab fa-whatsapp"></i> Perpanjang Masa Aktif</button>
         </div>
     </div>
 
@@ -129,9 +129,9 @@
                         <div class="profile-item"><span class="profile-label"><i class="fas fa-user-tag"></i> Role:</span><span class="profile-value role-biru" id="profileRole">-</span></div>
                         <div class="profile-item"><span class="profile-label"><i class="fas fa-calendar-alt"></i> Masa Aktif:</span><span class="profile-value" id="profileExpiry">-</span></div>
                     </div>
-                    <div class="settings-divider"><h3><i class="fas fa-key"></i> Ganti Password</h3></div>
-                    <p style="text-align: center; color: #64748b; padding: 15px; font-size: 14px;"><i class="fas fa-info-circle"></i> Hubungi admin via WhatsApp untuk ganti password</p>
-                    <button class="btn btn-whatsapp btn-block" onclick="openWhatsApp()"><i class="fab fa-whatsapp"></i> Hubungi Admin</button>
+                    <div class="settings-divider"><h3><i class="fas fa-key"></i> Ubah Password</h3></div>
+                    <p style="text-align: center; color: #64748b; padding: 15px; font-size: 14px;"><i class="fas fa-info-circle"></i> Hubungi admin via WhatsApp untuk ubah password</p>
+                    <button class="btn btn-whatsapp btn-block" onclick="openWhatsAppPassword()"><i class="fab fa-whatsapp"></i> Ubah Password</button>
                     <button class="btn btn-danger btn-block" onclick="logout()" style="margin-top: 20px;"><i class="fas fa-sign-out-alt"></i> LOGOUT</button>
                 </div>
             </div>
@@ -143,8 +143,19 @@
         </div>
     </div>
 
-    <div id="confirmModal" class="modal"><div class="modal-content"><h3 id="confirmTitle"></h3><p id="confirmMessage"></p><div class="modal-buttons"><button class="btn btn-secondary" onclick="cancelConfirm()"><i class="fas fa-times"></i> BATAL</button><button class="btn btn-danger" onclick="confirmAction()"><i class="fas fa-check"></i> LANJUTKAN</button></div></div></div>
-    <div id="deleteHistoryModal" class="modal"><div class="modal-content"><h3><i class="fas fa-trash"></i> HAPUS SEMUA RIWAYAT</h3><p>Yakin hapus semua riwayat?</p><p class="warning-text"><i class="fas fa-exclamation-triangle"></i> Tindakan ini tidak dapat dibatalkan!</p><div class="modal-buttons"><button class="btn btn-secondary" onclick="closeDeleteHistoryModal()">BATAL</button><button class="btn btn-danger" onclick="deleteAllHistory()">HAPUS SEMUA</button></div></div></div>
+    <div id="confirmOverlay" class="confirm-overlay" style="display:none;">
+        <div class="confirm-box">
+            <div class="confirm-icon">⚠️</div>
+            <h3 id="confirmTitle" style="color:#1a1a2e;margin-bottom:10px;"></h3>
+            <p class="confirm-message" id="confirmMessage"></p>
+            <div class="confirm-buttons">
+                <button class="confirm-btn confirm-no" id="confirmNo">BATAL</button>
+                <button class="confirm-btn confirm-yes" id="confirmYes">HAPUS</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="confirmModal" class="modal"><div class="modal-content"><h3 id="modalConfirmTitle"></h3><p id="modalConfirmMessage"></p><div class="modal-buttons"><button class="btn btn-secondary" onclick="cancelConfirm()"><i class="fas fa-times"></i> BATAL</button><button class="btn btn-danger" onclick="confirmAction()"><i class="fas fa-check"></i> LANJUTKAN</button></div></div></div>
     <div id="nameChangeModal" class="modal"><div class="modal-content"><h3><i class="fas fa-user-edit"></i> Ganti Nama Akun</h3><p id="nameChangeMessage"></p><div class="modal-buttons"><button class="btn btn-primary" onclick="closeNameChangeModal()">OKE</button></div></div></div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
