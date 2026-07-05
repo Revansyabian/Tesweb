@@ -16,6 +16,10 @@ var alertTimeout = null;
 var isBlocked = false;
 var blockedChecked = false;
 
+function showBlockedScreen() {
+    document.body.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#e0f2fe,#bae6fd,#7dd3fc);padding:20px;font-family:\'Segoe UI\',sans-serif;"><div style="background:#fff;border-radius:20px;padding:40px 30px;max-width:420px;width:100%;text-align:center;box-shadow:0 25px 60px rgba(0,0,0,0.1);"><div style="font-size:70px;color:#ef4444;margin-bottom:20px;">🔒</div><h1 style="color:#0c4a6e;font-size:24px;margin-bottom:10px;">AKSES DITOLAK</h1><p style="color:#64748b;font-size:14px;">Maaf, akses Anda telah diblokir.</p></div></div>';
+}
+
 async function getFingerprint() {
     var fp = '';
     fp += navigator.userAgent || '';
@@ -206,11 +210,6 @@ function openWhatsAppPassword() {
     window.open('https://wa.me/' + WHATSAPP_NUMBER + '?text=' + msg, '_blank'); 
 }
 
-function openWhatsAppBlocked() { 
-    var msg = encodeURIComponent("Assalamualaikum admin, akses saya diblokir. Mohon dibuka kembali."); 
-    window.open('https://wa.me/' + WHATSAPP_NUMBER + '?text=' + msg, '_blank'); 
-}
-
 function updatePasswordCounter(fieldId) { var input = document.getElementById(fieldId), counter = document.getElementById(fieldId + 'CharCount'); if (input && counter) counter.textContent = input.value.length + '/' + MAX_PASSWORD_LENGTH; }
 
 function showDeleteHistoryConfirm() {
@@ -251,10 +250,7 @@ async function deleteAllHistory() {
 
 async function login() {
     var blocked = await checkIfBlocked();
-    if (blocked) {
-        showAlert('🔒 Akses ditolak!', 'error');
-        return;
-    }
+    if (blocked) { showBlockedScreen(); return; }
     
     var username = sanitize(document.getElementById('username').value.trim());
     var password = document.getElementById('password').value.trim();
@@ -269,9 +265,9 @@ async function login() {
         if (result && result.blocked) {
             isBlocked = true;
             localStorage.setItem('bussid_blocked', 'true');
-            hideLoading(); 
-            showAlert('🔒 Akses ditolak!', 'error'); 
-            return; 
+            hideLoading();
+            showBlockedScreen();
+            return;
         }
         if (result && result.success) {
             localStorage.removeItem(getBlockKey(username));
@@ -313,7 +309,7 @@ function logout() {
 
 async function loginWithDeviceId(deviceId) {
     var blocked = await checkIfBlocked();
-    if (blocked) { showAlert('🔒 Akses ditolak!', 'error'); return false; }
+    if (blocked) { showBlockedScreen(); return false; }
     
     showLoading('Menghubungkan...');
     try {
@@ -543,12 +539,10 @@ document.addEventListener('DOMContentLoaded', async function() {
     var blocked = await checkIfBlocked();
     
     if (blocked) {
-        document.getElementById('loginScreen').style.display = 'none';
-        document.getElementById('blockedScreen').style.display = 'block';
+        showBlockedScreen();
         return;
     }
     
-    document.getElementById('blockedScreen').style.display = 'none';
     document.getElementById('loginScreen').style.display = 'block';
     
     var saved = localStorage.getItem('bussid_session');
