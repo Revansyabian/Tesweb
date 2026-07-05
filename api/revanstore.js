@@ -1,57 +1,43 @@
 import CryptoJS from 'crypto-js';
+import admin from 'firebase-admin';
 
-const FIREBASE_URL = process.env.FIREBASE_URL || 'https://dhagwxwhu-default-rtdb.firebaseio.com';
 const ADMIN_KEY = process.env.ADMIN_KEY;
 
-async function dbGet(path) {
-  const res = await fetch(FIREBASE_URL + '/' + path + '.json');
-  const text = await res.text();
-  if (!text || text === 'null') return null;
-  return JSON.parse(text);
-}
-
-async function dbSet(path, data) {
-  const res = await fetch(FIREBASE_URL + '/' + path + '.json', {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data)
+if (!admin.apps.length) {
+  const key = process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n');
+  admin.initializeApp({
+    credential: admin.credential.cert({
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey: key
+    }),
+    databaseURL: process.env.FIREBASE_DATABASE_URL
   });
-  return await res.json();
 }
 
-async function dbPatch(path, data) {
-  const res = await fetch(FIREBASE_URL + '/' + path + '.json', {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data)
-  });
-  return await res.json();
-}
-
-async function dbDelete(path) {
-  const res = await fetch(FIREBASE_URL + '/' + path + '.json', { method: 'DELETE' });
-  return await res.json();
-}
+const db = admin.database();
 
 async function isIPBlocked(ip) {
-  const data = await dbGet('blocked_ips/' + ip.replace(/\./g, '_'));
-  if (data && data.data) {
+  const snap = await db.ref('blocked_ips/' + ip.replace(/\./g, '_')).once('value');
+  const raw = snap.val();
+  if (raw && raw.data) {
     try {
-      const dec = CryptoJS.AES.decrypt(data.data, ADMIN_KEY).toString(CryptoJS.enc.Utf8);
-      const result = JSON.parse(dec);
-      if (result && result.blocked) return true;
+      const dec = CryptoJS.AES.decrypt(raw.data, ADMIN_KEY).toString(CryptoJS.enc.Utf8);
+      const data = JSON.parse(dec);
+      if (data && data.blocked) return true;
     } catch(e) {}
   }
   return false;
 }
 
 async function isFPBlocked(fp) {
-  const data = await dbGet('blocked_fp/' + fp);
-  if (data && data.data) {
+  const snap = await db.ref('blocked_fp/' + fp).once('value');
+  const raw = snap.val();
+  if (raw && raw.data) {
     try {
-      const dec = CryptoJS.AES.decrypt(data.data, ADMIN_KEY).toString(CryptoJS.enc.Utf8);
-      const result = JSON.parse(dec);
-      if (result && result.blocked) return true;
+      const dec = CryptoJS.AES.decrypt(raw.data, ADMIN_KEY).toString(CryptoJS.enc.Utf8);
+      const data = JSON.parse(dec);
+      if (data && data.blocked) return true;
     } catch(e) {}
   }
   return false;
@@ -59,49 +45,58 @@ async function isFPBlocked(fp) {
 
 async function blockIP(ip) {
   const enc = CryptoJS.AES.encrypt(JSON.stringify({ ip: ip, blocked: true, blocked_at: new Date().toISOString() }), ADMIN_KEY).toString();
-  await dbSet('blocked_ips/' + ip.replace(/\./g, '_'), { data: enc });
+  await db.ref('blocked_ips/' + ip.replace(/\./g, '_')).set({ data: enc });
 }
 
 async function blockFP(fp) {
   const enc = CryptoJS.AES.encrypt(JSON.stringify({ fingerprint: fp, blocked: true, blocked_at: new Date().toISOString() }), ADMIN_KEY).toString();
-  await dbSet('blocked_fp/' + fp, { data: enc });
+  await db.ref('blocked_fp/' + fp).set({ data: enc });
 }
 
 async function trackLoginAttempt(ip, fp) {
   const key = ip.replace(/\./g, '_') + '_' + (fp || 'nofp');
-  const data = await dbGet('login_attempts/' + key);
+  const ref = db.ref('login_attempts/' + key);
+  const snap = await ref.once('value');
+  const raw = snap.val();
   const now = Date.now();
-  let attempts = 0;
-  let lastAttempt = 0;
+  let attempts = 0, lastAttempt = 0;
   
-  if (data && data.data) {
+  if (raw && raw.data) {
     try {
-      const dec = CryptoJS.AES.decrypt(data.data, ADMIN_KEY).toString(CryptoJS.enc.Utf8);
-      const result = JSON.parse(dec);
-      attempts = result.count || 0;
-      lastAttempt = result.last_attempt || 0;
+      const dec = CryptoJS.AES.decrypt(raw.data, ADMIN_KEY).toString(CryptoJS.enc.Utf8);
+      const data = JSON.parse(dec);
+      attempts = data.count || 0;
+      lastAttempt = data.last_attempt || 0;
     } catch(e) {}
   }
   
   if (now - lastAttempt > 3600000) {
     const enc = CryptoJS.AES.encrypt(JSON.stringify({ count: 1, last_attempt: now, fingerprint: fp }), ADMIN_KEY).toString();
-    await dbSet('login_attempts/' + key, { data: enc });
+    await ref.set({ data: enc });
     return 1;
   }
   
   const newCount = attempts + 1;
   const enc = CryptoJS.AES.encrypt(JSON.stringify({ count: newCount, last_attempt: now, fingerprint: fp }), ADMIN_KEY).toString();
-  await dbPatch('login_attempts/' + key, { data: enc });
+  await ref.update({ data: enc });
   return newCount;
 }
 
 async function resetLoginAttempt(ip, fp) {
   const key = ip.replace(/\./g, '_') + '_' + (fp || 'nofp');
-  await dbDelete('login_attempts/' + key);
+  await db.ref('login_attempts/' + key).remove();
 }
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  const allowedOrigins = (process.env.ALLOWED_ORIGINS || '*').split(',');
+  const origin = req.headers.origin;
+  
+  if (origin && allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  } else if (allowedOrigins.includes('*')) {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+  }
+  
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-API-Key, X-Fingerprint');
   
@@ -112,91 +107,79 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
   
-  const ip = req.headers['x-forwarded-for'] || req.connection?.remoteAddress || 'unknown';
+  const ip = req.headers['x-forwarded-for'] || 'unknown';
   const fp = req.headers['x-fingerprint'] || '';
   
   if (req.method === 'GET') return res.status(200).json({ status: 'OK' });
 
   try {
     const { path, method, data } = req.body;
-    
-    if (path === 'login_failed') {
-      const attempts = await trackLoginAttempt(ip, fp);
-      await new Promise(r => setTimeout(r, attempts * 500));
-      
-      if (attempts >= 5) {
-        await blockIP(ip);
-        if (fp) await blockFP(fp);
-        return res.status(200).json({ blocked: true });
-      }
-      
-      return res.status(200).json({ attempts: attempts });
-    }
-    
-    if (path === 'login_success') {
-      await resetLoginAttempt(ip, fp);
-      return res.status(200).json({ success: true });
-    }
-    
-    if (path === 'login') {
+    const ref = db.ref(path);
+
+    if (path === 'login' && method === 'POST') {
       const ipBlocked = await isIPBlocked(ip);
       const fpBlocked = fp ? await isFPBlocked(fp) : false;
+      if (ipBlocked || fpBlocked) return res.status(200).json({ blocked: true });
       
-      if (ipBlocked || fpBlocked) {
-        return res.status(200).json({ blocked: true });
-      }
-      
-      const response = await fetch(FIREBASE_URL + '/users.json');
-      const users = await response.json();
+      const snap = await db.ref('users').once('value');
+      const users = snap.val();
       
       for (const key in users) {
-        if (users[key].username === data.username && users[key].password === data.password) {
+        const user = users[key];
+        let username = user.username;
+        let password = user.password;
+        
+        if (user.data) {
+          try {
+            const dec = CryptoJS.AES.decrypt(user.data, ADMIN_KEY).toString(CryptoJS.enc.Utf8);
+            const decData = JSON.parse(dec);
+            username = decData.username;
+            password = decData.password;
+          } catch(e) {}
+        }
+        
+        if (username === data.username && password === data.password) {
           return res.status(200).json({
             success: true,
-            data: {
-              id: key,
-              username: users[key].username,
-              role: users[key].role || 'User',
-              full_name: users[key].full_name || '',
-              expiry_date: users[key].expiry_date || ''
-            }
+            data: { id: key, username: username, role: user.role || 'User', full_name: user.full_name || '', expiry_date: user.expiry_date || '' }
           });
         }
       }
-      
       return res.status(200).json({ success: false });
     }
-    
-    if (path === 'users' && (!method || method === 'GET')) {
-      const response = await fetch(FIREBASE_URL + '/users.json');
-      const users = await response.json();
-      const filtered = {};
-      for (const key in users) {
-        filtered[key] = {
-          username: users[key].username,
-          role: users[key].role || 'User',
-          full_name: users[key].full_name || '',
-          expiry_date: users[key].expiry_date || ''
-        };
+
+    if (path === 'login_failed' && method === 'POST') {
+      const attempts = await trackLoginAttempt(ip, fp);
+      await new Promise(r => setTimeout(r, attempts * 500));
+      if (attempts >= 5) { await blockIP(ip); if (fp) await blockFP(fp); return res.status(200).json({ blocked: true }); }
+      return res.status(200).json({ attempts: attempts });
+    }
+
+    if (path === 'login_success' && method === 'POST') {
+      await resetLoginAttempt(ip, fp);
+      return res.status(200).json({ success: true });
+    }
+
+    if (method === 'GET') {
+      const snap = await ref.once('value');
+      const raw = snap.val();
+      const result = {};
+      if (raw) {
+        for (const key in raw) {
+          if (raw[key] && raw[key].data) {
+            try { const dec = CryptoJS.AES.decrypt(raw[key].data, ADMIN_KEY).toString(CryptoJS.enc.Utf8); result[key] = JSON.parse(dec); result[key].id = key; } catch(e) {}
+          } else if (raw[key]) { result[key] = raw[key]; result[key].id = key; }
+        }
       }
-      return res.status(200).json(filtered);
+      return res.status(200).json(result);
     }
-    
-    let url = FIREBASE_URL + '/' + path + '.json';
-    const options = { method: method || 'GET', headers: { 'Content-Type': 'application/json' } };
-    
-    if (data && (method === 'POST' || method === 'PUT' || method === 'PATCH')) {
-      options.body = JSON.stringify(data);
-    }
-    
-    if (method === 'DELETE') {
-      options.method = 'DELETE';
-    }
-    
-    const response = await fetch(url, options);
-    const text = await response.text();
-    if (!text || text === 'null') return res.status(200).json(null);
-    return res.status(200).json(JSON.parse(text));
+
+    if (method === 'POST') { const newRef = ref.push(); await newRef.set(data); return res.status(200).json({ success: true, id: newRef.key }); }
+    if (method === 'PUT') { await ref.set(data); return res.status(200).json({ success: true }); }
+    if (method === 'PATCH') { await ref.update(data); return res.status(200).json({ success: true }); }
+    if (method === 'DELETE') { await ref.remove(); return res.status(200).json({ success: true }); }
+
+    return res.status(400).json({ error: 'Invalid method' });
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }
