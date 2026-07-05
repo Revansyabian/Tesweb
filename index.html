@@ -13,11 +13,26 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
 <style>
-/* PATCH: Paksa login screen selalu flex & center */
-#loginScreen[style*="display: block"],
-#loginScreen[style*="display:block"] {
+/* ==== PATCH LOGIN CENTER ==== */
+.login-screen {
   display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 100vh !important;
+  width: 100% !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  z-index: 9999 !important;
 }
+.login-container {
+  width: 100%;
+  max-width: 420px;
+  margin: 0 auto;
+}
+/* ============================ */
 </style>
 </head>
 <body>
@@ -52,6 +67,7 @@
   </div>
 </div>
 
+<!-- ===== LOGIN SCREEN - DIUBAH ===== -->
 <div id="loginScreen" class="login-screen" style="display:none">
   <div class="login-container">
     <div class="login-card">
@@ -75,6 +91,7 @@
     </div>
   </div>
 </div>
+<!-- ===== END LOGIN SCREEN ===== -->
 
 <div id="mainApp" class="main-app" style="display:none">
   <div class="header">
