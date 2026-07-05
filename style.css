@@ -126,6 +126,7 @@ body{background:#f0f4f8;min-height:100vh;color:#1a1a2e}
 .transaction-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
 .transaction-amount{font-weight:700;font-size:16px}
 .transaction-details{display:flex;justify-content:space-between;color:#64748b;font-size:13px}
+.transaction-balance{display:flex;justify-content:space-between;color:#8899aa;font-size:11px;margin-top:6px;gap:8px}
 
 .history-header-actions{display:flex;gap:10px}
 .history-header-actions .btn-icon.btn-danger{color:#ef4444;border-color:#fecaca}
@@ -176,6 +177,12 @@ body{background:#f0f4f8;min-height:100vh;color:#1a1a2e}
 .amount-preview .value{color:#0ea5e9;font-size:22px;font-weight:700}
 .input-error{border-color:#ef4444!important;background:#fff5f5!important}
 .input-success{border-color:#10b981!important;background:#f0fdf4!important}
+
+.spinner{width:40px;height:40px;border:4px solid #333;border-top:4px solid #0ea5e9;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+
+#trxLagiModal{display:none;opacity:0;visibility:hidden}
+#trxLagiModal.active{display:flex;opacity:1;visibility:visible}
 
 @media(max-width:768px){
   .header{flex-direction:column;gap:16px;text-align:center}
