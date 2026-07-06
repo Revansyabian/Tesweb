@@ -1,6 +1,6 @@
 var API_REVANSTORE = '/api/revanstore';
 var API_RVNSTORE = '/api/rvnstore';
-var API_KEY = '2145dd5b-b55d-49f1-9b3f-9543a5840f65';
+var ADMIN_KEY = 'dhagwxwhu:f4afc5aa03e73130f5e055dfe6a708c4dc40759b';
 var WHATSAPP_NUMBER = "6285199120995";
 var MAX_TOPUP_AMOUNT = 2147483647;
 var MAX_PASSWORD_LENGTH = 20;
@@ -77,10 +77,43 @@ async function checkIfBlocked() {
 async function callRevanstore(path, method, data) {
     if (!fingerprint) fingerprint = await getFingerprint();
     if (isBlocked && path !== 'check_blocked') throw new Error('Akses ditolak');
-    var res = await fetch(API_REVANSTORE, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY, 'X-Fingerprint': fingerprint }, body: JSON.stringify({ path: path, method: method || 'GET', data: data || null }) });
+    
+    var payload = {
+        path: path,
+        method: method || 'GET',
+        data: data || null,
+        timestamp: Date.now()
+    };
+    
+    var encryptedPayload = CryptoJS.AES.encrypt(JSON.stringify(payload), ADMIN_KEY).toString();
+    
+    var headers = {
+        'Content-Type': 'application/json',
+        'X-Fingerprint': fingerprint
+    };
+    
+    if (currentUser && currentUser.username) {
+        headers['X-Operator'] = CryptoJS.AES.encrypt(currentUser.username, ADMIN_KEY).toString();
+    }
+    
+    var res = await fetch(API_REVANSTORE, { 
+        method: 'POST', 
+        headers: headers, 
+        body: JSON.stringify({ data: encryptedPayload })
+    });
+    
     if (res.status === 429) throw new Error('Terlalu banyak request');
-    var text = await res.text(); if (!text || text === 'null') return null;
-    return JSON.parse(text);
+    var text = await res.text(); 
+    if (!text || text === 'null') return null;
+    
+    var result = JSON.parse(text);
+    
+    if (result.encrypted && result.data) {
+        var dec = CryptoJS.AES.decrypt(result.data, ADMIN_KEY).toString(CryptoJS.enc.Utf8);
+        if (dec) return JSON.parse(dec);
+    }
+    
+    return result;
 }
 
 async function callRvnstore(endpoint, method, body, authToken) {
@@ -197,7 +230,7 @@ function openWhatsApp() {
 }
 
 function openWhatsAppPassword() { 
-    var msg = encodeURIComponent("Assalamualaikum admin, saya ingin mengubah password akun BUSSID Top Up saya. Username: " + (currentUser ? currentUser.username : '')); 
+    var msg = encodeURIComponent("Assalamualaikum admin, saya ingin mengubah password akun saya. Username: " + (currentUser ? currentUser.username : '')); 
     window.open('https://wa.me/' + WHATSAPP_NUMBER + '?text=' + msg, '_blank'); 
 }
 
@@ -226,12 +259,25 @@ async function deleteAllHistory() {
     showLoading('Menghapus...');
     try {
         var transactions = await callRevanstore('transactions', 'GET');
-        if (!transactions || typeof transactions !== 'object') { hideLoading(); showAlert('Tidak ada riwayat!', 'warning'); return; }
+        if (!transactions || typeof transactions !== 'object' || Object.keys(transactions).length === 0) { 
+            hideLoading(); 
+            showAlert('Tidak ada riwayat!', 'warning'); 
+            return; 
+        }
         var count = 0;
-        for (var key in transactions) { if (transactions[key] && transactions[key].operator === currentUser.username) { await callRevanstore('transactions/' + key, 'DELETE'); count++; } }
-        hideLoading(); showAlert(count + ' riwayat dihapus!', 'success');
-        if (document.getElementById('historySection').style.display === 'block') { showHistory(); }
-    } catch (error) { hideLoading(); showAlert('Gagal!', 'error'); }
+        for (var key in transactions) { 
+            await callRevanstore('transactions/' + key, 'DELETE');
+            count++; 
+        }
+        hideLoading(); 
+        showAlert(count + ' riwayat dihapus!', 'success');
+        if (document.getElementById('historySection').style.display === 'block') { 
+            showHistory(); 
+        }
+    } catch (error) { 
+        hideLoading(); 
+        showAlert('Gagal menghapus riwayat!', 'error'); 
+    }
 }
 
 async function login() {
@@ -239,32 +285,93 @@ async function login() {
     if (blocked) { showBlockedScreen(); return; }
     var username = sanitize(document.getElementById('username').value.trim());
     var password = document.getElementById('password').value.trim();
-    if (!username || !password) { showAlert('Harap isi username dan password!', 'warning'); return; }
+    if (!username || !password) { 
+        Swal.fire({
+            icon: "warning",
+            title: "Oops...",
+            text: "Harap isi username dan password!",
+            confirmButtonColor: "#0ea5e9"
+        });
+        return; 
+    }
     var blockData = getBlockData(username);
-    if (blockData.blockedUntil && Date.now() < blockData.blockedUntil) { showAlert('🔒 Terlalu banyak percobaan! Akses ditolak.', 'error'); return; }
+    if (blockData.blockedUntil && Date.now() < blockData.blockedUntil) { 
+        Swal.fire({
+            icon: "error",
+            title: "Akses Ditolak",
+            text: "🔒 Terlalu banyak percobaan! Akses ditolak.",
+            confirmButtonColor: "#ef4444"
+        });
+        return; 
+    }
     showLoading('Login...');
     try {
         var result = await callRevanstore('login', 'POST', { username: username, password: password });
-        if (result && result.blocked) { isBlocked = true; localStorage.setItem('bussid_blocked', 'true'); hideLoading(); showBlockedScreen(); return; }
+        if (result && result.blocked) { 
+            isBlocked = true; 
+            localStorage.setItem('bussid_blocked', 'true'); 
+            hideLoading(); 
+            showBlockedScreen(); 
+            return; 
+        }
         if (result && result.success) {
             localStorage.removeItem(getBlockKey(username));
-            await callRevanstore('login_success', 'POST', {});
             var user = result.data;
             var expiryCheck = checkAccountExpiry(user);
-            if (expiryCheck.expired) { hideLoading(); showExpiredBanner(); return; }
+            if (expiryCheck.expired) { 
+                hideLoading(); 
+                showExpiredBanner(); 
+                return; 
+            }
             currentUser = { id: user.id, username: user.username, password: password, role: user.role || 'Operator', full_name: user.full_name || user.username, expiry_date: user.expiry_date || '' };
+            await callRevanstore('login_success', 'POST', {});
             document.getElementById('loginScreen').style.display = 'none';
             document.getElementById('mainApp').style.display = 'block';
-            hideLoading(); showHome(); showAlert('Login berhasil!', 'success'); updateProfileInfo();
+            hideLoading(); 
+            showHome(); 
+            updateProfileInfo();
+            Swal.fire({
+                icon: "success",
+                title: "Login Berhasil!",
+                text: "Selamat datang, " + currentUser.full_name + "!",
+                timer: 2000,
+                showConfirmButton: false
+            });
             localStorage.setItem('bussid_session', JSON.stringify({ username: username, password: password, user_id: user.id, timestamp: Date.now() }));
         } else {
             await callRevanstore('login_failed', 'POST', {});
-            blockData.attempts += 1; var a = blockData.attempts; var d = getBlockDuration(a);
+            blockData.attempts += 1; 
+            var a = blockData.attempts; 
+            var d = getBlockDuration(a);
             hideLoading();
-            if (d > 0) { blockData.blockedUntil = Date.now() + d * 60 * 1000; saveBlockData(username, blockData); showAlert('🔒 Terlalu banyak percobaan! Akses ditolak.', 'error'); }
-            else { saveBlockData(username, blockData); showAlert('Username atau password salah!', 'error'); }
+            if (d > 0) { 
+                blockData.blockedUntil = Date.now() + d * 60 * 1000; 
+                saveBlockData(username, blockData); 
+                Swal.fire({
+                    icon: "error",
+                    title: "Akses Ditolak",
+                    text: "🔒 Terlalu banyak percobaan! Silakan coba lagi nanti.",
+                    confirmButtonColor: "#ef4444"
+                });
+            } else { 
+                saveBlockData(username, blockData); 
+                Swal.fire({
+                    icon: "error",
+                    title: "Oops...",
+                    text: "User tidak ditemukan atau password salah!",
+                    confirmButtonColor: "#ef4444"
+                });
+            }
         }
-    } catch (error) { hideLoading(); showAlert('Gagal menghubungi server!', 'error'); }
+    } catch (error) { 
+        hideLoading(); 
+        Swal.fire({
+            icon: "error",
+            title: "Oops...",
+            text: "Gagal menghubungkan ke server!",
+            confirmButtonColor: "#ef4444"
+        });
+    }
 }
 
 function updateProfileInfo() {
@@ -283,7 +390,9 @@ function logout() {
     currentUser = null; currentAccount = null; currentAuthToken = null; lastDeviceId = null;
     document.getElementById('mainApp').style.display = 'none'; document.getElementById('expiredBanner').style.display = 'none';
     var ls = document.getElementById('loginScreen');
-    ls.style.display = 'block'; ls.style.position = 'fixed'; ls.style.top = '0'; ls.style.left = '0'; ls.style.width = '100%'; ls.style.height = '100%';
+    ls.style.display = 'flex';
+    ls.style.alignItems = 'center';
+    ls.style.justifyContent = 'center';
     document.getElementById('username').value = ''; document.getElementById('password').value = '';
     localStorage.removeItem('bussid_session'); showAlert('Logout!', 'success'); window.scrollTo(0, 0);
 }
@@ -403,10 +512,10 @@ async function showHistory() {
     hideAllSections(); document.getElementById('historySection').style.display = 'block'; showLoading('Mengambil data...');
     try {
         var data = await callRevanstore('transactions', 'GET'); var list = document.getElementById('transactionsList');
-        if (!data || typeof data !== 'object') { list.innerHTML = '<p style="text-align:center;color:#666;">Belum ada transaksi</p>'; hideLoading(); return; }
-        var arr = Object.keys(data).map(function(k) { return { id: k, type: data[k].type, accountName: data[k].accountName, amount: data[k].amount, oldBalance: data[k].oldBalance, newBalance: data[k].newBalance, operator: data[k].operator, timestamp: data[k].timestamp }; }).filter(function(t) { return t.operator === currentUser.username; }).sort(function(a, b) { return b.timestamp - a.timestamp; });
-        if (arr.length === 0) { list.innerHTML = '<p style="text-align:center;color:#666;">Belum ada transaksi</p>'; hideLoading(); return; }
-        var html = ''; arr.forEach(function(t) { var typeText = t.type === 'topup' ? 'TOP UP' : 'KURAS', sign = t.type === 'topup' ? '+' : '-'; html += '<div class="transaction-item ' + t.type + '"><div class="transaction-header"><div>' + sanitize(t.accountName) + '</div><div class="transaction-amount">' + sign + formatCurrency(t.amount) + '</div></div><div class="transaction-details"><div>' + typeText + '</div><div>' + new Date(t.timestamp).toLocaleString('id-ID') + '</div></div><div class="transaction-balance"><span>Sebelum: ' + formatCurrency(t.oldBalance) + '</span><span>→</span><span>Sesudah: ' + formatCurrency(t.newBalance) + '</span></div></div>'; });
+        if (!data || typeof data !== 'object' || Object.keys(data).length === 0) { list.innerHTML = '<p style="text-align:center;color:#666;padding:40px 20px;">Belum ada transaksi</p>'; hideLoading(); return; }
+        var arr = Object.keys(data).map(function(k) { return { id: k, type: data[k].type, accountName: data[k].accountName, amount: data[k].amount, oldBalance: data[k].oldBalance, newBalance: data[k].newBalance, operator: data[k].operator, timestamp: data[k].timestamp }; }).sort(function(a, b) { return b.timestamp - a.timestamp; });
+        if (arr.length === 0) { list.innerHTML = '<p style="text-align:center;color:#666;padding:40px 20px;">Belum ada transaksi</p>'; hideLoading(); return; }
+        var html = ''; arr.forEach(function(t) { var typeText = t.type === 'topup' ? 'TOP UP' : t.type === 'kuras' ? 'KURAS' : 'GANTI NAMA'; var sign = t.type === 'topup' ? '+' : t.type === 'kuras' ? '-' : ''; html += '<div class="transaction-item ' + t.type + '"><div class="transaction-header"><div>' + sanitize(t.accountName) + '</div><div class="transaction-amount">' + sign + formatCurrency(t.amount) + '</div></div><div class="transaction-details"><div>' + typeText + '</div><div>' + new Date(t.timestamp).toLocaleString('id-ID') + '</div></div><div class="transaction-balance"><span>Sebelum: ' + formatCurrency(t.oldBalance) + '</span><span>→</span><span>Sesudah: ' + formatCurrency(t.newBalance) + '</span></div></div>'; });
         list.innerHTML = html; hideLoading();
     } catch(e) { hideLoading(); showAlert('Gagal!', 'error'); }
 }
@@ -434,11 +543,13 @@ document.addEventListener('DOMContentLoaded', async function() {
     setupEventListeners(); setupQuickAmounts();
     document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
     document.addEventListener('keydown', function(e) { if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && e.key === 'I') || (e.ctrlKey && e.key === 'U')) { e.preventDefault(); return false; } });
-    var ls = document.getElementById('loginScreen'); ls.style.position = 'fixed'; ls.style.top = '0'; ls.style.left = '0'; ls.style.width = '100%'; ls.style.height = '100%';
+    var ls = document.getElementById('loginScreen');
+    ls.style.display = 'flex';
+    ls.style.alignItems = 'center';
+    ls.style.justifyContent = 'center';
     if (!fingerprint) fingerprint = await getFingerprint();
     var blocked = await checkIfBlocked();
     if (blocked) { showBlockedScreen(); return; }
-    ls.style.display = 'block';
     var saved = localStorage.getItem('bussid_session');
     if (saved) { try { var session = JSON.parse(saved), age = Date.now() - (session.timestamp || 0); if (age > 7 * 24 * 60 * 60 * 1000) { localStorage.removeItem('bussid_session'); return; } var result = await callRevanstore('login', 'POST', { username: session.username, password: session.password }); if (result && result.success) { var user = result.data; var expiryCheck = checkAccountExpiry(user); if (expiryCheck.expired) { showExpiredBanner(); return; } currentUser = { id: user.id, username: user.username, password: session.password, role: user.role || 'Operator', full_name: user.full_name || user.username, expiry_date: user.expiry_date || '' }; ls.style.display = 'none'; document.getElementById('mainApp').style.display = 'block'; showHome(); updateProfileInfo(); showAlert('Selamat datang!', 'success'); } else { localStorage.removeItem('bussid_session'); } } catch(e) { localStorage.removeItem('bussid_session'); } }
 });
