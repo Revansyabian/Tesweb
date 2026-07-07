@@ -80,13 +80,15 @@ async function callRevanstore(path, method, data) {
     
     var appCheckToken = '';
     try {
-        var tokenResult = await appCheck.getToken(false);
-        appCheckToken = tokenResult.token;
+        appCheckToken = await new Promise(function(resolve, reject) {
+            grecaptcha.ready(function() {
+                grecaptcha.execute('6LdQnEgtAAAAAM2FbbmdB2v15bY9ytNnVzaGJ2q9', {action: 'submit'})
+                    .then(resolve)
+                    .catch(reject);
+            });
+        });
     } catch(e) {
-        try {
-            var tokenResult = await appCheck.getToken(true);
-            appCheckToken = tokenResult.token;
-        } catch(e2) {}
+        console.error('reCAPTCHA error:', e);
     }
     
     var payload = {
