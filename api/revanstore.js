@@ -2,6 +2,7 @@ import CryptoJS from 'crypto-js';
 import admin from 'firebase-admin';
 
 const ADMIN_KEY = process.env.ADMIN_KEY;
+const APP_CHECK_SECRET = process.env.APP_CHECK_SECRET || '';
 
 if (!admin.apps.length) {
   const key = process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n');
@@ -61,6 +62,21 @@ async function decryptData(raw) {
     } catch(e) { return raw; }
   }
   return raw;
+}
+
+async function verifyAppCheck(token) {
+  if (!token || !APP_CHECK_SECRET) return true;
+  try {
+    const response = await fetch('https://www.google.com/recaptcha/api/siteverify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `secret=${APP_CHECK_SECRET}&response=${token}`
+    });
+    const data = await response.json();
+    return data.success && data.score >= 0.5;
+  } catch(e) {
+    return true;
+  }
 }
 
 async function isIPBlocked(ip) {
@@ -154,7 +170,7 @@ export default async function handler(req, res) {
   else if (allowedOrigins.includes('*')) res.setHeader('Access-Control-Allow-Origin', '*');
   
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-API-Key, X-Fingerprint, X-Operator');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-API-Key, X-Fingerprint, X-Operator, X-App-Check-Token');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-XSS-Protection', '1; mode=block');
@@ -164,6 +180,11 @@ export default async function handler(req, res) {
   
   const ip = req.headers['x-forwarded-for'] || 'unknown';
   const fp = req.headers['x-fingerprint'] || '';
+  
+  const appCheckToken = req.headers['x-app-check-token'] || '';
+  if (appCheckToken && !(await verifyAppCheck(appCheckToken))) {
+    return res.status(403).json({ error: 'Verifikasi gagal' });
+  }
   
   let operator = '';
   try {
