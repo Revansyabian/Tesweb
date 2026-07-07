@@ -78,6 +78,17 @@ async function callRevanstore(path, method, data) {
     if (!fingerprint) fingerprint = await getFingerprint();
     if (isBlocked && path !== 'check_blocked') throw new Error('Akses ditolak');
     
+    var appCheckToken = '';
+    try {
+        var tokenResult = await appCheck.getToken(false);
+        appCheckToken = tokenResult.token;
+    } catch(e) {
+        try {
+            var tokenResult = await appCheck.getToken(true);
+            appCheckToken = tokenResult.token;
+        } catch(e2) {}
+    }
+    
     var payload = {
         path: path,
         method: method || 'GET',
@@ -89,7 +100,8 @@ async function callRevanstore(path, method, data) {
     
     var headers = {
         'Content-Type': 'application/json',
-        'X-Fingerprint': fingerprint
+        'X-Fingerprint': fingerprint,
+        'X-App-Check-Token': appCheckToken
     };
     
     if (currentUser && currentUser.username) {
