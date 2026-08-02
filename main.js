@@ -20,6 +20,36 @@ function showBlockedScreen() {
     document.body.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#e0f2fe,#bae6fd,#7dd3fc);padding:20px;font-family:\'Segoe UI\',sans-serif;"><div style="background:#fff;border-radius:20px;padding:40px 30px;max-width:420px;width:100%;text-align:center;box-shadow:0 25px 60px rgba(0,0,0,0.1);"><div style="font-size:70px;color:#ef4444;margin-bottom:20px;">🔒</div><h1 style="color:#0c4a6e;font-size:24px;margin-bottom:10px;">AKSES DITOLAK</h1><p style="color:#64748b;font-size:14px;">Maaf, akses Anda telah diblokir.</p></div></div>';
 }
 
+function showBannedScreen(reason, until) {
+    var untilText = '';
+    if (until === 0) {
+        untilText = 'selamanya';
+    } else if (until) {
+        var d = new Date(until);
+        untilText = 'sampai ' + d.toLocaleString('id-ID');
+    } else {
+        untilText = 'untuk sementara waktu';
+    }
+    document.body.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#fef2f2,#fee2e2,#fecaca);padding:20px;font-family:\'Segoe UI\',sans-serif;"><div style="background:#fff;border-radius:20px;padding:40px 30px;max-width:440px;width:100%;text-align:center;box-shadow:0 25px 60px rgba(0,0,0,0.1);border:1px solid #fecaca;"><div style="font-size:70px;color:#ef4444;margin-bottom:20px;">🚫</div><h1 style="color:#dc2626;font-size:24px;margin-bottom:10px;">AKUN DIBANNED</h1><p style="color:#64748b;font-size:14px;margin-bottom:8px;">' + reason + '</p><p style="color:#991b1b;font-size:13px;background:#fee2e2;padding:8px 12px;border-radius:8px;display:inline-block;">⏱️ Durasi: <b>' + untilText + '</b></p><br><br><button onclick="window.location.href=\'https://wa.me/' + WHATSAPP_NUMBER + '?text=Assalamualaikum%20admin%2C%20akun%20saya%20terbanned%20tolong%20dibantu\'" style="padding:12px 24px;background:#25D366;color:#fff;border:none;border-radius:10px;font-weight:600;font-size:14px;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:8px;"><i class="fab fa-whatsapp"></i> Hubungi Admin</button></div></div>';
+}
+
+function showForceLogoutScreen(reason) {
+    document.body.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#fef3c7,#fde68a,#fcd34d);padding:20px;font-family:\'Segoe UI\',sans-serif;"><div style="background:#fff;border-radius:20px;padding:40px 30px;max-width:440px;width:100%;text-align:center;box-shadow:0 25px 60px rgba(0,0,0,0.1);border:1px solid #fde68a;"><div style="font-size:70px;color:#f59e0b;margin-bottom:20px;">⏏️</div><h1 style="color:#92400e;font-size:24px;margin-bottom:10px;">AKUN DIKUNCI</h1><p style="color:#64748b;font-size:14px;margin-bottom:8px;">' + reason + '</p><p style="color:#92400e;font-size:12px;margin-bottom:16px;">Akun kamu tidak bisa login karena terdeteksi sharing akun atau aktivitas mencurigakan.</p><button onclick="window.location.href=\'https://wa.me/' + WHATSAPP_NUMBER + '?text=Assalamualaikum%20admin%2C%20akun%20saya%20terkunci%20tolong%20dibantu\'" style="padding:12px 24px;background:#25D366;color:#fff;border:none;border-radius:10px;font-weight:600;font-size:14px;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:8px;"><i class="fab fa-whatsapp"></i> Hubungi Admin</button></div></div>';
+}
+
+function showBanAksesScreen(reason, until) {
+    var untilText = '';
+    if (until === 0) {
+        untilText = 'PERMANEN';
+    } else if (until) {
+        var d = new Date(until);
+        untilText = 'sampai ' + d.toLocaleString('id-ID');
+    } else {
+        untilText = 'sementara';
+    }
+    document.body.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#fef2f2,#fee2e2,#fecaca);padding:20px;font-family:\'Segoe UI\',sans-serif;"><div style="background:#fff;border-radius:20px;padding:40px 30px;max-width:440px;width:100%;text-align:center;box-shadow:0 25px 60px rgba(0,0,0,0.1);border:1px solid #fecaca;"><div style="font-size:70px;color:#ef4444;margin-bottom:20px;">🛡️</div><h1 style="color:#dc2626;font-size:24px;margin-bottom:10px;">AKSES DIBLOKIR</h1><p style="color:#64748b;font-size:14px;margin-bottom:8px;">' + reason + '</p><p style="color:#991b1b;font-size:13px;background:#fee2e2;padding:8px 12px;border-radius:8px;display:inline-block;">⏱️ Durasi: <b>' + untilText + '</b></p><br><br><button onclick="window.location.href=\'https://wa.me/' + WHATSAPP_NUMBER + '?text=Assalamualaikum%20admin%2C%20akses%20saya%20diblokir%20tolong%20dibantu\'" style="padding:12px 24px;background:#25D366;color:#fff;border:none;border-radius:10px;font-weight:600;font-size:14px;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:8px;"><i class="fab fa-whatsapp"></i> Hubungi Admin</button></div></div>';
+}
+
 async function getFingerprint() {
     var fp = '';
     fp += navigator.userAgent || '';
@@ -315,13 +345,42 @@ async function login() {
     showLoading('Login...');
     try {
         var result = await callRevanstore('login', 'POST', { username: username, password: password });
+        
+        // Handle IP/FP Blocked
         if (result && result.blocked) { 
+            if (result.message === 'Akun dibanned / akses diblokir.') {
+                hideLoading();
+                showBlockedScreen();
+                return;
+            }
             isBlocked = true; 
             localStorage.setItem('bussid_blocked', 'true'); 
             hideLoading(); 
             showBlockedScreen(); 
             return; 
         }
+        
+        // Handle User Banned
+        if (result && result.banned) {
+            hideLoading();
+            showBannedScreen('Maaf, akun Anda telah dibanned oleh admin.', result.bannedUntil || 0);
+            return;
+        }
+        
+        // Handle Ban Akses
+        if (result && result.banAkses) {
+            hideLoading();
+            showBanAksesScreen('Maaf, akses Anda diblokir oleh admin.', result.banAksesUntil || 0);
+            return;
+        }
+        
+        // Handle Force Logout
+        if (result && result.forceLogout) {
+            hideLoading();
+            showForceLogoutScreen('Akun Anda tidak bisa login karena adanya indikasi sharing akun atau aktivitas mencurigakan.');
+            return;
+        }
+        
         if (result && result.success) {
             localStorage.removeItem(getBlockKey(username));
             var user = result.data;
