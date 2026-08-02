@@ -21,7 +21,13 @@ function showBlockedScreen() {
     document.body.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#e0f2fe,#bae6fd,#7dd3fc);padding:20px;font-family:\'Segoe UI\',sans-serif;"><div style="background:#fff;border-radius:20px;padding:40px 30px;max-width:420px;width:100%;text-align:center;box-shadow:0 25px 60px rgba(0,0,0,0.1);"><div style="font-size:70px;color:#ef4444;margin-bottom:20px;">🔒</div><h1 style="color:#0c4a6e;font-size:24px;margin-bottom:10px;">AKSES DITOLAK</h1><p style="color:#64748b;font-size:14px;">Maaf, akses Anda telah diblokir.</p></div></div>';
 }
 
-// ==================== POPUP BANNED ====================
+// ==================== BAN AKSES → HALAMAN PENUH ====================
+function showBanAksesScreen(until) {
+    var untilText = (until || 0) === 0 ? 'PERMANEN' : ('sampai ' + new Date(until).toLocaleString('id-ID'));
+    document.body.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#fef3c7,#fde68a,#fcd34d);padding:20px;font-family:\'Segoe UI\',sans-serif;"><div style="background:#fff;border-radius:20px;padding:40px 30px;max-width:420px;width:100%;text-align:center;box-shadow:0 25px 60px rgba(0,0,0,0.1);"><div style="font-size:70px;color:#f59e0b;margin-bottom:20px;">🚫</div><h1 style="color:#92400e;font-size:24px;margin-bottom:10px;">AKSES DIBLOKIR</h1><p style="color:#64748b;font-size:14px;margin-bottom:8px;">Maaf, akses Anda diblokir oleh admin.</p><p style="color:#991b1b;font-size:13px;background:#fee2e2;padding:8px 12px;border-radius:8px;display:inline-block;">⏰ Durasi: <b>' + untilText + '</b></p><br><br><button onclick="window.open(\'https://wa.me/' + WHATSAPP_NUMBER + '?text=Assalamualaikum%20admin%2C%20akses%20saya%20diblokir\',\'_blank\')" style="padding:12px 24px;background:#25D366;color:#fff;border:none;border-radius:10px;font-weight:600;font-size:14px;cursor:pointer;font-family:inherit;">💬 Hubungi Admin</button></div></div>';
+}
+
+// ==================== BANNED → POPUP ====================
 function showBannedPopup(until) {
     var untilText = (until || 0) === 0 ? 'PERMANEN' : ('sampai ' + new Date(until).toLocaleString('id-ID'));
     Swal.fire({
@@ -39,25 +45,7 @@ function showBannedPopup(until) {
     });
 }
 
-// ==================== POPUP BAN AKSES ====================
-function showBanAksesPopup(until) {
-    var untilText = (until || 0) === 0 ? 'PERMANEN' : ('sampai ' + new Date(until).toLocaleString('id-ID'));
-    Swal.fire({
-        icon: 'warning',
-        title: 'AKSES DIBLOKIR',
-        html: '<p>Maaf, akses Anda diblokir oleh admin.</p><p style="color:#dc2626;background:#fee2e2;padding:8px;border-radius:8px;"><b>Durasi: ' + untilText + '</b></p>',
-        confirmButtonText: '<i class="fab fa-whatsapp"></i> Hubungi Admin',
-        confirmButtonColor: '#25D366',
-        showCancelButton: true,
-        cancelButtonText: 'Tutup',
-        cancelButtonColor: '#64748b',
-        allowOutsideClick: false
-    }).then(function(r) {
-        if (r.isConfirmed) window.open('https://wa.me/' + WHATSAPP_NUMBER + '?text=Assalamualaikum%20admin%2C%20akses%20saya%20diblokir', '_blank');
-    });
-}
-
-// ==================== POPUP DITANGGUHKAN ====================
+// ==================== DITANGGUHKAN → POPUP ====================
 function showForceLogoutPopup() {
     Swal.fire({
         icon: 'warning',
@@ -254,7 +242,7 @@ async function deleteAllHistory() {
     } catch (error) { hideLoading(); Swal.fire({ icon: "error", title: "Oops...", text: "Gagal!", confirmButtonColor: "#ef4444" }); }
 }
 
-// ==================== LOGIN (DENGAN POPUP BANNED/FORCE) ====================
+// ==================== LOGIN ====================
 async function login() {
     if (loginInProgress) return;
     loginInProgress = true;
@@ -292,7 +280,7 @@ async function login() {
             fingerprint: fingerprint
         });
 
-        // CHECK BLOCKED
+        // CHECK BLOCKED (IP/FP)
         if (result && result.blocked) { 
             isBlocked = true; 
             localStorage.setItem('bussid_blocked', 'true'); 
@@ -302,18 +290,18 @@ async function login() {
             return; 
         }
 
-        // CHECK BANNED → POPUP
-        if (result && result.banned) {
+        // CHECK BAN AKSES → HALAMAN PENUH
+        if (result && result.banAkses) {
             hideLoading();
-            showBannedPopup(result.bannedUntil || 0);
+            showBanAksesScreen(result.banAksesUntil || 0);
             loginInProgress = false;
             return;
         }
 
-        // CHECK BAN AKSES → POPUP
-        if (result && result.banAkses) {
+        // CHECK BANNED → POPUP
+        if (result && result.banned) {
             hideLoading();
-            showBanAksesPopup(result.banAksesUntil || 0);
+            showBannedPopup(result.bannedUntil || 0);
             loginInProgress = false;
             return;
         }
@@ -370,6 +358,7 @@ async function login() {
     loginInProgress = false;
 }
 
+// ==================== SISANYA TETAP SAMA ====================
 function updateProfileInfo() {
     if (!currentUser) return;
     var expiryCheck = checkAccountExpiry(currentUser);
@@ -551,7 +540,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             if (age > 7 * 24 * 60 * 60 * 1000) { localStorage.removeItem('bussid_session'); return; } 
             document.getElementById('username').value = session.username;
             document.getElementById('password').value = session.password;
-            login(); // Auto login
+            login();
         } catch(e) { localStorage.removeItem('bussid_session'); } 
     }
 });
