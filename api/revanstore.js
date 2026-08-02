@@ -31,7 +31,7 @@ const requestTimestamps = new Map();
 const MIN_REQUEST_DELAY = 800;
 
 function checkRequestDelay(ip, path) {
-  if (path === 'login_success' || path === 'login_failed' || path === 'check_blocked' || path.startsWith('transactions/')) return true;
+  if (path === 'login_success' || path === 'login_failed' || path === 'check_blocked' || path === 'transactions/delete-all' || path.startsWith('transactions/')) return true;
   const now = Date.now();
   const last = requestTimestamps.get(ip) || 0;
   if (now - last < MIN_REQUEST_DELAY) return false;
@@ -162,6 +162,22 @@ async function autoDeleteOldTransactions(operator) {
   } catch(e) {}
 }
 
+async function deleteAllTransactions(operator) {
+  const snap = await db.ref('transactions').once('value');
+  const raw = snap.val();
+  let count = 0;
+  if (raw) {
+    for (const key in raw) {
+      const d = await decryptData(raw[key]);
+      if (d && d.operator === operator) {
+        await db.ref('transactions/' + key).remove();
+        count++;
+      }
+    }
+  }
+  return count;
+}
+
 export default async function handler(req, res) {
   const allowedOrigins = (process.env.ALLOWED_ORIGINS || '*').split(',');
   const origin = req.headers.origin;
@@ -182,7 +198,7 @@ export default async function handler(req, res) {
   const fp = req.headers['x-fingerprint'] || '';
   
   const appCheckToken = req.headers['x-app-check-token'] || '';
-  if (appCheckToken && !(await verifyAppCheck(appCheckToken))) {
+  if (appCheckToken && APP_CHECK_SECRET && !(await verifyAppCheck(appCheckToken))) {
     return res.status(403).json({ error: 'Verifikasi gagal' });
   }
   
@@ -265,6 +281,12 @@ export default async function handler(req, res) {
       await resetLoginAttempt(ip, fp); 
       if (operator) await autoDeleteOldTransactions(operator);
       return res.status(200).json({ success: true }); 
+    }
+
+    if (path === 'transactions/delete-all' && method === 'POST') {
+      if (!operator) return res.status(400).json({ error: 'Operator required' });
+      const count = await deleteAllTransactions(operator);
+      return res.status(200).json({ success: true, count });
     }
 
     if (path === 'transactions' && method === 'GET') { 
