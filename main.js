@@ -78,19 +78,6 @@ async function callRevanstore(path, method, data) {
     if (!fingerprint) fingerprint = await getFingerprint();
     if (isBlocked && path !== 'check_blocked') throw new Error('Akses ditolak');
     
-    var appCheckToken = '';
-    try {
-        appCheckToken = await new Promise(function(resolve, reject) {
-            grecaptcha.ready(function() {
-                grecaptcha.execute('6LdQnEgtAAAAAM2FbbmdB2v15bY9ytNnVzaGJ2q9', {action: 'submit'})
-                    .then(resolve)
-                    .catch(reject);
-            });
-        });
-    } catch(e) {
-        console.error('reCAPTCHA error:', e);
-    }
-    
     var payload = {
         path: path,
         method: method || 'GET',
@@ -102,8 +89,7 @@ async function callRevanstore(path, method, data) {
     
     var headers = {
         'Content-Type': 'application/json',
-        'X-Fingerprint': fingerprint,
-        'X-App-Check-Token': appCheckToken
+        'X-Fingerprint': fingerprint
     };
     
     if (currentUser && currentUser.username) {
@@ -270,44 +256,22 @@ function showDeleteHistoryConfirm() {
 async function deleteAllHistory() {
     showLoading('Menghapus...');
     try {
-        var transactions = await callRevanstore('transactions', 'GET');
-        if (!transactions || typeof transactions !== 'object' || Object.keys(transactions).length === 0) { 
-            hideLoading(); 
+        var result = await callRevanstore('transactions/delete-all', 'POST', {});
+        hideLoading();
+        if (result && result.success) {
+            Swal.fire({
+                icon: "success",
+                title: "Berhasil!",
+                text: (result.count || 0) + " riwayat berhasil dihapus!",
+                timer: 2000,
+                showConfirmButton: false
+            });
+        } else {
             Swal.fire({
                 icon: "warning",
                 title: "Oops...",
                 text: "Tidak ada riwayat!",
                 confirmButtonColor: "#0ea5e9"
-            });
-            return; 
-        }
-        var keys = Object.keys(transactions);
-        var count = 0;
-        var failed = 0;
-        for (var i = 0; i < keys.length; i++) { 
-            try {
-                await callRevanstore('transactions/' + keys[i], 'DELETE');
-                count++;
-            } catch(e) {
-                failed++;
-            }
-            await new Promise(function(r) { setTimeout(r, 1000); });
-        }
-        hideLoading();
-        if (failed > 0) {
-            Swal.fire({
-                icon: "warning",
-                title: "Selesai",
-                text: count + " riwayat dihapus, " + failed + " gagal.",
-                confirmButtonColor: "#0ea5e9"
-            });
-        } else {
-            Swal.fire({
-                icon: "success",
-                title: "Berhasil!",
-                text: count + " riwayat berhasil dihapus!",
-                timer: 2000,
-                showConfirmButton: false
             });
         }
         if (document.getElementById('historySection').style.display === 'block') { 
