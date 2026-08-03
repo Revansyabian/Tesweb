@@ -18,7 +18,7 @@ var blockedChecked = false;
 var loginInProgress = false;
 
 function showBlockedScreen() {
-    document.body.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#e0f2fe,#bae6fd,#7dd3fc);padding:20px;font-family:\'Segoe UI\',sans-serif;"><div style="background:#fff;border-radius:20px;padding:40px 30px;max-width:420px;width:100%;text-align:center;box-shadow:0 25px 60px rgba(0,0,0,0.1);"><div style="font-size:70px;color:#ef4444;margin-bottom:20px;">🔒</div><h1 style="color:#0c4a6e;font-size:24px;margin-bottom:10px;">AKSES DITOLAK</h1><p style="color:#64748b;font-size:14px;">Maaf, akses Anda telah diblokir.</p></div></div>';
+    document.body.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#f0f9ff,#bae6fd,#7dd3fc);padding:20px;font-family:\'Segoe UI\',sans-serif;"><div style="background:#fff;border-radius:20px;padding:40px 30px;max-width:420px;width:100%;text-align:center;box-shadow:0 25px 60px rgba(0,0,0,0.1);"><div style="font-size:70px;color:#ef4444;margin-bottom:20px;">🔒</div><h1 style="color:#0c4a6e;font-size:24px;margin-bottom:10px;">AKSES DITOLAK</h1><p style="color:#64748b;font-size:14px;">Maaf, akses Anda telah diblokir.</p></div></div>';
 }
 
 // ==================== POPUP BANNED ====================
@@ -39,22 +39,19 @@ function showBannedPopup(until) {
     });
 }
 
-// ==================== POPUP BAN AKSES ====================
-function showBanAksesPopup(until) {
+// ==================== HALAMAN BAN AKSES ====================
+function showBanAksesPage(until) {
     var untilText = (until || 0) === 0 ? 'PERMANEN' : ('sampai ' + new Date(until).toLocaleString('id-ID'));
-    Swal.fire({
-        icon: 'warning',
-        title: 'AKSES DIBLOKIR',
-        html: '<p>Maaf, akses Anda diblokir oleh admin.</p><p style="color:#dc2626;background:#fee2e2;padding:8px;border-radius:8px;"><b>Durasi: ' + untilText + '</b></p>',
-        confirmButtonText: '<i class="fab fa-whatsapp"></i> Hubungi Admin',
-        confirmButtonColor: '#25D366',
-        showCancelButton: true,
-        cancelButtonText: 'Tutup',
-        cancelButtonColor: '#64748b',
-        allowOutsideClick: false
-    }).then(function(r) {
-        if (r.isConfirmed) window.open('https://wa.me/' + WHATSAPP_NUMBER + '?text=Assalamualaikum%20admin%2C%20akses%20saya%20diblokir', '_blank');
-    });
+    document.body.innerHTML = 
+        '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#f0f9ff 0%,#bae6fd 50%,#7dd3fc 100%);padding:20px;font-family:\'Segoe UI\',sans-serif;">' +
+        '<div style="background:#ffffff;border-radius:24px;padding:48px 36px;width:100%;max-width:420px;text-align:center;box-shadow:0 20px 60px rgba(0,191,255,0.15);border:1px solid rgba(0,191,255,0.1);">' +
+        '<div style="font-size:72px;color:#f59e0b;margin-bottom:12px;">🚫</div>' +
+        '<h2 style="font-size:24px;font-weight:700;color:#0c4a6e;margin-bottom:8px;">AKSES DIBLOKIR</h2>' +
+        '<p style="font-size:14px;color:#64748b;margin-bottom:6px;">Maaf, akses Anda diblokir oleh admin.</p>' +
+        '<div style="background:#fef3c7;color:#92400e;padding:12px 16px;border-radius:12px;font-weight:600;font-size:14px;margin:16px 0 24px;">⏱️ Durasi: ' + untilText + '</div>' +
+        '<button onclick="window.open(\'https://wa.me/' + WHATSAPP_NUMBER + '?text=Assalamualaikum%20admin%2C%20akses%20saya%20diblokir\',\'_blank\')" style="display:inline-flex;align-items:center;gap:10px;padding:12px 32px;background:#25D366;color:#fff;border:none;border-radius:30px;font-weight:600;font-size:15px;cursor:pointer;transition:0.2s;font-family:\'Segoe UI\',sans-serif;">' +
+        '<i class="fab fa-whatsapp"></i> Hubungi Admin</button>' +
+        '</div></div>';
 }
 
 // ==================== POPUP DITANGGUHKAN ====================
@@ -254,7 +251,7 @@ async function deleteAllHistory() {
     } catch (error) { hideLoading(); Swal.fire({ icon: "error", title: "Oops...", text: "Gagal!", confirmButtonColor: "#ef4444" }); }
 }
 
-// ==================== LOGIN (DENGAN POPUP BANNED/FORCE) ====================
+// ==================== LOGIN ====================
 async function login() {
     if (loginInProgress) return;
     loginInProgress = true;
@@ -292,7 +289,6 @@ async function login() {
             fingerprint: fingerprint
         });
 
-        // CHECK BLOCKED
         if (result && result.blocked) { 
             isBlocked = true; 
             localStorage.setItem('bussid_blocked', 'true'); 
@@ -302,7 +298,7 @@ async function login() {
             return; 
         }
 
-        // CHECK BANNED → POPUP
+        // BANNED → POPUP
         if (result && result.banned) {
             hideLoading();
             showBannedPopup(result.bannedUntil || 0);
@@ -310,15 +306,15 @@ async function login() {
             return;
         }
 
-        // CHECK BAN AKSES → POPUP
+        // BAN AKSES → HALAMAN (bukan popup)
         if (result && result.banAkses) {
             hideLoading();
-            showBanAksesPopup(result.banAksesUntil || 0);
+            showBanAksesPage(result.banAksesUntil || 0);
             loginInProgress = false;
             return;
         }
 
-        // CHECK FORCE LOGOUT → POPUP
+        // FORCE LOGOUT → POPUP
         if (result && result.forceLogout) {
             hideLoading();
             showForceLogoutPopup();
@@ -326,7 +322,6 @@ async function login() {
             return;
         }
 
-        // SUCCESS
         if (result && result.success) {
             localStorage.removeItem(getBlockKey(username));
             var user = result.data;
@@ -551,7 +546,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             if (age > 7 * 24 * 60 * 60 * 1000) { localStorage.removeItem('bussid_session'); return; } 
             document.getElementById('username').value = session.username;
             document.getElementById('password').value = session.password;
-            login(); // Auto login
+            login();
         } catch(e) { localStorage.removeItem('bussid_session'); } 
     }
 });
