@@ -183,19 +183,51 @@ export default async function handler(req, res) {
     if (path === 'check_blocked' && method === 'POST') {
       const ipBlocked = await isIPBlocked(ip);
       const fpBlocked = fp ? await isFPBlocked(fp) : false;
-      return res.status(200).json({ blocked: ipBlocked || fpBlocked });
+      return res.status(200).json(encryptResponse({ blocked: ipBlocked || fpBlocked }));
     }
 
-    // ==================== LOGIN (FIXED - BANNED CHECK) ====================
+    // ==================== ACCESS KEY ====================
+    if (path === 'access_key' && method === 'GET') {
+      const snap = await ref.once('value');
+      const raw = snap.val();
+      let result = { key: '' };
+      if (raw && raw.data) {
+        try {
+          const dec = CryptoJS.AES.decrypt(raw.data, ADMIN_KEY).toString(CryptoJS.enc.Utf8);
+          result = JSON.parse(dec);
+        } catch (e) {}
+      }
+      return res.status(200).json(encryptResponse(result));
+    }
+
+    // ==================== ADMIN AUTH ====================
+    if (path === 'admin/auth' && method === 'GET') {
+      const ipBlocked = await isIPBlocked(ip);
+      const fpBlocked = fp ? await isFPBlocked(fp) : false;
+      if (ipBlocked || fpBlocked) {
+        return res.status(200).json(encryptResponse({ blocked: true }));
+      }
+      const snap = await ref.once('value');
+      const raw = snap.val();
+      let result = {};
+      if (raw && raw.data) {
+        try {
+          const dec = CryptoJS.AES.decrypt(raw.data, ADMIN_KEY).toString(CryptoJS.enc.Utf8);
+          result = JSON.parse(dec);
+        } catch (e) {}
+      }
+      return res.status(200).json(encryptResponse(result));
+    }
+
+    // ==================== LOGIN ====================
     if (path === 'login' && method === 'POST') {
-      // Check IP/FP blocked
       if (await isIPBlocked(ip) || (fp && await isFPBlocked(fp))) {
-        return res.status(200).json({ blocked: true, message: 'IP atau Fingerprint diblokir.' });
+        return res.status(200).json(encryptResponse({ blocked: true, message: 'IP atau Fingerprint diblokir.' }));
       }
 
       const snap = await db.ref('users').once('value');
       const users = snap.val();
-      if (!users) return res.status(200).json({ success: false });
+      if (!users) return res.status(200).json(encryptResponse({ success: false }));
 
       const username = data.username;
       const password = data.password;
@@ -207,68 +239,52 @@ export default async function handler(req, res) {
         
         if (decryptedUser && decryptedUser.username === username && decryptedUser.password === password) {
 
-          // ========== CHECK BANNED ==========
           if (decryptedUser.banned === true) {
             await logActivity(username, 'login_blocked_banned', 'Login ditolak - akun dibanned', currentIP, currentFP);
-            return res.status(200).json({
-              success: false,
-              banned: true,
-              bannedUntil: decryptedUser.bannedUntil || 0,
+            return res.status(200).json(encryptResponse({
+              success: false, banned: true, bannedUntil: decryptedUser.bannedUntil || 0,
               message: 'Akun Anda telah dibanned oleh admin.'
-            });
+            }));
           }
 
-          // ========== CHECK BAN AKSES ==========
           if (decryptedUser.banAkses === true) {
-            // Cek expired
             if (decryptedUser.banAksesUntil && decryptedUser.banAksesUntil !== 0 && decryptedUser.banAksesUntil < Date.now()) {
-              // Expired - auto unban
               const updatedData = { ...decryptedUser, banAkses: false, banAksesUntil: 0 };
               const enc = CryptoJS.AES.encrypt(JSON.stringify(updatedData), ADMIN_KEY).toString();
               await db.ref('users/' + key).update({ data: enc });
             } else {
               await logActivity(username, 'login_blocked_banakses', 'Login ditolak - ban akses', currentIP, currentFP);
-              return res.status(200).json({
-                success: false,
-                banAkses: true,
-                banAksesUntil: decryptedUser.banAksesUntil || 0,
+              return res.status(200).json(encryptResponse({
+                success: false, banAkses: true, banAksesUntil: decryptedUser.banAksesUntil || 0,
                 message: 'Akses Anda diblokir oleh admin.'
-              });
+              }));
             }
           }
 
-          // ========== CHECK FORCE LOGOUT ==========
           if (decryptedUser.forceLogout === true) {
             await logActivity(username, 'login_blocked_force', 'Login ditolak - ditangguhkan', currentIP, currentFP);
-            return res.status(200).json({
-              success: false,
-              forceLogout: true,
+            return res.status(200).json(encryptResponse({
+              success: false, forceLogout: true,
               message: 'Akun Anda ditangguhkan karena indikasi sharing akun.'
-            });
+            }));
           }
 
-          // ========== DETEKSI SHARING ==========
           const prevIP = decryptedUser.ip || '';
           const prevFP = decryptedUser.fingerprint || '';
           const ipChanged = prevIP && currentIP && prevIP !== currentIP;
           const fpChanged = prevFP && currentFP && prevFP !== currentFP;
 
           if (ipChanged && fpChanged) {
-            // SHARING TERDETEKSI - AUTO FORCE LOGOUT
             const updatedData = { ...decryptedUser, forceLogout: true };
             const enc = CryptoJS.AES.encrypt(JSON.stringify(updatedData), ADMIN_KEY).toString();
             await db.ref('users/' + key).update({ data: enc });
-
             await logActivity(username, 'sharing_detected', 'IP & FP berbeda! Auto force logout.', currentIP, currentFP);
-
-            return res.status(200).json({
-              success: false,
-              forceLogout: true,
+            return res.status(200).json(encryptResponse({
+              success: false, forceLogout: true,
               message: 'Akun ditangguhkan karena terdeteksi sharing. Hubungi admin.'
-            });
+            }));
           }
 
-          // ========== UPDATE IP & FP ==========
           const ipHistory = decryptedUser.ipHistory || [];
           if (currentIP && (!ipHistory.length || ipHistory[ipHistory.length - 1] !== currentIP)) {
             ipHistory.push(currentIP);
@@ -282,37 +298,28 @@ export default async function handler(req, res) {
           }
 
           const updatedData = {
-            ...decryptedUser,
-            ip: currentIP,
-            fingerprint: currentFP,
-            ipHistory, fpHistory,
+            ...decryptedUser, ip: currentIP, fingerprint: currentFP, ipHistory, fpHistory,
             lastLogin: { ip: currentIP, fingerprint: currentFP, timestamp: Date.now() }
           };
 
           const enc = CryptoJS.AES.encrypt(JSON.stringify(updatedData), ADMIN_KEY).toString();
           await db.ref('users/' + key).update({ data: enc });
-
           await resetLoginAttempt(ip, fp);
           await logActivity(username, 'login_success', 'Login berhasil', currentIP, currentFP);
 
-          return res.status(200).json({
+          return res.status(200).json(encryptResponse({
             success: true,
             data: {
-              id: key,
-              username: decryptedUser.username,
-              role: decryptedUser.role || 'Operator',
-              full_name: decryptedUser.full_name || decryptedUser.username,
-              expiry_date: decryptedUser.expiry_date || '',
-              ip: currentIP,
-              fingerprint: currentFP
+              id: key, username: decryptedUser.username, role: decryptedUser.role || 'Operator',
+              full_name: decryptedUser.full_name || decryptedUser.username, expiry_date: decryptedUser.expiry_date || '',
+              ip: currentIP, fingerprint: currentFP
             }
-          });
+          }));
         }
       }
 
-      // User tidak ditemukan
       await logActivity(username, 'login_failed', 'Password salah', currentIP, currentFP);
-      return res.status(200).json({ success: false });
+      return res.status(200).json(encryptResponse({ success: false }));
     }
 
     // ==================== LOGIN FAILED ====================
@@ -322,28 +329,28 @@ export default async function handler(req, res) {
       if (attempts >= 5) {
         await blockIP(ip);
         if (fp) await blockFP(fp);
-        return res.status(200).json({ blocked: true });
+        return res.status(200).json(encryptResponse({ blocked: true }));
       }
-      return res.status(200).json({ attempts, remaining: 5 - attempts });
+      return res.status(200).json(encryptResponse({ attempts, remaining: 5 - attempts }));
     }
 
     // ==================== LOGIN SUCCESS ====================
     if (path === 'login_success' && method === 'POST') {
       await resetLoginAttempt(ip, fp);
-      return res.status(200).json({ success: true });
+      return res.status(200).json(encryptResponse({ success: true }));
     }
 
     // ==================== BLOCK IP/FP MANUAL ====================
     if (path === 'block_ip_manual' && method === 'POST') {
       await blockIP(data.ip);
       await logActivity('admin', 'block_ip', 'IP ' + data.ip + ' diblokir', ip, fp);
-      return res.status(200).json({ success: true });
+      return res.status(200).json(encryptResponse({ success: true }));
     }
 
     if (path === 'block_fp_manual' && method === 'POST') {
       await blockFP(data.fp);
       await logActivity('admin', 'block_fp', 'FP diblokir', ip, fp);
-      return res.status(200).json({ success: true });
+      return res.status(200).json(encryptResponse({ success: true }));
     }
 
     // ==================== GET ====================
@@ -357,7 +364,7 @@ export default async function handler(req, res) {
           if (d) result[key] = d;
         }
       }
-      return res.status(200).json(result);
+      return res.status(200).json(encryptResponse(result));
     }
 
     // ==================== POST ====================
@@ -365,14 +372,14 @@ export default async function handler(req, res) {
       const enc = CryptoJS.AES.encrypt(JSON.stringify(data), ADMIN_KEY).toString();
       const r = ref.push();
       await r.set({ data: enc });
-      return res.status(200).json({ success: true, id: r.key });
+      return res.status(200).json(encryptResponse({ success: true, id: r.key }));
     }
 
     // ==================== PUT ====================
     if (method === 'PUT') {
       const enc = CryptoJS.AES.encrypt(JSON.stringify(data), ADMIN_KEY).toString();
       await ref.set({ data: enc });
-      return res.status(200).json({ success: true });
+      return res.status(200).json(encryptResponse({ success: true }));
     }
 
     // ==================== PATCH ====================
@@ -382,17 +389,17 @@ export default async function handler(req, res) {
       const merged = Object.assign({}, existing || {}, data);
       const enc = CryptoJS.AES.encrypt(JSON.stringify(merged), ADMIN_KEY).toString();
       await ref.update({ data: enc });
-      return res.status(200).json({ success: true });
+      return res.status(200).json(encryptResponse({ success: true }));
     }
 
     // ==================== DELETE ====================
     if (method === 'DELETE') {
       await ref.remove();
-      return res.status(200).json({ success: true });
+      return res.status(200).json(encryptResponse({ success: true }));
     }
 
-    return res.status(400).json({ error: 'Invalid method' });
+    return res.status(400).json(encryptResponse({ error: 'Invalid method' }));
   } catch (error) {
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json(encryptResponse({ error: error.message }));
   }
 }
