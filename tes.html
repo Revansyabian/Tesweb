@@ -1,0 +1,2232 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <title>Web Top Up BUSSID</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <meta name="theme-color" content="#0ea5e9">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Top Up BUSSID">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        body {
+            background: #f0f4f8;
+            min-height: 100vh;
+            color: #1a1a2e;
+        }
+
+        .alert {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-120px);
+            padding: 16px 24px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 15px;
+            z-index: 999999;
+            max-width: 90%;
+            width: 400px;
+            text-align: center;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+            opacity: 0;
+            transition: all 0.3s ease;
+            color: #fff;
+            letter-spacing: 0.3px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        .alert.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+        .alert.info {
+            background: #0ea5e9;
+            border-left: 5px solid #0284c7;
+        }
+        .alert.success {
+            background: #10b981;
+            border-left: 5px solid #059669;
+        }
+        .alert.error {
+            background: #ef4444;
+            border-left: 5px solid #dc2626;
+        }
+        .alert.warning {
+            background: #f59e0b;
+            border-left: 5px solid #d97706;
+        }
+        .alert.loading {
+            background: #6366f1;
+            border-left: 5px solid #4f46e5;
+        }
+        .alert-content {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .alert-icon {
+            font-size: 20px;
+        }
+
+        #loginScreen {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 50%, #7dd3fc 100%);
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            z-index: 10;
+        }
+        .login-container {
+            width: 100%;
+            max-width: 420px;
+        }
+        .login-card {
+            background: #fff;
+            border-radius: 24px;
+            padding: 45px 35px 35px;
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.08);
+            animation: fadeIn 0.4s ease;
+            margin: auto;
+        }
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .login-header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+        .login-header h1 {
+            color: #0c4a6e;
+            font-size: 28px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+        }
+        .login-header h1 i {
+            color: #0ea5e9;
+        }
+        .login-header p {
+            color: #64748b;
+            font-size: 14px;
+            margin-top: 6px;
+        }
+        .login-footer {
+            margin-top: 28px;
+            text-align: center;
+            color: #94a3b8;
+            font-size: 13px;
+            padding-top: 18px;
+            border-top: 1px solid #f1f5f9;
+        }
+
+        .form-group {
+            margin-bottom: 22px;
+        }
+        .form-group label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+            color: #475569;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        .form-group label i {
+            color: #0ea5e9;
+        }
+        .form-input {
+            width: 100%;
+            padding: 14px 18px;
+            background: #f8fafc;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            color: #1e293b;
+            font-size: 15px;
+            transition: all 0.2s ease;
+        }
+        .form-input:focus {
+            outline: none;
+            border-color: #0ea5e9;
+            background: #fff;
+            box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.1);
+        }
+        .form-input::placeholder {
+            color: #94a3b8;
+        }
+        .form-hint {
+            display: block;
+            margin-top: 6px;
+            color: #94a3b8;
+            font-size: 12px;
+        }
+
+        .btn {
+            padding: 14px 24px;
+            border: none;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            text-decoration: none;
+            color: #fff;
+            letter-spacing: 0.3px;
+        }
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+        }
+        .btn:active {
+            transform: scale(0.97);
+        }
+        .btn-block {
+            width: 100%;
+        }
+        .btn-primary {
+            background: #0ea5e9;
+            color: #fff;
+        }
+        .btn-primary:hover {
+            background: #0284c7;
+        }
+        .btn-success {
+            background: #10b981;
+        }
+        .btn-success:hover {
+            background: #059669;
+        }
+        .btn-warning {
+            background: #f59e0b;
+            color: #1e293b;
+        }
+        .btn-warning:hover {
+            background: #d97706;
+        }
+        .btn-danger {
+            background: #ef4444;
+        }
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+        .btn-secondary {
+            background: #64748b;
+        }
+        .btn-secondary:hover {
+            background: #475569;
+        }
+        .btn-purple {
+            background: #6366f1;
+            color: #fff;
+        }
+        .btn-purple:hover {
+            background: #4f46e5;
+        }
+        .btn-icon {
+            background: #f0f9ff;
+            color: #0ea5e9;
+            padding: 10px 18px;
+            border-radius: 10px;
+            border: 1px solid #bae6fd;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .btn-icon:hover {
+            background: #e0f2fe;
+        }
+        .btn-whatsapp {
+            background: #25D366;
+            color: #fff;
+        }
+        .btn-whatsapp:hover {
+            background: #128C7E;
+        }
+        .btn-quick {
+            background: #fff;
+            color: #0ea5e9;
+            border: 2px solid #e0f2fe;
+            padding: 12px 16px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-weight: 600;
+            flex: 1;
+            text-align: center;
+        }
+        .btn-quick:hover {
+            background: #0ea5e9;
+            color: #fff;
+            border-color: #0ea5e9;
+        }
+
+        .main-app {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            animation: fadeIn 0.3s ease;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            padding: 20px 24px;
+            background: #fff;
+            border-radius: 16px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+        }
+        .logo h1 {
+            color: #0c4a6e;
+            font-size: 26px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .logo h1 i {
+            color: #0ea5e9;
+        }
+        .subtitle {
+            color: #64748b;
+            font-size: 13px;
+            margin-top: 4px;
+        }
+        .user-info {
+            display: flex;
+            gap: 12px;
+        }
+
+        .card {
+            background: #fff;
+            border-radius: 16px;
+            margin-bottom: 20px;
+            border: 1px solid #e2e8f0;
+            overflow: hidden;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+            animation: slideUp 0.3s ease;
+        }
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .card-header {
+            background: #fff;
+            padding: 20px 24px;
+            border-bottom: 1px solid #f1f5f9;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .card-header h2 {
+            color: #0c4a6e;
+            font-size: 20px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .card-header h2 i {
+            color: #0ea5e9;
+        }
+        .card-body {
+            padding: 24px;
+            color: #334155;
+        }
+
+        .account-profile {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            margin-bottom: 24px;
+            padding: 16px;
+            background: #f8fafc;
+            border-radius: 16px;
+        }
+        .profile-photo-container {
+            width: 110px;
+            height: 110px;
+            border-radius: 50%;
+            overflow: hidden;
+            border: 3px solid #e0f2fe;
+            flex-shrink: 0;
+            background: #e0f2fe;
+        }
+        .profile-photo {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .profile-photo img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .profile-photo i {
+            font-size: 50px;
+            color: #0ea5e9;
+        }
+        .profile-info {
+            flex: 1;
+        }
+        .profile-info h3 {
+            color: #0c4a6e;
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+        .account-balance {
+            color: #0ea5e9;
+            font-size: 28px;
+            font-weight: 700;
+        }
+
+        .facebook-info-section {
+            background: #f0f9ff;
+            border-radius: 12px;
+            padding: 18px;
+            margin-bottom: 18px;
+            border-left: 4px solid #0ea5e9;
+        }
+        .facebook-info-section h4 {
+            color: #0c4a6e;
+            margin-bottom: 12px;
+            font-size: 16px;
+            font-weight: 600;
+        }
+        .facebook-info-details {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .fb-info-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 6px 0;
+            border-bottom: 1px solid #e0f2fe;
+        }
+        .fb-info-row:last-child {
+            border-bottom: none;
+        }
+        .fb-info-label {
+            min-width: 100px;
+            color: #64748b;
+            font-weight: 500;
+            font-size: 13px;
+        }
+        .fb-info-value {
+            color: #1e293b;
+            font-weight: 500;
+            font-size: 13px;
+            flex: 1;
+        }
+
+        .bussid-info-section {
+            background: #f0f9ff;
+            border-radius: 12px;
+            padding: 18px;
+            margin-bottom: 20px;
+            border-left: 4px solid #0ea5e9;
+        }
+        .bussid-info-section h4 {
+            color: #0c4a6e;
+            margin-bottom: 12px;
+            font-size: 16px;
+            font-weight: 600;
+        }
+        .bussid-info-details {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .bussid-info-details .info-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 6px 0;
+            border-bottom: 1px solid #e0f2fe;
+        }
+        .bussid-info-details .info-row:last-child {
+            border-bottom: none;
+        }
+        .bussid-info-details .info-label {
+            min-width: 100px;
+            color: #64748b;
+            font-weight: 500;
+            font-size: 13px;
+        }
+        .bussid-info-details .info-value {
+            color: #1e293b;
+            font-weight: 500;
+            font-size: 13px;
+            flex: 1;
+        }
+
+        .playfab-id-full {
+            font-family: monospace;
+            font-size: 13px;
+            background: #f1f5f9;
+            padding: 4px 10px;
+            border-radius: 6px;
+            word-break: break-all;
+        }
+        .status-active {
+            color: #10b981;
+            background: #d1fae5;
+            padding: 4px 10px;
+            border-radius: 20px;
+            display: inline-block;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .account-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin: 20px 0;
+        }
+        .account-actions .action-btn {
+            width: 100%;
+            padding: 18px !important;
+            font-size: 18px !important;
+        }
+
+        .quick-amounts {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+            gap: 10px;
+            margin: 20px 0;
+        }
+        .current-account-info {
+            background: #f8fafc;
+            padding: 16px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            border-left: 3px solid #0ea5e9;
+        }
+        .current-account-info p {
+            margin-bottom: 8px;
+            font-size: 15px;
+            color: #475569;
+        }
+        .current-account-info p:last-child {
+            margin-bottom: 0;
+        }
+
+        .user-profile-info {
+            background: #f8fafc;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 24px;
+        }
+        .profile-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .profile-item:last-child {
+            border-bottom: none;
+        }
+        .profile-label {
+            color: #64748b;
+            font-weight: 500;
+            font-size: 14px;
+        }
+        .profile-value {
+            font-weight: 600;
+            color: #1e293b;
+            font-size: 14px;
+        }
+        .highlight-black {
+            background: #e2e8f0;
+            padding: 4px 10px;
+            border-radius: 6px;
+        }
+        .role-biru {
+            color: #0ea5e9 !important;
+            background: #e0f2fe;
+            padding: 4px 10px;
+            border-radius: 6px;
+        }
+
+        .expiry-days-left {
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 12px;
+            display: inline-block;
+            font-weight: 600;
+        }
+        .days-green {
+            background: #d1fae5;
+            color: #059669;
+        }
+        .days-yellow {
+            background: #fef3c7;
+            color: #d97706;
+        }
+        .days-red {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+        .days-permanent {
+            background: #e0e7ff;
+            color: #6366f1;
+        }
+
+        .settings-divider {
+            margin: 24px 0 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .settings-divider h3 {
+            color: #0c4a6e;
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .transaction-item {
+            background: #f8fafc;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 10px;
+            border-left: 3px solid #0ea5e9;
+            transition: all 0.2s ease;
+        }
+        .transaction-item:hover {
+            background: #f1f5f9;
+            transform: translateX(3px);
+        }
+        .transaction-item.topup {
+            border-left-color: #10b981;
+        }
+        .transaction-item.kuras {
+            border-left-color: #f59e0b;
+        }
+        .transaction-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+        .transaction-amount {
+            font-weight: 700;
+            font-size: 16px;
+        }
+        .transaction-details {
+            display: flex;
+            justify-content: space-between;
+            color: #64748b;
+            font-size: 13px;
+        }
+        .transaction-balance {
+            display: flex;
+            justify-content: space-between;
+            color: #8899aa;
+            font-size: 11px;
+            margin-top: 6px;
+            gap: 8px;
+        }
+
+        .history-header-actions {
+            display: flex;
+            gap: 10px;
+        }
+        .history-header-actions .btn-icon.btn-danger {
+            color: #ef4444;
+            border-color: #fecaca;
+        }
+        .history-header-actions .btn-icon.btn-danger:hover {
+            background: #fee2e2;
+        }
+        .history-info {
+            background: #fef3c7;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 16px;
+            color: #92400e;
+            font-size: 13px;
+        }
+
+        .receipt-content {
+            background: #f8fafc;
+            border-radius: 12px;
+            padding: 24px;
+        }
+        .receipt-header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding-bottom: 16px;
+            border-bottom: 2px dashed #e2e8f0;
+        }
+        .receipt-header h3 {
+            color: #0c4a6e;
+            font-size: 22px;
+            font-weight: 700;
+        }
+        .receipt-details {
+            display: grid;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .receipt-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #f1f5f9;
+            font-size: 14px;
+        }
+        .receipt-row:last-child {
+            border-bottom: none;
+        }
+
+        .expired-banner {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.97);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            padding: 20px;
+        }
+        .expired-content {
+            background: #fff;
+            border: 1px solid #fecaca;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+            position: relative;
+            text-align: center;
+            animation: fadeIn 0.3s ease;
+        }
+        .expired-content h3 {
+            color: #dc2626;
+            font-size: 22px;
+            margin-bottom: 12px;
+        }
+        .expired-content p {
+            color: #64748b;
+            font-size: 15px;
+            margin-bottom: 24px;
+        }
+        .expired-close {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            background: #f1f5f9;
+            border: none;
+            color: #64748b;
+            font-size: 18px;
+            cursor: pointer;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+        .expired-close:hover {
+            background: #e2e8f0;
+        }
+        .expired-icon {
+            font-size: 50px;
+            color: #ef4444;
+            margin-bottom: 16px;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%,
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+            50% {
+                transform: scale(1.15);
+                opacity: 0.7;
+            }
+        }
+
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(15, 23, 42, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 99999;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.25s ease;
+            padding: 20px;
+        }
+        .modal.active {
+            opacity: 1;
+            visibility: visible;
+        }
+        .modal-content {
+            background: #fff;
+            border-radius: 20px;
+            padding: 36px;
+            max-width: 460px;
+            width: 100%;
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.12);
+            transform: scale(0.9);
+            transition: transform 0.25s ease;
+        }
+        .modal.active .modal-content {
+            transform: scale(1);
+        }
+        .modal-content h3 {
+            color: #0c4a6e;
+            font-size: 22px;
+            margin-bottom: 16px;
+            text-align: center;
+        }
+        .modal-content p {
+            color: #64748b;
+            font-size: 15px;
+            line-height: 1.6;
+            margin-bottom: 24px;
+            text-align: center;
+        }
+        .modal-buttons {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+        .modal-buttons .btn {
+            min-width: 110px;
+            padding: 12px 20px;
+            flex: 1;
+        }
+
+        .confirm-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 100001;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .confirm-box {
+            background: #fff;
+            border-radius: 16px;
+            padding: 30px;
+            text-align: center;
+            max-width: 380px;
+            width: 90%;
+            animation: popIn 0.3s ease;
+        }
+        .confirm-icon {
+            font-size: 50px;
+            margin-bottom: 15px;
+        }
+        .confirm-message {
+            color: #64748b;
+            font-size: 14px;
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+        .confirm-buttons {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+        .confirm-btn {
+            padding: 10px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .confirm-btn:active {
+            transform: scale(0.95);
+        }
+        .confirm-no {
+            background: #e2e8f0;
+            color: #475569;
+        }
+        .confirm-yes {
+            background: #ef4444;
+            color: #fff;
+        }
+        @keyframes popIn {
+            from {
+                transform: scale(0.8);
+                opacity: 0;
+            }
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        .password-counter {
+            text-align: right;
+            font-size: 11px;
+            color: #94a3b8;
+            margin-top: 4px;
+        }
+        .name-availability {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 13px;
+            display: none;
+        }
+        .availability-checking {
+            color: #0ea5e9;
+            background: #f0f9ff;
+        }
+        .availability-success {
+            color: #10b981;
+            background: #d1fae5;
+        }
+        .availability-error {
+            color: #ef4444;
+            background: #fee2e2;
+        }
+
+        .input-with-button {
+            display: flex;
+            gap: 10px;
+        }
+        .input-with-button .form-input {
+            flex: 1;
+        }
+        .input-with-button .btn {
+            padding: 14px 18px;
+            white-space: nowrap;
+        }
+
+        .max-badge {
+            display: inline-block;
+            background: #fef3c7;
+            color: #92400e;
+            padding: 3px 8px;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-left: 6px;
+        }
+        .amount-preview {
+            text-align: center;
+            margin: 12px 0;
+            padding: 14px;
+            background: #f0f9ff;
+            border-radius: 10px;
+        }
+        .amount-preview .label {
+            color: #64748b;
+            font-size: 13px;
+            margin-bottom: 4px;
+        }
+        .amount-preview .value {
+            color: #0ea5e9;
+            font-size: 22px;
+            font-weight: 700;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #333;
+            border-top: 4px solid #0ea5e9;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin {
+            from {
+                transform: rotate(0deg);
+            }
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        #trxLagiModal {
+            display: none;
+            opacity: 0;
+            visibility: hidden;
+        }
+        #trxLagiModal.active {
+            display: flex;
+            opacity: 1;
+            visibility: visible;
+        }
+
+        @media(max-width:768px) {
+            .header {
+                flex-direction: column;
+                gap: 16px;
+                text-align: center;
+            }
+            .user-info {
+                width: 100%;
+                justify-content: center;
+            }
+            .login-card {
+                padding: 30px 22px;
+            }
+            .card-header {
+                flex-direction: column;
+                gap: 12px;
+                text-align: center;
+            }
+            .card-header h2 {
+                flex-direction: column;
+                gap: 8px;
+                font-size: 18px;
+            }
+            .history-header-actions {
+                flex-direction: column;
+                width: 100%;
+            }
+            .modal-buttons {
+                flex-direction: column;
+            }
+            .modal-buttons .btn {
+                width: 100%;
+            }
+            .quick-amounts {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .profile-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 4px;
+            }
+            .account-profile {
+                flex-direction: column;
+                text-align: center;
+            }
+            .profile-info {
+                text-align: center;
+            }
+            .account-actions {
+                flex-direction: column;
+            }
+            .input-with-button {
+                flex-direction: column;
+            }
+            .input-with-button .btn {
+                width: 100%;
+            }
+            .btn {
+                font-size: 14px;
+                padding: 12px 18px;
+            }
+            .modal-content {
+                padding: 24px;
+            }
+        }
+
+        @media(max-width:480px) {
+            .login-header h1 {
+                font-size: 22px;
+            }
+            .btn {
+                padding: 12px 18px;
+                font-size: 14px;
+            }
+            .quick-amounts {
+                grid-template-columns: 1fr;
+            }
+            .profile-photo-container {
+                width: 90px;
+                height: 90px;
+            }
+            .profile-info h3 {
+                font-size: 20px;
+            }
+            .account-balance {
+                font-size: 22px;
+            }
+            .card-body {
+                padding: 16px;
+            }
+            .card-header {
+                padding: 16px;
+            }
+            .header {
+                padding: 16px;
+            }
+            .logo h1 {
+                font-size: 22px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="alert" class="alert"></div>
+
+    <div id="loadingOverlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:99999;justify-content:center;align-items:center">
+        <div style="background:#1a1a2e;padding:30px 40px;border-radius:16px;text-align:center;color:#fff">
+            <div class="spinner"></div>
+            <p id="loadingMessage" style="margin-top:15px;font-size:14px">Memproses...</p>
+        </div>
+    </div>
+
+    <div id="expiredBanner" class="expired-banner" style="display:none">
+        <div class="expired-content">
+            <button class="expired-close" onclick="closeExpiredBanner()"><i class="fas fa-times"></i></button>
+            <div class="expired-icon"><i class="fas fa-exclamation-triangle"></i></div>
+            <h3>MASA AKTIF AKUN HABIS</h3>
+            <p>Maaf masa aktif akun anda telah habis. Silakan perpanjang akses Anda.</p>
+            <button class="btn btn-whatsapp" onclick="openWhatsApp()"><i class="fab fa-whatsapp"></i> Perpanjang Masa Aktif</button>
+        </div>
+    </div>
+
+    <div id="trxLagiModal" class="modal" style="display:none">
+        <div class="modal-content" style="max-width:400px">
+            <h3 style="color:#0ea5e9;margin-bottom:20px;text-align:center"><i class="fas fa-redo"></i> MAU LANJUT TRX?</h3>
+            <div style="display:flex;gap:15px;margin-bottom:20px">
+                <button class="btn btn-success" onclick="window._pilihTopup()" style="flex:1;padding:15px"><i class="fas fa-arrow-up"></i> TOP UP</button>
+                <button class="btn btn-warning" onclick="window._pilihKuras()" style="flex:1;padding:15px"><i class="fas fa-arrow-down"></i> KURAS</button>
+            </div>
+            <button class="btn btn-secondary btn-block" onclick="window._tutupTrxModal()"><i class="fas fa-arrow-left"></i> KEMBALI</button>
+        </div>
+    </div>
+
+    <div id="loginScreen">
+        <div class="login-container">
+            <div class="login-card">
+                <div class="login-header">
+                    <h1><i class="fas fa-bus"></i> TOP UP BUSSID</h1>
+                    <p>Top Up BUS SIMULATOR ID</p>
+                </div>
+                <div class="form-group">
+                    <label for="username"><i class="fas fa-user"></i> Username</label>
+                    <input type="text" id="username" placeholder="Masukkan username" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label for="password"><i class="fas fa-lock"></i> Password</label>
+                    <input type="password" id="password" placeholder="Masukkan password" class="form-input" maxlength="20" oninput="updatePasswordCounter('password')">
+                    <div class="password-counter"><span id="passwordCharCount">0/20</span></div>
+                </div>
+                <button class="btn btn-primary btn-block" onclick="login()"><i class="fas fa-sign-in-alt"></i> LOGIN</button>
+                <div class="login-footer">
+                    <p><i class="fas fa-info-circle"></i> Hubungi admin untuk membuat akun</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="mainApp" class="main-app" style="display:none">
+        <div class="header">
+            <div class="logo">
+                <h1><i class="fas fa-bus"></i> TOP UP BUSSID</h1>
+                <p class="subtitle">Top Up uang bussid</p>
+            </div>
+            <div class="user-info">
+                <button class="btn-icon" onclick="showHistory()"><i class="fas fa-history"></i> Riwayat</button>
+                <button class="btn-icon" onclick="showSettings()"><i class="fas fa-cog"></i> Pengaturan</button>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="card search-card">
+                <div class="card-header">
+                    <h2><i class="fas fa-search"></i> CARI AKUN BUSSID</h2>
+                </div>
+                <div class="card-body">
+                    <div class="form-group">
+                        <label for="deviceId"><i class="fas fa-mobile-alt"></i> Device ID / X-Auth Token</label>
+                        <input type="text" id="deviceId" placeholder="Masukkan Device ID atau Token" class="form-input">
+                        <small class="form-hint"><i class="fas fa-info-circle"></i> Masukan device id atau x auth</small>
+                    </div>
+                    <button class="btn btn-primary btn-block" onclick="searchAccount()"><i class="fas fa-search"></i> CARI AKUN</button>
+                </div>
+            </div>
+
+            <div id="accountInfo" class="card" style="display:none">
+                <div class="card-header">
+                    <h2><i class="fas fa-user-circle"></i> INFORMASI AKUN BUSSID</h2>
+                    <button class="btn-icon" onclick="refreshAccountInfo()"><i class="fas fa-sync-alt"></i> Refresh</button>
+                </div>
+                <div class="card-body">
+                    <div class="account-profile">
+                        <div class="profile-photo-container">
+                            <div class="profile-photo" id="profilePhoto"><i class="fas fa-user"></i></div>
+                        </div>
+                        <div class="profile-info">
+                            <h3 id="accountName">-</h3>
+                            <p class="account-balance" id="accountBalance">Rp 0</p>
+                        </div>
+                    </div>
+                    <div class="facebook-info-section">
+                        <h4><i class="fab fa-facebook" style="color:#1877F2"></i> INFORMASI AKUN FACEBOOK</h4>
+                        <div class="facebook-info-details" id="facebookDetails">
+                            <div class="fb-info-row">
+                                <span class="fb-info-label"><i class="fab fa-facebook"></i> Status:</span>
+                                <span class="fb-info-value">Memuat data Facebook...</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bussid-info-section">
+                        <h4><i class="fas fa-bus"></i> INFORMASI BUSSID</h4>
+                        <div class="bussid-info-details">
+                            <div class="info-row">
+                                <span class="info-label"><i class="fas fa-id-card"></i> PlayFab ID:</span>
+                                <span class="info-value playfab-id-full" id="playfabId">-</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label"><i class="fas fa-circle"></i> Status:</span>
+                                <span class="info-value status-active"><i class="fas fa-check-circle"></i> AKTIF</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="account-actions">
+                        <button class="btn btn-success action-btn" onclick="showTopupFromAccount()"><i class="fas fa-arrow-up"></i> TOP UP</button>
+                        <button class="btn btn-warning action-btn" onclick="showKurasFromAccount()"><i class="fas fa-arrow-down"></i> KURAS</button>
+                        <button class="btn btn-purple action-btn" onclick="showChangeNameSection()"><i class="fas fa-user-edit"></i> GANTI NAMA AKUN</button>
+                    </div>
+                    <button class="btn btn-primary btn-block" onclick="showHome()" style="margin-top:10px"><i class="fas fa-home"></i> KEMBALI KE HOME</button>
+                </div>
+            </div>
+
+            <div id="topupSection" class="card" style="display:none">
+                <div class="card-header"><h2><i class="fas fa-money-bill-wave"></i> TOP UP SALDO BUSSID</h2></div>
+                <div class="card-body">
+                    <div class="current-account-info">
+                        <p><i class="fas fa-user"></i> <strong>Akun:</strong> <span id="topupAccountName">-</span></p>
+                        <p><i class="fas fa-coins"></i> <strong>Saldo Saat Ini:</strong> <span id="topupCurrentBalance">Rp 0</span></p>
+                    </div>
+                    <div class="form-group">
+                        <label for="topupAmount"><i class="fas fa-coins"></i> Jumlah Top Up <span class="max-badge">MAX: 2.147M</span></label>
+                        <input type="text" id="topupAmount" placeholder="Contoh: 2M, 1M, 500JT, MAX" class="form-input" oninput="validateTopupAmount()">
+                        <div id="amountPreview" class="amount-preview" style="display:none">
+                            <div class="label">Jumlah Top Up</div>
+                            <div class="value" id="amountPreviewValue">Rp 0</div>
+                        </div>
+                    </div>
+                    <div class="quick-amounts"></div>
+                    <button class="btn btn-success btn-block" onclick="processTopup()"><i class="fas fa-check-circle"></i> PROSES TOP UP</button>
+                    <button class="btn btn-primary btn-block" onclick="backToAccount()" style="margin-top:10px"><i class="fas fa-home"></i> KEMBALI</button>
+                </div>
+            </div>
+
+            <div id="kurasSection" class="card" style="display:none">
+                <div class="card-header"><h2><i class="fas fa-exchange-alt"></i> KURAS SALDO BUSSID</h2></div>
+                <div class="card-body">
+                    <div class="current-account-info">
+                        <p><i class="fas fa-user"></i> <strong>Akun:</strong> <span id="kurasAccountName">-</span></p>
+                        <p><i class="fas fa-coins"></i> <strong>Saldo Saat Ini:</strong> <span id="kurasCurrentBalance">Rp 0</span></p>
+                    </div>
+                    <div class="form-group">
+                        <label for="kurasAmount"><i class="fas fa-coins"></i> Jumlah Kuras</label>
+                        <input type="text" id="kurasAmount" placeholder="Kosongkan untuk kuras semua" class="form-input">
+                        <small class="form-hint">Biarkan kosong untuk menguras semua saldo</small>
+                    </div>
+                    <button class="btn btn-warning btn-block" onclick="processKuras()"><i class="fas fa-bolt"></i> PROSES KURAS</button>
+                    <button class="btn btn-primary btn-block" onclick="backToAccount()" style="margin-top:10px"><i class="fas fa-home"></i> KEMBALI</button>
+                </div>
+            </div>
+
+            <div id="changeNameSection" class="card" style="display:none">
+                <div class="card-header"><h2><i class="fas fa-user-edit"></i> GANTI NAMA AKUN</h2></div>
+                <div class="card-body">
+                    <div class="current-account-info">
+                        <p><i class="fas fa-user"></i> <strong>Akun:</strong> <span id="changeNameAccountLabel">-</span></p>
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-user-plus"></i> Nama Baru (Maks 25 karakter)</label>
+                        <div class="input-with-button">
+                            <input type="text" id="newAccountName" placeholder="Masukkan nama baru" class="form-input" maxlength="25">
+                            <button class="btn btn-primary" onclick="checkNameAvailability()"><i class="fas fa-search"></i> Cek</button>
+                        </div>
+                        <div class="name-availability" id="nameAvailability" style="display:none"></div>
+                    </div>
+                    <button class="btn btn-success btn-block" onclick="changeAccountNameSimple()"><i class="fas fa-check"></i> GANTI NAMA</button>
+                    <button class="btn btn-primary btn-block" onclick="backToAccount()" style="margin-top:10px"><i class="fas fa-home"></i> KEMBALI</button>
+                </div>
+            </div>
+
+            <div id="historySection" class="card" style="display:none">
+                <div class="card-header">
+                    <h2><i class="fas fa-history"></i> RIWAYAT TRANSAKSI</h2>
+                    <div class="history-header-actions">
+                        <button class="btn-icon" onclick="showHome()"><i class="fas fa-home"></i> Home</button>
+                        <button class="btn-icon btn-danger" onclick="showDeleteHistoryConfirm()"><i class="fas fa-trash"></i> Hapus Semua</button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="history-info"><p><i class="fas fa-info-circle"></i> Riwayat otomatis terhapus setelah 2 hari</p></div>
+                    <div id="transactionsList"></div>
+                </div>
+            </div>
+
+            <div id="settingsSection" class="card" style="display:none">
+                <div class="card-header">
+                    <h2><i class="fas fa-cog"></i> PENGATURAN AKUN</h2>
+                    <button class="btn-icon" onclick="showHome()"><i class="fas fa-home"></i> Home</button>
+                </div>
+                <div class="card-body">
+                    <div class="user-profile-info">
+                        <div class="profile-item"><span class="profile-label"><i class="fas fa-user"></i> Username:</span><span class="profile-value highlight-black" id="profileUsername">-</span></div>
+                        <div class="profile-item"><span class="profile-label"><i class="fas fa-user"></i> Nama:</span><span class="profile-value highlight-black" id="profileName">-</span></div>
+                        <div class="profile-item"><span class="profile-label"><i class="fas fa-user-tag"></i> Role:</span><span class="profile-value role-biru" id="profileRole">-</span></div>
+                        <div class="profile-item"><span class="profile-label"><i class="fas fa-calendar-alt"></i> Masa Aktif:</span><span class="profile-value" id="profileExpiry">-</span></div>
+                    </div>
+                    <div class="settings-divider"><h3><i class="fas fa-key"></i> Ubah Password</h3></div>
+                    <p style="text-align:center;color:#64748b;padding:15px;font-size:14px"><i class="fas fa-info-circle"></i> Hubungi admin via WhatsApp untuk ubah password</p>
+                    <button class="btn btn-whatsapp btn-block" onclick="openWhatsAppPassword()"><i class="fab fa-whatsapp"></i> Ubah Password</button>
+                    <button class="btn btn-danger btn-block" onclick="logout()" style="margin-top:20px"><i class="fas fa-sign-out-alt"></i> LOGOUT</button>
+                </div>
+            </div>
+
+            <div id="receiptSection" class="card" style="display:none">
+                <div class="card-header"><h2><i class="fas fa-receipt"></i> DETAIL TRANSAKSI</h2></div>
+                <div class="card-body"><div id="receiptContent"></div></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="confirmOverlay" class="confirm-overlay" style="display:none">
+        <div class="confirm-box">
+            <div class="confirm-icon"><i class="fas fa-exclamation-triangle"></i></div>
+            <h3 id="confirmTitle" style="color:#1a1a2e;margin-bottom:10px"></h3>
+            <p class="confirm-message" id="confirmMessage"></p>
+            <div class="confirm-buttons">
+                <button class="confirm-btn confirm-no" id="confirmNo"><i class="fas fa-times"></i> BATAL</button>
+                <button class="confirm-btn confirm-yes" id="confirmYes"><i class="fas fa-check"></i> HAPUS</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="confirmModal" class="modal">
+        <div class="modal-content">
+            <h3 id="modalConfirmTitle"></h3>
+            <p id="modalConfirmMessage"></p>
+            <div class="modal-buttons">
+                <button class="btn btn-secondary" onclick="cancelConfirm()"><i class="fas fa-times"></i> BATAL</button>
+                <button class="btn btn-danger" onclick="confirmAction()"><i class="fas fa-check"></i> LANJUTKAN</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="nameChangeModal" class="modal">
+        <div class="modal-content">
+            <h3><i class="fas fa-user-edit"></i> Ganti Nama Akun</h3>
+            <p id="nameChangeMessage"></p>
+            <div class="modal-buttons"><button class="btn btn-primary" onclick="closeNameChangeModal()"><i class="fas fa-check"></i> OKE</button></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
+    <script>
+        // ==================== CONFIG ====================
+        var API_REVANSTORE = '/api/revanstore';
+        var API_RVNSTORE = '/api/rvnstore';
+        var ADMIN_KEY = 'dhagwxwhu:f4afc5aa03e73130f5e055dfe6a708c4dc40759b';
+        var WHATSAPP_NUMBER = "6285199120995";
+        var MAX_TOPUP_AMOUNT = 2147483647;
+        var MAX_PASSWORD_LENGTH = 20;
+
+        var currentUser = null;
+        var currentAccount = null;
+        var currentAuthToken = null;
+        var pendingAction = null;
+        var pendingData = null;
+        var lastDeviceId = null;
+        var fingerprint = '';
+        var alertTimeout = null;
+        var isBlocked = false;
+        var blockedChecked = false;
+        var loginInProgress = false;
+
+        // ==================== ENCRYPTED LOCALSTORAGE ====================
+        var STORAGE_KEY = 'bussid_data';
+        var STORAGE_SECRET = ADMIN_KEY;
+
+        function storageSet(key, value) {
+            try {
+                var allData = storageGetAll();
+                allData[key] = value;
+                var encrypted = CryptoJS.AES.encrypt(JSON.stringify(allData), STORAGE_SECRET).toString();
+                localStorage.setItem(STORAGE_KEY, encrypted);
+            } catch (e) {}
+        }
+
+        function storageGet(key) {
+            var allData = storageGetAll();
+            return allData[key] !== undefined ? allData[key] : null;
+        }
+
+        function storageRemove(key) {
+            var allData = storageGetAll();
+            delete allData[key];
+            var encrypted = CryptoJS.AES.encrypt(JSON.stringify(allData), STORAGE_SECRET).toString();
+            localStorage.setItem(STORAGE_KEY, encrypted);
+        }
+
+        function storageGetAll() {
+            try {
+                var encrypted = localStorage.getItem(STORAGE_KEY);
+                if (!encrypted) return {};
+                var decrypted = CryptoJS.AES.decrypt(encrypted, STORAGE_SECRET).toString(CryptoJS.enc.Utf8);
+                return JSON.parse(decrypted) || {};
+            } catch (e) {
+                return {};
+            }
+        }
+
+        // Override localStorage untuk key tertentu
+        function getBlockKey(username) { return 'bussid_block_' + (username || 'global'); }
+
+        function getBlockData(username) {
+            var data = storageGet(getBlockKey(username));
+            if (data) {
+                try {
+                    if (data.blockedUntil && Date.now() > data.blockedUntil) {
+                        storageRemove(getBlockKey(username));
+                        return { attempts: 0, blockedUntil: null, level: 0 };
+                    }
+                    return data;
+                } catch (e) { return { attempts: 0, blockedUntil: null, level: 0 }; }
+            }
+            return { attempts: 0, blockedUntil: null, level: 0 };
+        }
+
+        function saveBlockData(username, data) { storageSet(getBlockKey(username), data); }
+
+        function showBlockedScreen() {
+            document.body.innerHTML =
+                '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#f0f9ff,#bae6fd,#7dd3fc);padding:20px;font-family:\'Segoe UI\',sans-serif;"><div style="background:#fff;border-radius:20px;padding:40px 30px;max-width:420px;width:100%;text-align:center;box-shadow:0 25px 60px rgba(0,0,0,0.1);"><div style="font-size:70px;color:#ef4444;margin-bottom:20px;">🔒</div><h1 style="color:#0c4a6e;font-size:24px;margin-bottom:10px;">AKSES DITOLAK</h1><p style="color:#64748b;font-size:14px;">Maaf, akses Anda telah diblokir.</p></div></div>';
+        }
+
+        function showBannedPopup(until) {
+            var untilText = (until || 0) === 0 ? 'PERMANEN' : ('sampai ' + new Date(until).toLocaleString('id-ID'));
+            Swal.fire({
+                icon: 'error',
+                title: 'AKUN DIBANNED',
+                html: '<p>Maaf, akun Anda telah dibanned oleh admin.</p><p style="color:#dc2626;background:#fee2e2;padding:8px;border-radius:8px;"><b>Durasi: ' +
+                    untilText + '</b></p>',
+                confirmButtonText: '<i class="fab fa-whatsapp"></i> Hubungi Admin',
+                confirmButtonColor: '#25D366',
+                showCancelButton: true,
+                cancelButtonText: 'Tutup',
+                cancelButtonColor: '#64748b',
+                allowOutsideClick: false
+            }).then(function(r) {
+                if (r.isConfirmed) window.open('https://wa.me/' + WHATSAPP_NUMBER +
+                    '?text=Assalamualaikum%20admin%2C%20akun%20saya%20dibanned', '_blank');
+            });
+        }
+
+        function showBanAksesPage(until) {
+            var untilText = (until || 0) === 0 ? 'PERMANEN' : ('sampai ' + new Date(until).toLocaleString('id-ID'));
+            document.body.innerHTML =
+                '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#f0f9ff 0%,#bae6fd 50%,#7dd3fc 100%);padding:20px;font-family:\'Segoe UI\',sans-serif;">' +
+                '<div style="background:#ffffff;border-radius:24px;padding:48px 36px;width:100%;max-width:420px;text-align:center;box-shadow:0 20px 60px rgba(0,191,255,0.15);border:1px solid rgba(0,191,255,0.1);">' +
+                '<div style="font-size:72px;color:#f59e0b;margin-bottom:12px;">🚫</div>' +
+                '<h2 style="font-size:24px;font-weight:700;color:#0c4a6e;margin-bottom:8px;">AKSES DIBLOKIR</h2>' +
+                '<p style="font-size:14px;color:#64748b;margin-bottom:6px;">Maaf, akses Anda diblokir oleh admin.</p>' +
+                '<div style="background:#fef3c7;color:#92400e;padding:12px 16px;border-radius:12px;font-weight:600;font-size:14px;margin:16px 0 24px;">⏱️ Durasi: ' +
+                untilText + '</div>' +
+                '<button onclick="window.open(\'https://wa.me/' + WHATSAPP_NUMBER +
+                '?text=Assalamualaikum%20admin%2C%20akses%20saya%20diblokir\',\'_blank\')" style="display:inline-flex;align-items:center;gap:10px;padding:12px 32px;background:#25D366;color:#fff;border:none;border-radius:30px;font-weight:600;font-size:15px;cursor:pointer;transition:0.2s;font-family:\'Segoe UI\',sans-serif;">' +
+                '<i class="fab fa-whatsapp"></i> Hubungi Admin</button>' +
+                '</div></div>';
+        }
+
+        function showForceLogoutPopup() {
+            Swal.fire({
+                icon: 'warning',
+                title: 'AKUN DITANGGUHKAN',
+                html: '<p>Akun Anda ditangguhkan karena indikasi sharing akun.</p><p style="font-size:12px;color:#92400e;">Silakan hubungi admin.</p>',
+                confirmButtonText: '<i class="fab fa-whatsapp"></i> Hubungi Admin',
+                confirmButtonColor: '#25D366',
+                showCancelButton: true,
+                cancelButtonText: 'Tutup',
+                cancelButtonColor: '#64748b',
+                allowOutsideClick: false
+            }).then(function(r) {
+                if (r.isConfirmed) window.open('https://wa.me/' + WHATSAPP_NUMBER +
+                    '?text=Assalamualaikum%20admin%2C%20akun%20saya%20ditangguhkan', '_blank');
+            });
+        }
+
+        async function getFingerprint() {
+            var fp = '';
+            fp += navigator.userAgent || '';
+            fp += navigator.language || '';
+            fp += (screen.width || 0) + 'x' + (screen.height || 0);
+            fp += screen.colorDepth || '';
+            fp += new Date().getTimezoneOffset();
+            fp += navigator.hardwareConcurrency || '';
+            fp += navigator.deviceMemory || '';
+            fp += navigator.platform || '';
+            return CryptoJS.MD5(fp).toString();
+        }
+
+        var BLOCK_CONFIG = { attempts: [5, 10, 15], durations: [15, 60, 1440] };
+
+        function getBlockDuration(attempts) { if (attempts >= 15) return 1440; if (attempts >= 10) return 60; if (attempts >=
+                5) return 15; return 0; }
+
+        function sanitize(str) { if (!str) return ''; return String(str).replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#x27;'); }
+
+        async function checkIfBlocked() {
+            if (blockedChecked) return isBlocked;
+            if (!fingerprint) fingerprint = await getFingerprint();
+            try {
+                var result = await callRevanstore('check_blocked', 'POST', { fingerprint: fingerprint });
+                if (result && result.blocked) { isBlocked = true;
+                    storageSet('bussid_blocked', 'true'); } else { isBlocked = false;
+                    storageRemove('bussid_blocked'); }
+                blockedChecked = true;
+            } catch (e) { isBlocked = storageGet('bussid_blocked') === 'true';
+                blockedChecked = true; }
+            return isBlocked;
+        }
+
+        async function callRevanstore(path, method, data) {
+            if (!fingerprint) fingerprint = await getFingerprint();
+            if (isBlocked && path !== 'check_blocked') throw new Error('Akses ditolak');
+            var payload = { path: path, method: method || 'GET', data: data || null, timestamp: Date.now() };
+            var encryptedPayload = CryptoJS.AES.encrypt(JSON.stringify(payload), ADMIN_KEY).toString();
+            var headers = { 'Content-Type': 'application/json', 'X-Fingerprint': fingerprint };
+            if (currentUser && currentUser.username) headers['X-Operator'] = CryptoJS.AES.encrypt(currentUser.username,
+                ADMIN_KEY).toString();
+            var res = await fetch(API_REVANSTORE, { method: 'POST', headers: headers, body: JSON.stringify({ data: encryptedPayload }) });
+            if (res.status === 429) throw new Error('Terlalu banyak request');
+            var text = await res.text();
+            if (!text || text === 'null') return null;
+            var result = JSON.parse(text);
+            if (result.encrypted && result.data) { var dec = CryptoJS.AES.decrypt(result.data, ADMIN_KEY).toString(CryptoJS
+                    .enc.Utf8); if (dec) return JSON.parse(dec); }
+            return result;
+        }
+
+        async function callRvnstore(endpoint, method, body, authToken) {
+            var res = await fetch(API_RVNSTORE, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ endpoint: endpoint, method: method || 'POST', body: body || null, authToken: authToken || null }) });
+            return await res.json();
+        }
+
+        function showAlert(message, type, duration) {
+            type = type || 'info';
+            duration = duration || 2500;
+            var alertDiv = document.getElementById('alert');
+            if (alertDiv) {
+                var icons = { success: 'fa-check-circle', error: 'fa-exclamation-circle', warning: 'fa-exclamation-triangle',
+                    info: 'fa-info-circle', loading: 'fa-spinner fa-spin' };
+                alertDiv.innerHTML =
+                    '<div class="alert-content"><div class="alert-icon"><i class="fas ' + (icons[type] || 'fa-info-circle') +
+                    '"></i></div><span>' + sanitize(message) + '</span></div>';
+                alertDiv.className = 'alert ' + type + ' show';
+                if (alertTimeout) clearTimeout(alertTimeout);
+                if (type !== 'loading') { alertTimeout = setTimeout(function() { alertDiv.classList.remove('show'); },
+                    duration); }
+            }
+        }
+
+        function showLoading(message) { var overlay = document.getElementById('loadingOverlay'),
+                msg = document.getElementById('loadingMessage'); if (overlay && msg) { msg.textContent = message ||
+                    'Memproses...';
+                overlay.style.display = 'flex'; } }
+
+        function hideLoading() { var overlay = document.getElementById('loadingOverlay'); if (overlay) overlay.style.display =
+                'none'; }
+
+        function formatCurrency(amount) { if (!amount && amount !== 0) return 'Rp 0'; return new Intl.NumberFormat('id-ID',
+                { style: 'currency', currency: 'IDR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(Math.abs(
+                amount)); }
+
+        function parseAmount(input) {
+            if (!input || input.trim() === '') return 0;
+            var cleaned = input.toUpperCase().replace(/\s/g, '');
+            if (cleaned === '2M' || cleaned === '2 M') return MAX_TOPUP_AMOUNT;
+            var multiplier = 1,
+                cleanInput = cleaned;
+            if (cleaned.includes('M') && !cleaned.includes('JT') && !cleaned.includes('MAX')) { multiplier = 1000000000;
+                cleanInput = cleaned.replace('M', ''); } else if (cleaned.includes('JT')) { multiplier = 1000000;
+                cleanInput = cleaned.replace('JT', ''); } else if (cleaned.includes('RB') || cleaned.includes('K')) { multiplier =
+                    1000;
+                cleanInput = cleaned.replace(/[KRB]/g, ''); } else if (cleaned.includes('MAX')) return MAX_TOPUP_AMOUNT;
+            var number = parseFloat(cleanInput.replace(/\./g, '').replace(',', '.'));
+            var result = isNaN(number) ? 0 : Math.round(number * multiplier);
+            return Math.min(result, MAX_TOPUP_AMOUNT);
+        }
+
+        function validateTopupAmount() {
+            var input = document.getElementById('topupAmount'),
+                preview = document.getElementById('amountPreview'),
+                previewValue = document.getElementById('amountPreviewValue');
+            var amount = parseAmount(input.value);
+            if (amount > 0 && input.value.trim() !== '') { preview.style.display = 'block';
+                previewValue.textContent = formatCurrency(amount); } else { preview.style.display = 'none'; }
+        }
+
+        function hideAllSections() {
+            var sections = ['accountInfo', 'topupSection', 'kurasSection', 'changeNameSection', 'historySection',
+                'settingsSection', 'receiptSection'
+            ];
+            sections.forEach(function(section) { var el = document.getElementById(section); if (el) el.style.display =
+                    'none'; });
+            var searchCard = document.querySelector('.search-card'); if (searchCard) searchCard.style.display = 'none';
+        }
+
+        function showHome() { hideAllSections();
+            document.querySelector('.search-card').style.display = 'block'; }
+
+        function backToAccount() { if (currentAccount) { hideAllSections();
+                document.getElementById('accountInfo').style.display = 'block'; } else { showHome(); } }
+
+        function parseDate(dateStr) {
+            if (!dateStr) return null;
+            var parts = dateStr.split('/'); if (parts.length !== 3) return null;
+            var month = parseInt(parts[0], 10) - 1,
+                day = parseInt(parts[1], 10),
+                year = parseInt(parts[2], 10);
+            if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
+            if (month < 0 || month > 11 || day < 1 || day > 31 || year < 2000) return null;
+            var date = new Date(year, month, day);
+            if (date.getMonth() !== month || date.getDate() !== day) return null;
+            return date;
+        }
+
+        function calculateRemainingDays(expiryDate) {
+            if (!expiryDate) return -999;
+            if (expiryDate.includes('9999')) return 999999;
+            var expiry = parseDate(expiryDate); if (!expiry) return -999;
+            var now = new Date();
+            now.setHours(0, 0, 0, 0);
+            return Math.ceil((expiry - now) / (1000 * 60 * 60 * 24));
+        }
+
+        function getDaysLeftClass(daysLeft) { if (daysLeft === 999999) return 'days-permanent'; if (daysLeft <= 0) return
+                'days-red'; if (daysLeft <= 3) return 'days-yellow'; return 'days-green'; }
+
+        function getDaysLeftText(daysLeft) { if (daysLeft === 999999) return '♾️ Permanent'; if (daysLeft === -999) return
+                '⏰ Tidak ada'; if (daysLeft < 0) return '⏰ Habis ' + Math.abs(daysLeft) + ' hari'; if (daysLeft === 0)
+                return '⚠️ Hari ini'; if (daysLeft === 1) return '📅 1 hari'; return '📅 ' + daysLeft + ' hari'; }
+
+        function checkAccountExpiry(user) { if (!user || !user.expiry_date) return { expired: true, daysLeft: -999,
+                daysLeftText: '⏰ Tidak ada', daysLeftClass: 'days-red' }; var daysLeft = calculateRemainingDays(user
+                .expiry_date); var expired = daysLeft <= 0 && daysLeft !== 999999; return { expired: expired,
+                daysLeft: daysLeft, daysLeftText: getDaysLeftText(daysLeft), daysLeftClass: getDaysLeftClass(daysLeft) }; }
+
+        function showExpiredBanner() { document.getElementById('expiredBanner').style.display = 'flex';
+            document.getElementById('mainApp').style.display = 'none'; }
+
+        function closeExpiredBanner() { document.getElementById('expiredBanner').style.display = 'none';
+        logout(); }
+
+        function openWhatsApp() {
+            var msg = encodeURIComponent(
+                "Assalamualaikum admin, saya ingin memperpanjang masa aktif akun BUSSID Top Up saya. Username: " + (
+                    currentUser ? currentUser.username : ''));
+            window.open('https://wa.me/' + WHATSAPP_NUMBER + '?text=' + msg, '_blank');
+        }
+
+        function openWhatsAppPassword() {
+            var msg = encodeURIComponent(
+                "Assalamualaikum admin, saya ingin mengubah password akun saya. Username: " + (currentUser ? currentUser
+                    .username : ''));
+            window.open('https://wa.me/' + WHATSAPP_NUMBER + '?text=' + msg, '_blank');
+        }
+
+        function updatePasswordCounter(fieldId) { var input = document.getElementById(fieldId),
+                counter = document.getElementById(fieldId + 'CharCount'); if (input && counter) counter.textContent = input
+                .value.length + '/' + MAX_PASSWORD_LENGTH; }
+
+        function showDeleteHistoryConfirm() {
+            Swal.fire({
+                title: '<i class="fas fa-trash"></i> HAPUS SEMUA RIWAYAT',
+                text: "Yakin hapus semua riwayat?",
+                icon: "warning",
+                showCancelButton: true,
+                confirmButtonColor: "#ef4444",
+                cancelButtonColor: "#64748b",
+                confirmButtonText: "HAPUS SEMUA",
+                cancelButtonText: "BATAL"
+            }).then((result) => { if (result.isConfirmed) deleteAllHistory(); });
+        }
+
+        // ==================== DELETE ALL HISTORY (1 REQUEST) ====================
+        async function deleteAllHistory() {
+            showLoading('Menghapus...');
+            try {
+                // Hapus node transactions langsung (1 request)
+                var result = await callRevanstore('transactions', 'DELETE');
+                hideLoading();
+                if (result && result.success) {
+                    Swal.fire({ icon: "success", title: "Berhasil!", text: "Semua riwayat dihapus!", timer: 2000,
+                        showConfirmButton: false });
+                    if (document.getElementById('historySection').style.display === 'block') showHistory();
+                } else {
+                    Swal.fire({ icon: "info", title: "Info", text: "Tidak ada riwayat!", confirmButtonColor: "#0ea5e9" });
+                }
+            } catch (error) {
+                hideLoading();
+                Swal.fire({ icon: "error", title: "Oops...", text: "Gagal menghapus!", confirmButtonColor: "#ef4444" });
+            }
+        }
+
+        // ==================== LOGIN ====================
+        async function login() {
+            if (loginInProgress) return;
+            loginInProgress = true;
+
+            try {
+                var blocked = await checkIfBlocked();
+                if (blocked) { showBlockedScreen(); return; }
+
+                var username = sanitize(document.getElementById('username').value.trim());
+                var password = document.getElementById('password').value.trim();
+
+                if (!username || !password) {
+                    Swal.fire({ icon: "warning", title: "Oops...", text: "Harap isi username dan password!",
+                        confirmButtonColor: "#0ea5e9" });
+                    loginInProgress = false;
+                    return;
+                }
+
+                var blockData = getBlockData(username);
+                if (blockData.blockedUntil && Date.now() < blockData.blockedUntil) {
+                    Swal.fire({ icon: "error", title: "Akses Ditolak", text: "🔒 Terlalu banyak percobaan!",
+                        confirmButtonColor: "#ef4444" });
+                    loginInProgress = false;
+                    return;
+                }
+
+                showLoading('Login...');
+
+                var userIP = 'unknown';
+                try { var ipRes = await fetch('https://api.ipify.org?format=json');
+                    var ipData = await ipRes.json();
+                    userIP = ipData.ip || 'unknown'; } catch (e) {}
+                if (!fingerprint) fingerprint = await getFingerprint();
+
+                var result = await callRevanstore('login', 'POST', {
+                    username: username,
+                    password: password,
+                    ip: userIP,
+                    fingerprint: fingerprint
+                });
+
+                if (result && result.blocked) {
+                    isBlocked = true;
+                    storageSet('bussid_blocked', 'true');
+                    hideLoading();
+                    showBlockedScreen();
+                    loginInProgress = false;
+                    return;
+                }
+
+                if (result && result.banned) {
+                    hideLoading();
+                    showBannedPopup(result.bannedUntil || 0);
+                    loginInProgress = false;
+                    return;
+                }
+
+                if (result && result.banAkses) {
+                    hideLoading();
+                    showBanAksesPage(result.banAksesUntil || 0);
+                    loginInProgress = false;
+                    return;
+                }
+
+                if (result && result.forceLogout) {
+                    hideLoading();
+                    showForceLogoutPopup();
+                    loginInProgress = false;
+                    return;
+                }
+
+                if (result && result.success) {
+                    storageRemove(getBlockKey(username));
+                    var user = result.data;
+                    var expiryCheck = checkAccountExpiry(user);
+                    if (expiryCheck.expired) { hideLoading();
+                        showExpiredBanner();
+                        loginInProgress = false; return; }
+
+                    currentUser = {
+                        id: user.id,
+                        username: user.username,
+                        password: password,
+                        role: user.role || 'Operator',
+                        full_name: user.full_name || user.username,
+                        expiry_date: user.expiry_date || ''
+                    };
+
+                    await callRevanstore('login_success', 'POST', {});
+                    document.getElementById('loginScreen').style.display = 'none';
+                    document.getElementById('mainApp').style.display = 'block';
+                    hideLoading();
+                    showHome();
+                    updateProfileInfo();
+
+                    Swal.fire({ icon: "success", title: "Login Berhasil!", text: "Selamat datang, " + currentUser
+                            .full_name + "!", timer: 2000, showConfirmButton: false });
+                    storageSet('bussid_session', JSON.stringify({ username: username, password: password, user_id: user.id,
+                        timestamp: Date.now() }));
+                } else {
+                    await callRevanstore('login_failed', 'POST', {});
+                    blockData.attempts += 1;
+                    var a = blockData.attempts;
+                    var d = getBlockDuration(a);
+                    hideLoading();
+                    if (d > 0) {
+                        blockData.blockedUntil = Date.now() + d * 60 * 1000;
+                        saveBlockData(username, blockData);
+                        Swal.fire({ icon: "error", title: "Akses Ditolak", text: "🔒 Terlalu banyak percobaan!",
+                            confirmButtonColor: "#ef4444" });
+                    } else {
+                        saveBlockData(username, blockData);
+                        Swal.fire({ icon: "error", title: "Oops...",
+                            text: "User tidak ditemukan atau password salah!", confirmButtonColor: "#ef4444" });
+                    }
+                }
+            } catch (error) {
+                hideLoading();
+                Swal.fire({ icon: "error", title: "Oops...", text: "Gagal menghubungkan ke server!",
+                    confirmButtonColor: "#ef4444" });
+            }
+            loginInProgress = false;
+        }
+
+        function updateProfileInfo() {
+            if (!currentUser) return;
+            var expiryCheck = checkAccountExpiry(currentUser);
+            document.getElementById('profileUsername').textContent = currentUser.username;
+            document.getElementById('profileName').textContent = currentUser.full_name || currentUser.username;
+            document.getElementById('profileRole').textContent = currentUser.role || 'Operator';
+            var expiryFormatted = currentUser.expiry_date || 'Tidak ada';
+            document.getElementById('profileExpiry').innerHTML =
+                '<span>' + expiryFormatted + '</span> ' +
+                '<span class="expiry-days-left ' + expiryCheck.daysLeftClass + '">' + expiryCheck.daysLeftText + '</span>';
+        }
+
+        function logout() {
+            currentUser = null;
+            currentAccount = null;
+            currentAuthToken = null;
+            lastDeviceId = null;
+            document.getElementById('mainApp').style.display = 'none';
+            document.getElementById('expiredBanner').style.display = 'none';
+            var ls = document.getElementById('loginScreen');
+            ls.style.display = 'flex';
+            ls.style.alignItems = 'center';
+            ls.style.justifyContent = 'center';
+            document.getElementById('username').value = '';
+            document.getElementById('password').value = '';
+            storageRemove('bussid_session');
+            showAlert('Logout!', 'success');
+            window.scrollTo(0, 0);
+        }
+
+        async function loginWithDeviceId(deviceId) {
+            var blocked = await checkIfBlocked();
+            if (blocked) { showBlockedScreen(); return false; }
+            showLoading('Menghubungkan...');
+            try {
+                var cleanInput = sanitize(deviceId.trim());
+                if (cleanInput.includes('.')) { currentAuthToken = cleanInput; } else {
+                    var cid = cleanInput.toLowerCase().replace(/^android-/, '');
+                    var data = await callRvnstore('/Client/LoginWithAndroidDeviceID', 'POST', { TitleId: "4AE9",
+                        AndroidDeviceId: cid, CreateAccount: true, InfoRequestParameters: { GetUserAccountInfo: true,
+                            GetUserVirtualCurrency: true, GetPlayerProfile: true } }, null);
+                    if (data.data && data.data.SessionTicket) { currentAuthToken = data.data.SessionTicket; } else { hideLoading(); throw new Error(
+                            'Device ID tidak valid!'); }
+                }
+                var info = await getUserInfoFromPlayFab();
+                if (info) { currentAccount = { deviceId: cleanInput, name: info.name, balance: info.balance,
+                        facebook: info.facebook, facebookAvatarUrl: info.facebookAvatarUrl, playFabId: info.playFabId };
+                    hideLoading(); return true; }
+                hideLoading();
+                throw new Error('Gagal!');
+            } catch (error) { hideLoading();
+                showAlert(error.message, 'error'); return false; }
+        }
+
+        async function getUserInfoFromPlayFab() {
+            if (!currentAuthToken) return null;
+            try {
+                var result = await callRvnstore('/Client/GetPlayerCombinedInfo', 'POST', { InfoRequestParameters: { GetUserAccountInfo: true,
+                        GetUserVirtualCurrency: true, GetPlayerProfile: true } }, currentAuthToken);
+                if (result.data) {
+                    var info = result.data.InfoResultPayload;
+                    var acc = info.AccountInfo;
+                    var name = (acc && acc.TitleInfo) ? (acc.TitleInfo.DisplayName || 'Unknown') : 'Unknown';
+                    var balance = info.UserVirtualCurrency ? (info.UserVirtualCurrency.RP || 0) : 0;
+                    var pfid = acc ? (acc.PlayFabId || '-') : '-';
+                    var fb = { id: null, name: 'Tidak tertaut', email: null, isConnected: false };
+                    var fbAvatar = null;
+                    if (acc && acc.FacebookInfo) { fb = { id: acc.FacebookInfo.FacebookId || null, name: acc.FacebookInfo
+                                .FullName || 'Tidak tertaut', email: acc.FacebookInfo.Email || null,
+                            isConnected: true }; if (fb.id) fbAvatar = 'https://graph.facebook.com/' + fb.id +
+                            '/picture?type=large'; }
+                    return { name: name, balance: balance, facebook: fb, facebookAvatarUrl: fbAvatar, playFabId: pfid };
+                }
+            } catch (e) {}
+            return null;
+        }
+
+        function tampilkanFotoProfile(acc) {
+            var c = document.getElementById('profilePhoto'); if (!c) return;
+            c.innerHTML = '';
+            var url = acc && acc.facebookAvatarUrl ? acc.facebookAvatarUrl : null;
+            if (url && url !== 'null' && url !== '') {
+                var img = document.createElement('img');
+                img.src = url;
+                img.style.width = '100%';
+                img.style.height = '100%';
+                img.style.objectFit = 'cover';
+                img.style.borderRadius = '50%';
+                img.onload = function() { c.appendChild(img); };
+                img.onerror = function() { c.innerHTML = '<i class="fas fa-user"></i>'; };
+            } else { c.innerHTML = '<i class="fas fa-user"></i>'; }
+        }
+
+        function tampilkanInfoFacebook(fb) {
+            var d = document.getElementById('facebookDetails'); if (!d) return;
+            if (fb && fb.isConnected && fb.id) {
+                d.innerHTML =
+                    '<div class="fb-info-row"><span class="fb-info-label"><i class="fab fa-facebook"></i> Status:</span><span class="fb-info-value" style="color:#1877F2;">✅ TERHUBUNG</span></div>' +
+                    '<div class="fb-info-row"><span class="fb-info-label">Facebook ID:</span><span class="fb-info-value" style="font-family:monospace;font-size:12px;">' +
+                    sanitize(fb.id) + '</span></div>' +
+                    '<div class="fb-info-row"><span class="fb-info-label">Nama:</span><span class="fb-info-value">' + sanitize(
+                        fb.name || '-') + '</span></div>' +
+                    '<div class="fb-info-row"><span class="fb-info-label">Email:</span><span class="fb-info-value">' + sanitize(
+                        fb.email || '-') + '</span></div>';
+            } else {
+                d.innerHTML =
+                    '<div class="fb-info-row"><span class="fb-info-label"><i class="fab fa-facebook"></i> Status:</span><span class="fb-info-value" style="color:#ffaa00;">⚠️ TIDAK TERHUBUNG</span></div>';
+            }
+        }
+
+        async function searchAccount() {
+            var id = document.getElementById('deviceId').value.trim();
+            if (!id) { showAlert('Masukkan Device ID!', 'error'); return; }
+            var ok = await loginWithDeviceId(id);
+            if (ok) { lastDeviceId = id;
+                showAccountInfo(currentAccount);
+                hideAllSections();
+                document.getElementById('accountInfo').style.display = 'block';
+                showAlert('Akun ditemukan!', 'success'); }
+        }
+
+        function showAccountInfo(acc) {
+            document.getElementById('accountName').textContent = sanitize(acc.name || '-');
+            document.getElementById('accountBalance').textContent = formatCurrency(acc.balance);
+            document.getElementById('playfabId').textContent = acc.playFabId || '-';
+            tampilkanFotoProfile(acc);
+            tampilkanInfoFacebook(acc.facebook);
+        }
+
+        function refreshAccountInfo() {
+            if (!currentAccount) { showAlert('Cari akun dulu!', 'error'); return; }
+            showLoading('Refresh...');
+            setTimeout(async function() {
+                var info = await getUserInfoFromPlayFab();
+                if (info) { currentAccount.balance = info.balance;
+                    currentAccount.name = info.name;
+                    currentAccount.facebook = info.facebook;
+                    currentAccount.facebookAvatarUrl = info.facebookAvatarUrl;
+                    currentAccount.playFabId = info.playFabId;
+                    showAccountInfo(currentAccount);
+                    hideLoading();
+                    showAlert('Updated!', 'success'); } else { hideLoading(); }
+            }, 1000);
+        }
+
+        function setAmount(a) { document.getElementById('topupAmount').value = a;
+            validateTopupAmount(); }
+
+        function showTopupFromAccount() { if (!currentAccount) return;
+            document.getElementById('topupAccountName').textContent = currentAccount.name;
+            document.getElementById('topupCurrentBalance').textContent = formatCurrency(currentAccount.balance);
+            hideAllSections();
+            document.getElementById('topupSection').style.display = 'block'; }
+
+        function showKurasFromAccount() { if (!currentAccount) return;
+            document.getElementById('kurasAccountName').textContent = currentAccount.name;
+            document.getElementById('kurasCurrentBalance').textContent = formatCurrency(currentAccount.balance);
+            hideAllSections();
+            document.getElementById('kurasSection').style.display = 'block'; }
+
+        function showChangeNameSection() { if (!currentAccount) return;
+            document.getElementById('changeNameAccountLabel').textContent = currentAccount.name;
+            hideAllSections();
+            document.getElementById('changeNameSection').style.display = 'block'; }
+
+        async function processTopup() { if (!currentAccount) return; var amt = parseAmount(document.getElementById(
+                'topupAmount').value.trim()); if (amt <= 0) { showAlert('Jumlah tidak valid!', 'error'); return; }
+            showConfirm('TOP UP', 'Top up ' + formatCurrency(amt) + '?', 'topup', { amount: amt }); }
+
+        async function executeTopup(amt) { showLoading('Memproses...'); var old = currentAccount.balance; var ok =
+                await addCashToAccount(amt); if (ok) { var trx = { type: 'topup', deviceId: currentAccount.deviceId,
+                    accountName: currentAccount.name, amount: amt, oldBalance: old, newBalance: currentAccount.balance,
+                    operator: currentUser.username, timestamp: Date.now(), status: 'success' };
+                await callRevanstore('transactions', 'POST', trx);
+                hideLoading();
+                showReceipt(trx);
+                showAlert('Berhasil!', 'success'); } else { hideLoading();
+                showAlert('Gagal!', 'error'); } }
+
+        async function processKuras() { if (!currentAccount) return; var amt = parseAmount(document.getElementById(
+                'kurasAmount').value.trim()) || currentAccount.balance; if (amt <= 0 || amt > currentAccount
+            .balance) { showAlert('Saldo tidak cukup!', 'error'); return; }
+            showConfirm('KURAS', 'Kuras ' + formatCurrency(amt) + '?', 'kuras', { amount: amt }); }
+
+        async function executeKuras(amt) { showLoading('Memproses...'); var old = currentAccount.balance; var ok =
+                await addCashToAccount(-amt); if (ok) { var trx = { type: 'kuras', deviceId: currentAccount.deviceId,
+                    accountName: currentAccount.name, amount: amt, oldBalance: old, newBalance: currentAccount.balance,
+                    operator: currentUser.username, timestamp: Date.now(), status: 'success' };
+                await callRevanstore('transactions', 'POST', trx);
+                hideLoading();
+                showReceipt(trx);
+                showAlert('Berhasil!', 'success'); } else { hideLoading();
+                showAlert('Gagal!', 'error'); } }
+
+        async function addCashToAccount(amt) {
+            if (!currentAuthToken) return false;
+            try { var res = await callRvnstore('/Client/ExecuteCloudScript', 'POST', { FunctionName: "AddRp",
+                    FunctionParameter: { addValue: amt }, RevisionSelection: "Live", GeneratePlayStreamEvent: true },
+                    currentAuthToken); if (res.data) { await new Promise(function(r) { setTimeout(r, 2000); }); var info =
+                    await getUserInfoFromPlayFab(); if (info) { currentAccount.balance = info.balance;
+                    currentAccount.facebook = info.facebook;
+                    currentAccount.facebookAvatarUrl = info.facebookAvatarUrl;
+                    currentAccount.playFabId = info.playFabId;
+                    showAccountInfo(currentAccount); return true; } } return false; } catch (e) { return false; }
+        }
+
+        function showReceipt(trx) {
+            hideAllSections();
+            var typeText = trx.type === 'topup' ? 'TOP UP' : 'KURAS',
+                sign = trx.type === 'topup' ? '+' : '-';
+            document.getElementById('receiptContent').innerHTML =
+                '<div class="receipt-content"><div class="receipt-header"><h3>BUSSID</h3><p>Detail Transaksi</p></div><div class="receipt-details"><div class="receipt-row"><span>Akun:</span><span>' +
+                sanitize(trx.accountName) + '</span></div><div class="receipt-row"><span>Jenis:</span><span>' + typeText +
+                '</span></div><div class="receipt-row"><span>Jumlah:</span><span style="color:' + (trx.type === 'topup' ?
+                    '#10b981' : '#f59e0b') + '">' + sign + formatCurrency(trx.amount) +
+                '</span></div><div class="receipt-row"><span>Saldo Awal:</span><span>' + formatCurrency(trx.oldBalance) +
+                '</span></div><div class="receipt-row"><span>Saldo Akhir:</span><span>' + formatCurrency(trx.newBalance) +
+                '</span></div><div class="receipt-row"><span>Tanggal:</span><span>' + new Date(trx.timestamp).toLocaleString(
+                    'id-ID') +
+                '</span></div><div class="receipt-row"><span>Status:</span><span style="color:#10b981;">BERHASIL</span></div></div></div><div style="display:flex;gap:8px;margin-top:20px;"><button class="btn btn-primary" onclick="window._showTrxModal()" style="flex:1;">TRX LAGI</button><button class="btn btn-secondary" onclick="window._goHome()" style="flex:1;">HOME</button></div>';
+            document.getElementById('receiptSection').style.display = 'block';
+        }
+
+        window._showTrxModal = function() { var modal = document.getElementById('trxLagiModal'); if (modal) { modal.style
+                .display = 'flex';
+                modal.style.opacity = '1';
+                modal.style.visibility = 'visible'; } };
+        window._tutupTrxModal = function() { var modal = document.getElementById('trxLagiModal'); if (modal) modal.style
+            .display = 'none'; };
+        window._pilihTopup = function() { window._tutupTrxModal();
+            showTopupFromAccount(); };
+        window._pilihKuras = function() { window._tutupTrxModal();
+            showKurasFromAccount(); };
+        window._goHome = function() { showHome(); };
+
+        function backToHome() { showHome(); }
+
+        async function showHistory() {
+            hideAllSections();
+            document.getElementById('historySection').style.display = 'block';
+            showLoading('Mengambil data...');
+            try {
+                var data = await callRevanstore('transactions', 'GET');
+                var list = document.getElementById('transactionsList');
+                if (!data || typeof data !== 'object' || Object.keys(data).length === 0) {
+                    list.innerHTML = '<p style="text-align:center;color:#666;padding:40px 20px;">Belum ada transaksi</p>';
+                    hideLoading();
+                    return;
+                }
+                var arr = Object.keys(data).map(function(k) { return { id: k, type: data[k].type, accountName: data[k]
+                        .accountName, amount: data[k].amount, oldBalance: data[k].oldBalance, newBalance: data[k]
+                        .newBalance, operator: data[k].operator, timestamp: data[k].timestamp }; }).sort(function(a,
+                    b) { return b.timestamp - a.timestamp; });
+                if (arr.length === 0) {
+                    list.innerHTML = '<p style="text-align:center;color:#666;padding:40px 20px;">Belum ada transaksi</p>';
+                    hideLoading();
+                    return;
+                }
+                var html = '';
+                arr.forEach(function(t) { var typeText = t.type === 'topup' ? 'TOP UP' : t.type === 'kuras' ? 'KURAS' :
+                        'GANTI NAMA'; var sign = t.type === 'topup' ? '+' : t.type === 'kuras' ? '-' : '';
+                    html += '<div class="transaction-item ' + t.type +
+                        '"><div class="transaction-header"><div>' + sanitize(t.accountName) +
+                        '</div><div class="transaction-amount">' + sign + formatCurrency(t.amount) +
+                        '</div></div><div class="transaction-details"><div>' + typeText + '</div><div>' + new Date(t
+                            .timestamp).toLocaleString('id-ID') +
+                        '</div></div><div class="transaction-balance"><span>Sebelum: ' + formatCurrency(t.oldBalance) +
+                        '</span><span>→</span><span>Sesudah: ' + formatCurrency(t.newBalance) +
+                        '</span></div></div>'; });
+                list.innerHTML = html;
+                hideLoading();
+            } catch (e) { hideLoading();
+                showAlert('Gagal!', 'error'); }
+        }
+
+        function showSettings() { hideAllSections();
+            document.getElementById('settingsSection').style.display = 'block';
+            updateProfileInfo(); }
+
+        function showConfirm(title, message, action, data) { document.getElementById('modalConfirmTitle').innerHTML =
+                sanitize(title);
+            document.getElementById('modalConfirmMessage').innerHTML = sanitize(message);
+            pendingAction = action;
+            pendingData = data;
+            document.getElementById('confirmModal').classList.add('active'); }
+
+        function cancelConfirm() { pendingAction = null;
+            pendingData = null;
+            document.getElementById('confirmModal').classList.remove('active'); }
+
+        async function confirmAction() { if (!pendingAction || !pendingData) return;
+            document.getElementById('confirmModal').classList.remove('active'); if (pendingAction === 'topup')
+            await executeTopup(pendingData.amount); else if (pendingAction === 'kuras')
+            await executeKuras(pendingData.amount); else if (pendingAction === 'changename')
+            await executeChangeName(pendingData);
+            pendingAction = null;
+            pendingData = null; }
+
+        async function checkNameAvailability() { var d = document.getElementById('nameAvailability');
+            d.innerHTML = 'Mengecek...';
+            d.style.display = 'block';
+            setTimeout(function() { d.innerHTML = '✅ Tersedia!'; }, 1000); }
+
+        async function changeAccountNameSimple() { var name = sanitize(document.getElementById('newAccountName').value
+            .trim()); if (!name) { showAlert('Masukkan nama!', 'error'); return; } if (!currentAccount || !
+                currentAuthToken) { showAlert('Cari akun dulu!', 'error'); return; }
+            showConfirm('GANTI NAMA', 'Ganti ke "' + name + '"?', 'changename', name); }
+
+        async function executeChangeName(newName) {
+            showLoading('Mengubah...');
+            try { var res = await callRvnstore('/Client/UpdateUserTitleDisplayName', 'POST', { DisplayName: newName },
+                    currentAuthToken); if (res.data && res.data.DisplayName) { var old = currentAccount.name;
+                    currentAccount.name = newName;
+                    document.getElementById('accountName').textContent = newName;
+                    await callRevanstore('transactions', 'POST', { type: 'gantinama', accountName: currentAccount.name,
+                        oldName: old, newName: newName, operator: currentUser.username, timestamp: Date.now(),
+                        status: 'success' });
+                    hideAllSections();
+                    document.getElementById('receiptContent').innerHTML =
+                        '<div class="receipt-content"><div class="receipt-header"><h3>GANTI NAMA</h3></div><div class="receipt-details"><div class="receipt-row"><span>Lama:</span><span>' +
+                        sanitize(old) +
+                        '</span></div><div class="receipt-row"><span>Baru:</span><span style="color:#0ea5e9;">' + sanitize(
+                            newName) +
+                        '</span></div></div></div><button class="btn btn-primary btn-block" onclick="window._goBackAccount()">KEMBALI</button>';
+                    document.getElementById('receiptSection').style.display = 'block';
+                    hideLoading();
+                    showAlert('Berhasil!', 'success'); } else { hideLoading();
+                    showAlert('Gagal!', 'error'); } } catch (e) { hideLoading();
+                showAlert('Gagal!', 'error'); }
+        }
+
+        window._goBackAccount = function() { backToAccount(); };
+
+        function showNameChangeModal(msg, type) { var m = document.getElementById('nameChangeModal');
+            document.getElementById('nameChangeMessage').innerHTML = sanitize(msg);
+            m.classList.add('active'); }
+
+        function closeNameChangeModal() { document.getElementById('nameChangeModal').classList.remove('active'); }
+
+        function setupQuickAmounts() { var q = document.querySelector('.quick-amounts'); if (q) q.innerHTML =
+                '<button class="btn-quick" onclick="setAmount(\'2M\')">2M</button><button class="btn-quick" onclick="setAmount(\'1M\')">1M</button><button class="btn-quick" onclick="setAmount(\'500JT\')">500JT</button><button class="btn-quick" onclick="setAmount(\'100JT\')">100JT</button><button class="btn-quick" onclick="setAmount(\'50JT\')">50JT</button>'; }
+
+        function setupEventListeners() { var u = document.getElementById('username'); if (u) u.addEventListener('keypress',
+                function(e) { if (e.key === 'Enter') document.getElementById('password').focus(); }); var p = document
+                .getElementById('password'); if (p) p.addEventListener('keypress', function(e) { if (e.key === 'Enter')
+                login(); }); var t = document.getElementById('topupAmount'); if (t) t.addEventListener('keypress',
+                function(e) { if (e.key === 'Enter') processTopup(); }); var d = document.getElementById('deviceId'); if (
+                d) d.addEventListener('keypress', function(e) { if (e.key === 'Enter') searchAccount(); }); }
+
+        document.addEventListener('DOMContentLoaded', async function() {
+            setupEventListeners();
+            setupQuickAmounts();
+            document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
+            document.addEventListener('keydown', function(e) { if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && e
+                    .key === 'I') || (e.ctrlKey && e.key === 'U')) { e.preventDefault(); return false; } });
+            var ls = document.getElementById('loginScreen');
+            ls.style.display = 'flex';
+            ls.style.alignItems = 'center';
+            ls.style.justifyContent = 'center';
+            if (!fingerprint) fingerprint = await getFingerprint();
+            var blocked = await checkIfBlocked();
+            if (blocked) { showBlockedScreen(); return; }
+            var saved = storageGet('bussid_session');
+            if (saved) {
+                try {
+                    var session = JSON.parse(saved),
+                        age = Date.now() - (session.timestamp || 0);
+                    if (age > 7 * 24 * 60 * 60 * 1000) { storageRemove('bussid_session'); return; }
+                    document.getElementById('username').value = session.username;
+                    document.getElementById('password').value = session.password;
+                    login();
+                } catch (e) { storageRemove('bussid_session'); }
+            }
+        });
+    </script>
+</body>
+</html>
