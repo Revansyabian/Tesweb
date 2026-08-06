@@ -22,6 +22,7 @@
             background: #f0f4f8;
             min-height: 100vh;
             color: #1a1a2e;
+            padding-bottom: 70px;
         }
 
         .alert {
@@ -1015,6 +1016,38 @@
             visibility: visible;
         }
 
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #fff;
+            border-top: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-around;
+            padding: 8px 0;
+            z-index: 100;
+            box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.04);
+        }
+        .bottom-nav a {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-decoration: none;
+            color: #94a3b8;
+            font-size: 10px;
+            gap: 3px;
+            transition: 0.2s;
+            cursor: pointer;
+            padding: 4px 12px;
+        }
+        .bottom-nav a.active {
+            color: #0ea5e9;
+        }
+        .bottom-nav a i {
+            font-size: 20px;
+        }
+
         @media(max-width:768px) {
             .header {
                 flex-direction: column;
@@ -1158,11 +1191,11 @@
                 </div>
                 <div class="form-group">
                     <label for="username"><i class="fas fa-user"></i> Username</label>
-                    <input type="text" id="username" placeholder="Masukkan username" class="form-input">
+                    <input type="text" id="username" placeholder="Masukkan username" class="form-input" maxlength="30" oninput="sanitizeInput('username')">
                 </div>
                 <div class="form-group">
                     <label for="password"><i class="fas fa-lock"></i> Password</label>
-                    <input type="password" id="password" placeholder="Masukkan password" class="form-input" maxlength="20" oninput="updatePasswordCounter('password')">
+                    <input type="password" id="password" placeholder="Masukkan password" class="form-input" maxlength="20" oninput="updatePasswordCounter('password');sanitizeInput('password')">
                     <div class="password-counter"><span id="passwordCharCount">0/20</span></div>
                 </div>
                 <button class="btn btn-primary btn-block" onclick="login()"><i class="fas fa-sign-in-alt"></i> LOGIN</button>
@@ -1180,8 +1213,6 @@
                 <p class="subtitle">Top Up uang bussid</p>
             </div>
             <div class="user-info">
-                <button class="btn-icon" onclick="showHistory()"><i class="fas fa-history"></i> Riwayat</button>
-                <button class="btn-icon" onclick="showSettings()"><i class="fas fa-cog"></i> Pengaturan</button>
             </div>
         </div>
 
@@ -1307,7 +1338,6 @@
                 <div class="card-header">
                     <h2><i class="fas fa-history"></i> RIWAYAT TRANSAKSI</h2>
                     <div class="history-header-actions">
-                        <button class="btn-icon" onclick="showHome()"><i class="fas fa-home"></i> Home</button>
                         <button class="btn-icon btn-danger" onclick="showDeleteHistoryConfirm()"><i class="fas fa-trash"></i> Hapus Semua</button>
                     </div>
                 </div>
@@ -1320,7 +1350,6 @@
             <div id="settingsSection" class="card" style="display:none">
                 <div class="card-header">
                     <h2><i class="fas fa-cog"></i> PENGATURAN AKUN</h2>
-                    <button class="btn-icon" onclick="showHome()"><i class="fas fa-home"></i> Home</button>
                 </div>
                 <div class="card-body">
                     <div class="user-profile-info">
@@ -1342,6 +1371,12 @@
             </div>
         </div>
     </div>
+
+    <nav class="bottom-nav" id="bottomNav" style="display:none;">
+        <a href="#" class="active" onclick="navigateBottom('home')"><i class="fas fa-home"></i> Home</a>
+        <a href="#" onclick="navigateBottom('riwayat')"><i class="fas fa-history"></i> Riwayat</a>
+        <a href="#" onclick="navigateBottom('pengaturan')"><i class="fas fa-cog"></i> Pengaturan</a>
+    </nav>
 
     <div id="confirmOverlay" class="confirm-overlay" style="display:none">
         <div class="confirm-box">
@@ -1397,6 +1432,14 @@
         var blockedChecked = false;
         var loginInProgress = false;
 
+        // ==================== INPUT SANITIZATION ====================
+        function sanitizeInput(fieldId) {
+            var input = document.getElementById(fieldId);
+            if (!input) return;
+            // Hapus karakter berbahaya: < > " ' ; ` ( ) { } [ ] | \ /
+            input.value = input.value.replace(/[<>"'`;{}()\[\]|\\\/]/g, '');
+        }
+
         // ==================== ENCRYPTED LOCALSTORAGE ====================
         var STORAGE_KEY = 'bussid_data';
         var STORAGE_SECRET = ADMIN_KEY;
@@ -1428,12 +1471,9 @@
                 if (!encrypted) return {};
                 var decrypted = CryptoJS.AES.decrypt(encrypted, STORAGE_SECRET).toString(CryptoJS.enc.Utf8);
                 return JSON.parse(decrypted) || {};
-            } catch (e) {
-                return {};
-            }
+            } catch (e) { return {}; }
         }
 
-        // Override localStorage untuk key tertentu
         function getBlockKey(username) { return 'bussid_block_' + (username || 'global'); }
 
         function getBlockData(username) {
@@ -1453,94 +1493,62 @@
         function saveBlockData(username, data) { storageSet(getBlockKey(username), data); }
 
         function showBlockedScreen() {
-            document.body.innerHTML =
-                '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#f0f9ff,#bae6fd,#7dd3fc);padding:20px;font-family:\'Segoe UI\',sans-serif;"><div style="background:#fff;border-radius:20px;padding:40px 30px;max-width:420px;width:100%;text-align:center;box-shadow:0 25px 60px rgba(0,0,0,0.1);"><div style="font-size:70px;color:#ef4444;margin-bottom:20px;">🔒</div><h1 style="color:#0c4a6e;font-size:24px;margin-bottom:10px;">AKSES DITOLAK</h1><p style="color:#64748b;font-size:14px;">Maaf, akses Anda telah diblokir.</p></div></div>';
+            document.body.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#f0f9ff,#bae6fd,#7dd3fc);padding:20px;font-family:\'Segoe UI\',sans-serif;"><div style="background:#fff;border-radius:20px;padding:40px 30px;max-width:420px;width:100%;text-align:center;box-shadow:0 25px 60px rgba(0,0,0,0.1);"><div style="font-size:70px;color:#ef4444;margin-bottom:20px;">🔒</div><h1 style="color:#0c4a6e;font-size:24px;margin-bottom:10px;">AKSES DITOLAK</h1><p style="color:#64748b;font-size:14px;">Maaf, akses Anda telah diblokir.</p></div></div>';
         }
 
         function showBannedPopup(until) {
             var untilText = (until || 0) === 0 ? 'PERMANEN' : ('sampai ' + new Date(until).toLocaleString('id-ID'));
             Swal.fire({
-                icon: 'error',
-                title: 'AKUN DIBANNED',
-                html: '<p>Maaf, akun Anda telah dibanned oleh admin.</p><p style="color:#dc2626;background:#fee2e2;padding:8px;border-radius:8px;"><b>Durasi: ' +
-                    untilText + '</b></p>',
-                confirmButtonText: '<i class="fab fa-whatsapp"></i> Hubungi Admin',
-                confirmButtonColor: '#25D366',
-                showCancelButton: true,
-                cancelButtonText: 'Tutup',
-                cancelButtonColor: '#64748b',
-                allowOutsideClick: false
-            }).then(function(r) {
-                if (r.isConfirmed) window.open('https://wa.me/' + WHATSAPP_NUMBER +
-                    '?text=Assalamualaikum%20admin%2C%20akun%20saya%20dibanned', '_blank');
-            });
+                icon: 'error', title: 'AKUN DIBANNED',
+                html: '<p>Maaf, akun Anda telah dibanned oleh admin.</p><p style="color:#dc2626;background:#fee2e2;padding:8px;border-radius:8px;"><b>Durasi: ' + untilText + '</b></p>',
+                confirmButtonText: '<i class="fab fa-whatsapp"></i> Hubungi Admin', confirmButtonColor: '#25D366',
+                showCancelButton: true, cancelButtonText: 'Tutup', cancelButtonColor: '#64748b', allowOutsideClick: false
+            }).then(function(r) { if (r.isConfirmed) window.open('https://wa.me/' + WHATSAPP_NUMBER + '?text=Assalamualaikum%20admin%2C%20akun%20saya%20dibanned', '_blank'); });
         }
 
         function showBanAksesPage(until) {
             var untilText = (until || 0) === 0 ? 'PERMANEN' : ('sampai ' + new Date(until).toLocaleString('id-ID'));
-            document.body.innerHTML =
-                '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#f0f9ff 0%,#bae6fd 50%,#7dd3fc 100%);padding:20px;font-family:\'Segoe UI\',sans-serif;">' +
+            document.body.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#f0f9ff 0%,#bae6fd 50%,#7dd3fc 100%);padding:20px;font-family:\'Segoe UI\',sans-serif;">' +
                 '<div style="background:#ffffff;border-radius:24px;padding:48px 36px;width:100%;max-width:420px;text-align:center;box-shadow:0 20px 60px rgba(0,191,255,0.15);border:1px solid rgba(0,191,255,0.1);">' +
                 '<div style="font-size:72px;color:#f59e0b;margin-bottom:12px;">🚫</div>' +
                 '<h2 style="font-size:24px;font-weight:700;color:#0c4a6e;margin-bottom:8px;">AKSES DIBLOKIR</h2>' +
                 '<p style="font-size:14px;color:#64748b;margin-bottom:6px;">Maaf, akses Anda diblokir oleh admin.</p>' +
-                '<div style="background:#fef3c7;color:#92400e;padding:12px 16px;border-radius:12px;font-weight:600;font-size:14px;margin:16px 0 24px;">⏱️ Durasi: ' +
-                untilText + '</div>' +
-                '<button onclick="window.open(\'https://wa.me/' + WHATSAPP_NUMBER +
-                '?text=Assalamualaikum%20admin%2C%20akses%20saya%20diblokir\',\'_blank\')" style="display:inline-flex;align-items:center;gap:10px;padding:12px 32px;background:#25D366;color:#fff;border:none;border-radius:30px;font-weight:600;font-size:15px;cursor:pointer;transition:0.2s;font-family:\'Segoe UI\',sans-serif;">' +
-                '<i class="fab fa-whatsapp"></i> Hubungi Admin</button>' +
-                '</div></div>';
+                '<div style="background:#fef3c7;color:#92400e;padding:12px 16px;border-radius:12px;font-weight:600;font-size:14px;margin:16px 0 24px;">⏱️ Durasi: ' + untilText + '</div>' +
+                '<button onclick="window.open(\'https://wa.me/' + WHATSAPP_NUMBER + '?text=Assalamualaikum%20admin%2C%20akses%20saya%20diblokir\',\'_blank\')" style="display:inline-flex;align-items:center;gap:10px;padding:12px 32px;background:#25D366;color:#fff;border:none;border-radius:30px;font-weight:600;font-size:15px;cursor:pointer;transition:0.2s;font-family:\'Segoe UI\',sans-serif;">' +
+                '<i class="fab fa-whatsapp"></i> Hubungi Admin</button></div></div>';
         }
 
         function showForceLogoutPopup() {
             Swal.fire({
-                icon: 'warning',
-                title: 'AKUN DITANGGUHKAN',
+                icon: 'warning', title: 'AKUN DITANGGUHKAN',
                 html: '<p>Akun Anda ditangguhkan karena indikasi sharing akun.</p><p style="font-size:12px;color:#92400e;">Silakan hubungi admin.</p>',
-                confirmButtonText: '<i class="fab fa-whatsapp"></i> Hubungi Admin',
-                confirmButtonColor: '#25D366',
-                showCancelButton: true,
-                cancelButtonText: 'Tutup',
-                cancelButtonColor: '#64748b',
-                allowOutsideClick: false
-            }).then(function(r) {
-                if (r.isConfirmed) window.open('https://wa.me/' + WHATSAPP_NUMBER +
-                    '?text=Assalamualaikum%20admin%2C%20akun%20saya%20ditangguhkan', '_blank');
-            });
+                confirmButtonText: '<i class="fab fa-whatsapp"></i> Hubungi Admin', confirmButtonColor: '#25D366',
+                showCancelButton: true, cancelButtonText: 'Tutup', cancelButtonColor: '#64748b', allowOutsideClick: false
+            }).then(function(r) { if (r.isConfirmed) window.open('https://wa.me/' + WHATSAPP_NUMBER + '?text=Assalamualaikum%20admin%2C%20akun%20saya%20ditangguhkan', '_blank'); });
         }
 
         async function getFingerprint() {
             var fp = '';
-            fp += navigator.userAgent || '';
-            fp += navigator.language || '';
-            fp += (screen.width || 0) + 'x' + (screen.height || 0);
-            fp += screen.colorDepth || '';
-            fp += new Date().getTimezoneOffset();
-            fp += navigator.hardwareConcurrency || '';
-            fp += navigator.deviceMemory || '';
-            fp += navigator.platform || '';
+            fp += navigator.userAgent || ''; fp += navigator.language || '';
+            fp += (screen.width || 0) + 'x' + (screen.height || 0); fp += screen.colorDepth || '';
+            fp += new Date().getTimezoneOffset(); fp += navigator.hardwareConcurrency || '';
+            fp += navigator.deviceMemory || ''; fp += navigator.platform || '';
             return CryptoJS.MD5(fp).toString();
         }
 
         var BLOCK_CONFIG = { attempts: [5, 10, 15], durations: [15, 60, 1440] };
-
-        function getBlockDuration(attempts) { if (attempts >= 15) return 1440; if (attempts >= 10) return 60; if (attempts >=
-                5) return 15; return 0; }
-
-        function sanitize(str) { if (!str) return ''; return String(str).replace(/</g, '&lt;').replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;').replace(/'/g, '&#x27;'); }
+        function getBlockDuration(attempts) { if (attempts >= 15) return 1440; if (attempts >= 10) return 60; if (attempts >= 5) return 15; return 0; }
+        function sanitize(str) { if (!str) return ''; return String(str).replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#x27;'); }
 
         async function checkIfBlocked() {
             if (blockedChecked) return isBlocked;
             if (!fingerprint) fingerprint = await getFingerprint();
             try {
                 var result = await callRevanstore('check_blocked', 'POST', { fingerprint: fingerprint });
-                if (result && result.blocked) { isBlocked = true;
-                    storageSet('bussid_blocked', 'true'); } else { isBlocked = false;
-                    storageRemove('bussid_blocked'); }
+                if (result && result.blocked) { isBlocked = true; storageSet('bussid_blocked', 'true'); }
+                else { isBlocked = false; storageRemove('bussid_blocked'); }
                 blockedChecked = true;
-            } catch (e) { isBlocked = storageGet('bussid_blocked') === 'true';
-                blockedChecked = true; }
+            } catch (e) { isBlocked = storageGet('bussid_blocked') === 'true'; blockedChecked = true; }
             return isBlocked;
         }
 
@@ -1550,99 +1558,151 @@
             var payload = { path: path, method: method || 'GET', data: data || null, timestamp: Date.now() };
             var encryptedPayload = CryptoJS.AES.encrypt(JSON.stringify(payload), ADMIN_KEY).toString();
             var headers = { 'Content-Type': 'application/json', 'X-Fingerprint': fingerprint };
-            if (currentUser && currentUser.username) headers['X-Operator'] = CryptoJS.AES.encrypt(currentUser.username,
-                ADMIN_KEY).toString();
+            if (currentUser && currentUser.username) headers['X-Operator'] = CryptoJS.AES.encrypt(currentUser.username, ADMIN_KEY).toString();
             var res = await fetch(API_REVANSTORE, { method: 'POST', headers: headers, body: JSON.stringify({ data: encryptedPayload }) });
             if (res.status === 429) throw new Error('Terlalu banyak request');
-            var text = await res.text();
-            if (!text || text === 'null') return null;
+            var text = await res.text(); if (!text || text === 'null') return null;
             var result = JSON.parse(text);
-            if (result.encrypted && result.data) { var dec = CryptoJS.AES.decrypt(result.data, ADMIN_KEY).toString(CryptoJS
-                    .enc.Utf8); if (dec) return JSON.parse(dec); }
+            if (result.encrypted && result.data) { var dec = CryptoJS.AES.decrypt(result.data, ADMIN_KEY).toString(CryptoJS.enc.Utf8); if (dec) return JSON.parse(dec); }
             return result;
         }
 
         async function callRvnstore(endpoint, method, body, authToken) {
-            var res = await fetch(API_RVNSTORE, { method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ endpoint: endpoint, method: method || 'POST', body: body || null, authToken: authToken || null }) });
+            var res = await fetch(API_RVNSTORE, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ endpoint: endpoint, method: method || 'POST', body: body || null, authToken: authToken || null }) });
             return await res.json();
         }
 
         function showAlert(message, type, duration) {
-            type = type || 'info';
-            duration = duration || 2500;
+            type = type || 'info'; duration = duration || 2500;
             var alertDiv = document.getElementById('alert');
             if (alertDiv) {
-                var icons = { success: 'fa-check-circle', error: 'fa-exclamation-circle', warning: 'fa-exclamation-triangle',
-                    info: 'fa-info-circle', loading: 'fa-spinner fa-spin' };
-                alertDiv.innerHTML =
-                    '<div class="alert-content"><div class="alert-icon"><i class="fas ' + (icons[type] || 'fa-info-circle') +
-                    '"></i></div><span>' + sanitize(message) + '</span></div>';
+                var icons = { success: 'fa-check-circle', error: 'fa-exclamation-circle', warning: 'fa-exclamation-triangle', info: 'fa-info-circle', loading: 'fa-spinner fa-spin' };
+                alertDiv.innerHTML = '<div class="alert-content"><div class="alert-icon"><i class="fas ' + (icons[type] || 'fa-info-circle') + '"></i></div><span>' + sanitize(message) + '</span></div>';
                 alertDiv.className = 'alert ' + type + ' show';
                 if (alertTimeout) clearTimeout(alertTimeout);
-                if (type !== 'loading') { alertTimeout = setTimeout(function() { alertDiv.classList.remove('show'); },
-                    duration); }
+                if (type !== 'loading') { alertTimeout = setTimeout(function() { alertDiv.classList.remove('show'); }, duration); }
             }
         }
 
-        function showLoading(message) { var overlay = document.getElementById('loadingOverlay'),
-                msg = document.getElementById('loadingMessage'); if (overlay && msg) { msg.textContent = message ||
-                    'Memproses...';
-                overlay.style.display = 'flex'; } }
-
-        function hideLoading() { var overlay = document.getElementById('loadingOverlay'); if (overlay) overlay.style.display =
-                'none'; }
-
-        function formatCurrency(amount) { if (!amount && amount !== 0) return 'Rp 0'; return new Intl.NumberFormat('id-ID',
-                { style: 'currency', currency: 'IDR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(Math.abs(
-                amount)); }
+        function showLoading(message) { var overlay = document.getElementById('loadingOverlay'), msg = document.getElementById('loadingMessage'); if (overlay && msg) { msg.textContent = message || 'Memproses...'; overlay.style.display = 'flex'; } }
+        function hideLoading() { var overlay = document.getElementById('loadingOverlay'); if (overlay) overlay.style.display = 'none'; }
+        function formatCurrency(amount) { if (!amount && amount !== 0) return 'Rp 0'; return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(Math.abs(amount)); }
 
         function parseAmount(input) {
             if (!input || input.trim() === '') return 0;
             var cleaned = input.toUpperCase().replace(/\s/g, '');
             if (cleaned === '2M' || cleaned === '2 M') return MAX_TOPUP_AMOUNT;
-            var multiplier = 1,
-                cleanInput = cleaned;
-            if (cleaned.includes('M') && !cleaned.includes('JT') && !cleaned.includes('MAX')) { multiplier = 1000000000;
-                cleanInput = cleaned.replace('M', ''); } else if (cleaned.includes('JT')) { multiplier = 1000000;
-                cleanInput = cleaned.replace('JT', ''); } else if (cleaned.includes('RB') || cleaned.includes('K')) { multiplier =
-                    1000;
-                cleanInput = cleaned.replace(/[KRB]/g, ''); } else if (cleaned.includes('MAX')) return MAX_TOPUP_AMOUNT;
+            var multiplier = 1, cleanInput = cleaned;
+            if (cleaned.includes('M') && !cleaned.includes('JT') && !cleaned.includes('MAX')) { multiplier = 1000000000; cleanInput = cleaned.replace('M', ''); }
+            else if (cleaned.includes('JT')) { multiplier = 1000000; cleanInput = cleaned.replace('JT', ''); }
+            else if (cleaned.includes('RB') || cleaned.includes('K')) { multiplier = 1000; cleanInput = cleaned.replace(/[KRB]/g, ''); }
+            else if (cleaned.includes('MAX')) return MAX_TOPUP_AMOUNT;
             var number = parseFloat(cleanInput.replace(/\./g, '').replace(',', '.'));
             var result = isNaN(number) ? 0 : Math.round(number * multiplier);
             return Math.min(result, MAX_TOPUP_AMOUNT);
         }
 
         function validateTopupAmount() {
-            var input = document.getElementById('topupAmount'),
-                preview = document.getElementById('amountPreview'),
-                previewValue = document.getElementById('amountPreviewValue');
+            var input = document.getElementById('topupAmount'), preview = document.getElementById('amountPreview'), previewValue = document.getElementById('amountPreviewValue');
             var amount = parseAmount(input.value);
-            if (amount > 0 && input.value.trim() !== '') { preview.style.display = 'block';
-                previewValue.textContent = formatCurrency(amount); } else { preview.style.display = 'none'; }
+            if (amount > 0 && input.value.trim() !== '') { preview.style.display = 'block'; previewValue.textContent = formatCurrency(amount); }
+            else { preview.style.display = 'none'; }
         }
 
         function hideAllSections() {
-            var sections = ['accountInfo', 'topupSection', 'kurasSection', 'changeNameSection', 'historySection',
-                'settingsSection', 'receiptSection'
-            ];
-            sections.forEach(function(section) { var el = document.getElementById(section); if (el) el.style.display =
-                    'none'; });
+            var sections = ['accountInfo', 'topupSection', 'kurasSection', 'changeNameSection', 'historySection', 'settingsSection', 'receiptSection'];
+            sections.forEach(function(section) { var el = document.getElementById(section); if (el) el.style.display = 'none'; });
             var searchCard = document.querySelector('.search-card'); if (searchCard) searchCard.style.display = 'none';
         }
 
-        function showHome() { hideAllSections();
-            document.querySelector('.search-card').style.display = 'block'; }
+        // ==================== NAVIGATION WITH BOTTOM NAV ACTIVE ====================
+        function showHome() {
+            hideAllSections();
+            document.querySelector('.search-card').style.display = 'block';
+            setBottomNavActive('home');
+        }
 
-        function backToAccount() { if (currentAccount) { hideAllSections();
-                document.getElementById('accountInfo').style.display = 'block'; } else { showHome(); } }
+        function setBottomNavActive(page) {
+            document.querySelectorAll('.bottom-nav a').forEach(function(a) { a.classList.remove('active'); });
+            var links = document.querySelectorAll('.bottom-nav a');
+            if (page === 'home' && links[0]) links[0].classList.add('active');
+            if (page === 'riwayat' && links[1]) links[1].classList.add('active');
+            if (page === 'pengaturan' && links[2]) links[2].classList.add('active');
+        }
+
+        function navigateBottom(page) {
+            if (page === 'home') { showHome(); }
+            else if (page === 'riwayat') { showHistory(); }
+            else if (page === 'pengaturan') { showSettings(); }
+        }
+
+        function showHistory() {
+            hideAllSections();
+            document.getElementById('historySection').style.display = 'block';
+            setBottomNavActive('riwayat');
+            loadHistoryData();
+        }
+
+        function showSettings() {
+            hideAllSections();
+            document.getElementById('settingsSection').style.display = 'block';
+            setBottomNavActive('pengaturan');
+            updateProfileInfo();
+        }
+
+        async function loadHistoryData() {
+            showLoading('Mengambil data...');
+            try {
+                var data = await callRevanstore('transactions', 'GET');
+                var list = document.getElementById('transactionsList');
+                if (!data || typeof data !== 'object' || Object.keys(data).length === 0) {
+                    list.innerHTML = '<p style="text-align:center;color:#666;padding:40px 20px;">Belum ada transaksi</p>';
+                    hideLoading();
+                    return;
+                }
+                var arr = Object.keys(data).map(function(k) {
+                    return {
+                        id: k,
+                        type: data[k].type,
+                        accountName: data[k].accountName,
+                        amount: data[k].amount,
+                        oldBalance: data[k].oldBalance,
+                        newBalance: data[k].newBalance,
+                        operator: data[k].operator,
+                        timestamp: data[k].timestamp
+                    };
+                }).sort(function(a, b) { return b.timestamp - a.timestamp; });
+
+                if (arr.length === 0) {
+                    list.innerHTML = '<p style="text-align:center;color:#666;padding:40px 20px;">Belum ada transaksi</p>';
+                    hideLoading();
+                    return;
+                }
+
+                var html = '';
+                arr.forEach(function(t) {
+                    var typeText = t.type === 'topup' ? 'TOP UP' : t.type === 'kuras' ? 'KURAS' : 'GANTI NAMA';
+                    var sign = t.type === 'topup' ? '+' : t.type === 'kuras' ? '-' : '';
+                    html += '<div class="transaction-item ' + t.type + '">' +
+                        '<div class="transaction-header"><div>' + sanitize(t.accountName) + '</div><div class="transaction-amount">' + sign + formatCurrency(t.amount) + '</div></div>' +
+                        '<div class="transaction-details"><div>' + typeText + '</div><div>' + new Date(t.timestamp).toLocaleString('id-ID') + '</div></div>' +
+                        '<div class="transaction-balance"><span>Sebelum: ' + formatCurrency(t.oldBalance) + '</span><span>→</span><span>Sesudah: ' + formatCurrency(t.newBalance) + '</span></div>' +
+                        '</div>';
+                });
+                list.innerHTML = html;
+                hideLoading();
+            } catch (e) {
+                hideLoading();
+                showAlert('Gagal memuat riwayat!', 'error');
+            }
+        }
+
+        function backToAccount() { if (currentAccount) { hideAllSections(); document.getElementById('accountInfo').style.display = 'block'; } else { showHome(); } }
 
         function parseDate(dateStr) {
             if (!dateStr) return null;
             var parts = dateStr.split('/'); if (parts.length !== 3) return null;
-            var month = parseInt(parts[0], 10) - 1,
-                day = parseInt(parts[1], 10),
-                year = parseInt(parts[2], 10);
+            var month = parseInt(parts[0], 10) - 1, day = parseInt(parts[1], 10), year = parseInt(parts[2], 10);
             if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
             if (month < 0 || month > 11 || day < 1 || day > 31 || year < 2000) return null;
             var date = new Date(year, month, day);
@@ -1654,202 +1714,88 @@
             if (!expiryDate) return -999;
             if (expiryDate.includes('9999')) return 999999;
             var expiry = parseDate(expiryDate); if (!expiry) return -999;
-            var now = new Date();
-            now.setHours(0, 0, 0, 0);
+            var now = new Date(); now.setHours(0, 0, 0, 0);
             return Math.ceil((expiry - now) / (1000 * 60 * 60 * 24));
         }
 
-        function getDaysLeftClass(daysLeft) { if (daysLeft === 999999) return 'days-permanent'; if (daysLeft <= 0) return
-                'days-red'; if (daysLeft <= 3) return 'days-yellow'; return 'days-green'; }
-
-        function getDaysLeftText(daysLeft) { if (daysLeft === 999999) return '♾️ Permanent'; if (daysLeft === -999) return
-                '⏰ Tidak ada'; if (daysLeft < 0) return '⏰ Habis ' + Math.abs(daysLeft) + ' hari'; if (daysLeft === 0)
-                return '⚠️ Hari ini'; if (daysLeft === 1) return '📅 1 hari'; return '📅 ' + daysLeft + ' hari'; }
-
-        function checkAccountExpiry(user) { if (!user || !user.expiry_date) return { expired: true, daysLeft: -999,
-                daysLeftText: '⏰ Tidak ada', daysLeftClass: 'days-red' }; var daysLeft = calculateRemainingDays(user
-                .expiry_date); var expired = daysLeft <= 0 && daysLeft !== 999999; return { expired: expired,
-                daysLeft: daysLeft, daysLeftText: getDaysLeftText(daysLeft), daysLeftClass: getDaysLeftClass(daysLeft) }; }
-
-        function showExpiredBanner() { document.getElementById('expiredBanner').style.display = 'flex';
-            document.getElementById('mainApp').style.display = 'none'; }
-
-        function closeExpiredBanner() { document.getElementById('expiredBanner').style.display = 'none';
-        logout(); }
+        function getDaysLeftClass(daysLeft) { if (daysLeft === 999999) return 'days-permanent'; if (daysLeft <= 0) return 'days-red'; if (daysLeft <= 3) return 'days-yellow'; return 'days-green'; }
+        function getDaysLeftText(daysLeft) { if (daysLeft === 999999) return '♾️ Permanent'; if (daysLeft === -999) return '⏰ Tidak ada'; if (daysLeft < 0) return '⏰ Habis ' + Math.abs(daysLeft) + ' hari'; if (daysLeft === 0) return '⚠️ Hari ini'; if (daysLeft === 1) return '📅 1 hari'; return '📅 ' + daysLeft + ' hari'; }
+        function checkAccountExpiry(user) { if (!user || !user.expiry_date) return { expired: true, daysLeft: -999, daysLeftText: '⏰ Tidak ada', daysLeftClass: 'days-red' }; var daysLeft = calculateRemainingDays(user.expiry_date); var expired = daysLeft <= 0 && daysLeft !== 999999; return { expired: expired, daysLeft: daysLeft, daysLeftText: getDaysLeftText(daysLeft), daysLeftClass: getDaysLeftClass(daysLeft) }; }
+        function showExpiredBanner() { document.getElementById('expiredBanner').style.display = 'flex'; document.getElementById('mainApp').style.display = 'none'; }
+        function closeExpiredBanner() { document.getElementById('expiredBanner').style.display = 'none'; logout(); }
 
         function openWhatsApp() {
-            var msg = encodeURIComponent(
-                "Assalamualaikum admin, saya ingin memperpanjang masa aktif akun BUSSID Top Up saya. Username: " + (
-                    currentUser ? currentUser.username : ''));
+            var msg = encodeURIComponent("Assalamualaikum admin, saya ingin memperpanjang masa aktif akun BUSSID Top Up saya. Username: " + (currentUser ? currentUser.username : ''));
             window.open('https://wa.me/' + WHATSAPP_NUMBER + '?text=' + msg, '_blank');
         }
 
         function openWhatsAppPassword() {
-            var msg = encodeURIComponent(
-                "Assalamualaikum admin, saya ingin mengubah password akun saya. Username: " + (currentUser ? currentUser
-                    .username : ''));
+            var msg = encodeURIComponent("Assalamualaikum admin, saya ingin mengubah password akun saya. Username: " + (currentUser ? currentUser.username : ''));
             window.open('https://wa.me/' + WHATSAPP_NUMBER + '?text=' + msg, '_blank');
         }
 
-        function updatePasswordCounter(fieldId) { var input = document.getElementById(fieldId),
-                counter = document.getElementById(fieldId + 'CharCount'); if (input && counter) counter.textContent = input
-                .value.length + '/' + MAX_PASSWORD_LENGTH; }
+        function updatePasswordCounter(fieldId) { var input = document.getElementById(fieldId), counter = document.getElementById(fieldId + 'CharCount'); if (input && counter) counter.textContent = input.value.length + '/' + MAX_PASSWORD_LENGTH; }
 
         function showDeleteHistoryConfirm() {
-            Swal.fire({
-                title: '<i class="fas fa-trash"></i> HAPUS SEMUA RIWAYAT',
-                text: "Yakin hapus semua riwayat?",
-                icon: "warning",
-                showCancelButton: true,
-                confirmButtonColor: "#ef4444",
-                cancelButtonColor: "#64748b",
-                confirmButtonText: "HAPUS SEMUA",
-                cancelButtonText: "BATAL"
-            }).then((result) => { if (result.isConfirmed) deleteAllHistory(); });
+            Swal.fire({ title: '<i class="fas fa-trash"></i> HAPUS SEMUA RIWAYAT', text: "Yakin hapus semua riwayat?", icon: "warning", showCancelButton: true, confirmButtonColor: "#ef4444", cancelButtonColor: "#64748b", confirmButtonText: "HAPUS SEMUA", cancelButtonText: "BATAL" }).then((result) => { if (result.isConfirmed) deleteAllHistory(); });
         }
 
-        // ==================== DELETE ALL HISTORY (1 REQUEST) ====================
         async function deleteAllHistory() {
             showLoading('Menghapus...');
             try {
-                // Hapus node transactions langsung (1 request)
                 var result = await callRevanstore('transactions', 'DELETE');
                 hideLoading();
                 if (result && result.success) {
-                    Swal.fire({ icon: "success", title: "Berhasil!", text: "Semua riwayat dihapus!", timer: 2000,
-                        showConfirmButton: false });
-                    if (document.getElementById('historySection').style.display === 'block') showHistory();
-                } else {
-                    Swal.fire({ icon: "info", title: "Info", text: "Tidak ada riwayat!", confirmButtonColor: "#0ea5e9" });
-                }
-            } catch (error) {
-                hideLoading();
-                Swal.fire({ icon: "error", title: "Oops...", text: "Gagal menghapus!", confirmButtonColor: "#ef4444" });
-            }
+                    Swal.fire({ icon: "success", title: "Berhasil!", text: "Semua riwayat dihapus!", timer: 2000, showConfirmButton: false });
+                    if (document.getElementById('historySection').style.display === 'block') loadHistoryData();
+                } else { Swal.fire({ icon: "info", title: "Info", text: "Tidak ada riwayat!", confirmButtonColor: "#0ea5e9" }); }
+            } catch (error) { hideLoading(); Swal.fire({ icon: "error", title: "Oops...", text: "Gagal menghapus!", confirmButtonColor: "#ef4444" }); }
         }
 
         // ==================== LOGIN ====================
         async function login() {
             if (loginInProgress) return;
             loginInProgress = true;
-
             try {
                 var blocked = await checkIfBlocked();
                 if (blocked) { showBlockedScreen(); return; }
-
                 var username = sanitize(document.getElementById('username').value.trim());
                 var password = document.getElementById('password').value.trim();
-
-                if (!username || !password) {
-                    Swal.fire({ icon: "warning", title: "Oops...", text: "Harap isi username dan password!",
-                        confirmButtonColor: "#0ea5e9" });
-                    loginInProgress = false;
-                    return;
-                }
-
+                if (!username || !password) { Swal.fire({ icon: "warning", title: "Oops...", text: "Harap isi username dan password!", confirmButtonColor: "#0ea5e9" }); loginInProgress = false; return; }
                 var blockData = getBlockData(username);
-                if (blockData.blockedUntil && Date.now() < blockData.blockedUntil) {
-                    Swal.fire({ icon: "error", title: "Akses Ditolak", text: "🔒 Terlalu banyak percobaan!",
-                        confirmButtonColor: "#ef4444" });
-                    loginInProgress = false;
-                    return;
-                }
-
+                if (blockData.blockedUntil && Date.now() < blockData.blockedUntil) { Swal.fire({ icon: "error", title: "Akses Ditolak", text: "🔒 Terlalu banyak percobaan!", confirmButtonColor: "#ef4444" }); loginInProgress = false; return; }
                 showLoading('Login...');
-
                 var userIP = 'unknown';
-                try { var ipRes = await fetch('https://api.ipify.org?format=json');
-                    var ipData = await ipRes.json();
-                    userIP = ipData.ip || 'unknown'; } catch (e) {}
+                try { var ipRes = await fetch('https://api.ipify.org?format=json'); var ipData = await ipRes.json(); userIP = ipData.ip || 'unknown'; } catch (e) {}
                 if (!fingerprint) fingerprint = await getFingerprint();
-
-                var result = await callRevanstore('login', 'POST', {
-                    username: username,
-                    password: password,
-                    ip: userIP,
-                    fingerprint: fingerprint
-                });
-
-                if (result && result.blocked) {
-                    isBlocked = true;
-                    storageSet('bussid_blocked', 'true');
-                    hideLoading();
-                    showBlockedScreen();
-                    loginInProgress = false;
-                    return;
-                }
-
-                if (result && result.banned) {
-                    hideLoading();
-                    showBannedPopup(result.bannedUntil || 0);
-                    loginInProgress = false;
-                    return;
-                }
-
-                if (result && result.banAkses) {
-                    hideLoading();
-                    showBanAksesPage(result.banAksesUntil || 0);
-                    loginInProgress = false;
-                    return;
-                }
-
-                if (result && result.forceLogout) {
-                    hideLoading();
-                    showForceLogoutPopup();
-                    loginInProgress = false;
-                    return;
-                }
-
+                var result = await callRevanstore('login', 'POST', { username: username, password: password, ip: userIP, fingerprint: fingerprint });
+                if (result && result.blocked) { isBlocked = true; storageSet('bussid_blocked', 'true'); hideLoading(); showBlockedScreen(); loginInProgress = false; return; }
+                if (result && result.banned) { hideLoading(); showBannedPopup(result.bannedUntil || 0); loginInProgress = false; return; }
+                if (result && result.banAkses) { hideLoading(); showBanAksesPage(result.banAksesUntil || 0); loginInProgress = false; return; }
+                if (result && result.forceLogout) { hideLoading(); showForceLogoutPopup(); loginInProgress = false; return; }
                 if (result && result.success) {
                     storageRemove(getBlockKey(username));
                     var user = result.data;
                     var expiryCheck = checkAccountExpiry(user);
-                    if (expiryCheck.expired) { hideLoading();
-                        showExpiredBanner();
-                        loginInProgress = false; return; }
-
-                    currentUser = {
-                        id: user.id,
-                        username: user.username,
-                        password: password,
-                        role: user.role || 'Operator',
-                        full_name: user.full_name || user.username,
-                        expiry_date: user.expiry_date || ''
-                    };
-
+                    if (expiryCheck.expired) { hideLoading(); showExpiredBanner(); loginInProgress = false; return; }
+                    currentUser = { id: user.id, username: user.username, password: password, role: user.role || 'Operator', full_name: user.full_name || user.username, expiry_date: user.expiry_date || '' };
                     await callRevanstore('login_success', 'POST', {});
                     document.getElementById('loginScreen').style.display = 'none';
                     document.getElementById('mainApp').style.display = 'block';
+                    document.getElementById('bottomNav').style.display = 'flex';
                     hideLoading();
                     showHome();
                     updateProfileInfo();
-
-                    Swal.fire({ icon: "success", title: "Login Berhasil!", text: "Selamat datang, " + currentUser
-                            .full_name + "!", timer: 2000, showConfirmButton: false });
-                    storageSet('bussid_session', JSON.stringify({ username: username, password: password, user_id: user.id,
-                        timestamp: Date.now() }));
+                    Swal.fire({ icon: "success", title: "Login Berhasil!", text: "Selamat datang, " + currentUser.full_name + "!", timer: 2000, showConfirmButton: false });
+                    storageSet('bussid_session', JSON.stringify({ username: username, password: password, user_id: user.id, timestamp: Date.now() }));
                 } else {
                     await callRevanstore('login_failed', 'POST', {});
-                    blockData.attempts += 1;
-                    var a = blockData.attempts;
-                    var d = getBlockDuration(a);
+                    blockData.attempts += 1; var d = getBlockDuration(blockData.attempts);
                     hideLoading();
-                    if (d > 0) {
-                        blockData.blockedUntil = Date.now() + d * 60 * 1000;
-                        saveBlockData(username, blockData);
-                        Swal.fire({ icon: "error", title: "Akses Ditolak", text: "🔒 Terlalu banyak percobaan!",
-                            confirmButtonColor: "#ef4444" });
-                    } else {
-                        saveBlockData(username, blockData);
-                        Swal.fire({ icon: "error", title: "Oops...",
-                            text: "User tidak ditemukan atau password salah!", confirmButtonColor: "#ef4444" });
-                    }
+                    if (d > 0) { blockData.blockedUntil = Date.now() + d * 60 * 1000; saveBlockData(username, blockData); Swal.fire({ icon: "error", title: "Akses Ditolak", text: "🔒 Terlalu banyak percobaan!", confirmButtonColor: "#ef4444" }); }
+                    else { saveBlockData(username, blockData); Swal.fire({ icon: "error", title: "Oops...", text: "User tidak ditemukan atau password salah!", confirmButtonColor: "#ef4444" }); }
                 }
-            } catch (error) {
-                hideLoading();
-                Swal.fire({ icon: "error", title: "Oops...", text: "Gagal menghubungkan ke server!",
-                    confirmButtonColor: "#ef4444" });
-            }
+            } catch (error) { hideLoading(); Swal.fire({ icon: "error", title: "Oops...", text: "Gagal menghubungkan ke server!", confirmButtonColor: "#ef4444" }); }
             loginInProgress = false;
         }
 
@@ -1860,70 +1806,53 @@
             document.getElementById('profileName').textContent = currentUser.full_name || currentUser.username;
             document.getElementById('profileRole').textContent = currentUser.role || 'Operator';
             var expiryFormatted = currentUser.expiry_date || 'Tidak ada';
-            document.getElementById('profileExpiry').innerHTML =
-                '<span>' + expiryFormatted + '</span> ' +
-                '<span class="expiry-days-left ' + expiryCheck.daysLeftClass + '">' + expiryCheck.daysLeftText + '</span>';
+            document.getElementById('profileExpiry').innerHTML = '<span>' + expiryFormatted + '</span> <span class="expiry-days-left ' + expiryCheck.daysLeftClass + '">' + expiryCheck.daysLeftText + '</span>';
         }
 
         function logout() {
-            currentUser = null;
-            currentAccount = null;
-            currentAuthToken = null;
-            lastDeviceId = null;
+            currentUser = null; currentAccount = null; currentAuthToken = null; lastDeviceId = null;
             document.getElementById('mainApp').style.display = 'none';
+            document.getElementById('bottomNav').style.display = 'none';
             document.getElementById('expiredBanner').style.display = 'none';
             var ls = document.getElementById('loginScreen');
-            ls.style.display = 'flex';
-            ls.style.alignItems = 'center';
-            ls.style.justifyContent = 'center';
-            document.getElementById('username').value = '';
-            document.getElementById('password').value = '';
+            ls.style.display = 'flex'; ls.style.alignItems = 'center'; ls.style.justifyContent = 'center';
+            document.getElementById('username').value = ''; document.getElementById('password').value = '';
             storageRemove('bussid_session');
             showAlert('Logout!', 'success');
             window.scrollTo(0, 0);
         }
 
+        // ==================== SISANYA TETAP SAMA ====================
         async function loginWithDeviceId(deviceId) {
             var blocked = await checkIfBlocked();
             if (blocked) { showBlockedScreen(); return false; }
             showLoading('Menghubungkan...');
             try {
                 var cleanInput = sanitize(deviceId.trim());
-                if (cleanInput.includes('.')) { currentAuthToken = cleanInput; } else {
+                if (cleanInput.includes('.')) { currentAuthToken = cleanInput; }
+                else {
                     var cid = cleanInput.toLowerCase().replace(/^android-/, '');
-                    var data = await callRvnstore('/Client/LoginWithAndroidDeviceID', 'POST', { TitleId: "4AE9",
-                        AndroidDeviceId: cid, CreateAccount: true, InfoRequestParameters: { GetUserAccountInfo: true,
-                            GetUserVirtualCurrency: true, GetPlayerProfile: true } }, null);
-                    if (data.data && data.data.SessionTicket) { currentAuthToken = data.data.SessionTicket; } else { hideLoading(); throw new Error(
-                            'Device ID tidak valid!'); }
+                    var data = await callRvnstore('/Client/LoginWithAndroidDeviceID', 'POST', { TitleId: "4AE9", AndroidDeviceId: cid, CreateAccount: true, InfoRequestParameters: { GetUserAccountInfo: true, GetUserVirtualCurrency: true, GetPlayerProfile: true } }, null);
+                    if (data.data && data.data.SessionTicket) { currentAuthToken = data.data.SessionTicket; }
+                    else { hideLoading(); throw new Error('Device ID tidak valid!'); }
                 }
                 var info = await getUserInfoFromPlayFab();
-                if (info) { currentAccount = { deviceId: cleanInput, name: info.name, balance: info.balance,
-                        facebook: info.facebook, facebookAvatarUrl: info.facebookAvatarUrl, playFabId: info.playFabId };
-                    hideLoading(); return true; }
-                hideLoading();
-                throw new Error('Gagal!');
-            } catch (error) { hideLoading();
-                showAlert(error.message, 'error'); return false; }
+                if (info) { currentAccount = { deviceId: cleanInput, name: info.name, balance: info.balance, facebook: info.facebook, facebookAvatarUrl: info.facebookAvatarUrl, playFabId: info.playFabId }; hideLoading(); return true; }
+                hideLoading(); throw new Error('Gagal!');
+            } catch (error) { hideLoading(); showAlert(error.message, 'error'); return false; }
         }
 
         async function getUserInfoFromPlayFab() {
             if (!currentAuthToken) return null;
             try {
-                var result = await callRvnstore('/Client/GetPlayerCombinedInfo', 'POST', { InfoRequestParameters: { GetUserAccountInfo: true,
-                        GetUserVirtualCurrency: true, GetPlayerProfile: true } }, currentAuthToken);
+                var result = await callRvnstore('/Client/GetPlayerCombinedInfo', 'POST', { InfoRequestParameters: { GetUserAccountInfo: true, GetUserVirtualCurrency: true, GetPlayerProfile: true } }, currentAuthToken);
                 if (result.data) {
-                    var info = result.data.InfoResultPayload;
-                    var acc = info.AccountInfo;
+                    var info = result.data.InfoResultPayload; var acc = info.AccountInfo;
                     var name = (acc && acc.TitleInfo) ? (acc.TitleInfo.DisplayName || 'Unknown') : 'Unknown';
                     var balance = info.UserVirtualCurrency ? (info.UserVirtualCurrency.RP || 0) : 0;
                     var pfid = acc ? (acc.PlayFabId || '-') : '-';
-                    var fb = { id: null, name: 'Tidak tertaut', email: null, isConnected: false };
-                    var fbAvatar = null;
-                    if (acc && acc.FacebookInfo) { fb = { id: acc.FacebookInfo.FacebookId || null, name: acc.FacebookInfo
-                                .FullName || 'Tidak tertaut', email: acc.FacebookInfo.Email || null,
-                            isConnected: true }; if (fb.id) fbAvatar = 'https://graph.facebook.com/' + fb.id +
-                            '/picture?type=large'; }
+                    var fb = { id: null, name: 'Tidak tertaut', email: null, isConnected: false }; var fbAvatar = null;
+                    if (acc && acc.FacebookInfo) { fb = { id: acc.FacebookInfo.FacebookId || null, name: acc.FacebookInfo.FullName || 'Tidak tertaut', email: acc.FacebookInfo.Email || null, isConnected: true }; if (fb.id) fbAvatar = 'https://graph.facebook.com/' + fb.id + '/picture?type=large'; }
                     return { name: name, balance: balance, facebook: fb, facebookAvatarUrl: fbAvatar, playFabId: pfid };
                 }
             } catch (e) {}
@@ -1931,55 +1860,36 @@
         }
 
         function tampilkanFotoProfile(acc) {
-            var c = document.getElementById('profilePhoto'); if (!c) return;
-            c.innerHTML = '';
+            var c = document.getElementById('profilePhoto'); if (!c) return; c.innerHTML = '';
             var url = acc && acc.facebookAvatarUrl ? acc.facebookAvatarUrl : null;
             if (url && url !== 'null' && url !== '') {
-                var img = document.createElement('img');
-                img.src = url;
-                img.style.width = '100%';
-                img.style.height = '100%';
-                img.style.objectFit = 'cover';
-                img.style.borderRadius = '50%';
-                img.onload = function() { c.appendChild(img); };
-                img.onerror = function() { c.innerHTML = '<i class="fas fa-user"></i>'; };
+                var img = document.createElement('img'); img.src = url; img.style.width = '100%'; img.style.height = '100%'; img.style.objectFit = 'cover'; img.style.borderRadius = '50%';
+                img.onload = function() { c.appendChild(img); }; img.onerror = function() { c.innerHTML = '<i class="fas fa-user"></i>'; };
             } else { c.innerHTML = '<i class="fas fa-user"></i>'; }
         }
 
         function tampilkanInfoFacebook(fb) {
             var d = document.getElementById('facebookDetails'); if (!d) return;
             if (fb && fb.isConnected && fb.id) {
-                d.innerHTML =
-                    '<div class="fb-info-row"><span class="fb-info-label"><i class="fab fa-facebook"></i> Status:</span><span class="fb-info-value" style="color:#1877F2;">✅ TERHUBUNG</span></div>' +
-                    '<div class="fb-info-row"><span class="fb-info-label">Facebook ID:</span><span class="fb-info-value" style="font-family:monospace;font-size:12px;">' +
-                    sanitize(fb.id) + '</span></div>' +
-                    '<div class="fb-info-row"><span class="fb-info-label">Nama:</span><span class="fb-info-value">' + sanitize(
-                        fb.name || '-') + '</span></div>' +
-                    '<div class="fb-info-row"><span class="fb-info-label">Email:</span><span class="fb-info-value">' + sanitize(
-                        fb.email || '-') + '</span></div>';
-            } else {
-                d.innerHTML =
-                    '<div class="fb-info-row"><span class="fb-info-label"><i class="fab fa-facebook"></i> Status:</span><span class="fb-info-value" style="color:#ffaa00;">⚠️ TIDAK TERHUBUNG</span></div>';
-            }
+                d.innerHTML = '<div class="fb-info-row"><span class="fb-info-label"><i class="fab fa-facebook"></i> Status:</span><span class="fb-info-value" style="color:#1877F2;">✅ TERHUBUNG</span></div>' +
+                    '<div class="fb-info-row"><span class="fb-info-label">Facebook ID:</span><span class="fb-info-value" style="font-family:monospace;font-size:12px;">' + sanitize(fb.id) + '</span></div>' +
+                    '<div class="fb-info-row"><span class="fb-info-label">Nama:</span><span class="fb-info-value">' + sanitize(fb.name || '-') + '</span></div>' +
+                    '<div class="fb-info-row"><span class="fb-info-label">Email:</span><span class="fb-info-value">' + sanitize(fb.email || '-') + '</span></div>';
+            } else { d.innerHTML = '<div class="fb-info-row"><span class="fb-info-label"><i class="fab fa-facebook"></i> Status:</span><span class="fb-info-value" style="color:#ffaa00;">⚠️ TIDAK TERHUBUNG</span></div>'; }
         }
 
         async function searchAccount() {
             var id = document.getElementById('deviceId').value.trim();
             if (!id) { showAlert('Masukkan Device ID!', 'error'); return; }
             var ok = await loginWithDeviceId(id);
-            if (ok) { lastDeviceId = id;
-                showAccountInfo(currentAccount);
-                hideAllSections();
-                document.getElementById('accountInfo').style.display = 'block';
-                showAlert('Akun ditemukan!', 'success'); }
+            if (ok) { lastDeviceId = id; showAccountInfo(currentAccount); hideAllSections(); document.getElementById('accountInfo').style.display = 'block'; showAlert('Akun ditemukan!', 'success'); }
         }
 
         function showAccountInfo(acc) {
             document.getElementById('accountName').textContent = sanitize(acc.name || '-');
             document.getElementById('accountBalance').textContent = formatCurrency(acc.balance);
             document.getElementById('playfabId').textContent = acc.playFabId || '-';
-            tampilkanFotoProfile(acc);
-            tampilkanInfoFacebook(acc.facebook);
+            tampilkanFotoProfile(acc); tampilkanInfoFacebook(acc.facebook);
         }
 
         function refreshAccountInfo() {
@@ -1987,239 +1897,71 @@
             showLoading('Refresh...');
             setTimeout(async function() {
                 var info = await getUserInfoFromPlayFab();
-                if (info) { currentAccount.balance = info.balance;
-                    currentAccount.name = info.name;
-                    currentAccount.facebook = info.facebook;
-                    currentAccount.facebookAvatarUrl = info.facebookAvatarUrl;
-                    currentAccount.playFabId = info.playFabId;
-                    showAccountInfo(currentAccount);
-                    hideLoading();
-                    showAlert('Updated!', 'success'); } else { hideLoading(); }
+                if (info) { currentAccount.balance = info.balance; currentAccount.name = info.name; currentAccount.facebook = info.facebook; currentAccount.facebookAvatarUrl = info.facebookAvatarUrl; currentAccount.playFabId = info.playFabId; showAccountInfo(currentAccount); hideLoading(); showAlert('Updated!', 'success'); }
+                else { hideLoading(); }
             }, 1000);
         }
 
-        function setAmount(a) { document.getElementById('topupAmount').value = a;
-            validateTopupAmount(); }
+        function setAmount(a) { document.getElementById('topupAmount').value = a; validateTopupAmount(); }
+        function showTopupFromAccount() { if (!currentAccount) return; document.getElementById('topupAccountName').textContent = currentAccount.name; document.getElementById('topupCurrentBalance').textContent = formatCurrency(currentAccount.balance); hideAllSections(); document.getElementById('topupSection').style.display = 'block'; }
+        function showKurasFromAccount() { if (!currentAccount) return; document.getElementById('kurasAccountName').textContent = currentAccount.name; document.getElementById('kurasCurrentBalance').textContent = formatCurrency(currentAccount.balance); hideAllSections(); document.getElementById('kurasSection').style.display = 'block'; }
+        function showChangeNameSection() { if (!currentAccount) return; document.getElementById('changeNameAccountLabel').textContent = currentAccount.name; hideAllSections(); document.getElementById('changeNameSection').style.display = 'block'; }
 
-        function showTopupFromAccount() { if (!currentAccount) return;
-            document.getElementById('topupAccountName').textContent = currentAccount.name;
-            document.getElementById('topupCurrentBalance').textContent = formatCurrency(currentAccount.balance);
-            hideAllSections();
-            document.getElementById('topupSection').style.display = 'block'; }
-
-        function showKurasFromAccount() { if (!currentAccount) return;
-            document.getElementById('kurasAccountName').textContent = currentAccount.name;
-            document.getElementById('kurasCurrentBalance').textContent = formatCurrency(currentAccount.balance);
-            hideAllSections();
-            document.getElementById('kurasSection').style.display = 'block'; }
-
-        function showChangeNameSection() { if (!currentAccount) return;
-            document.getElementById('changeNameAccountLabel').textContent = currentAccount.name;
-            hideAllSections();
-            document.getElementById('changeNameSection').style.display = 'block'; }
-
-        async function processTopup() { if (!currentAccount) return; var amt = parseAmount(document.getElementById(
-                'topupAmount').value.trim()); if (amt <= 0) { showAlert('Jumlah tidak valid!', 'error'); return; }
-            showConfirm('TOP UP', 'Top up ' + formatCurrency(amt) + '?', 'topup', { amount: amt }); }
-
-        async function executeTopup(amt) { showLoading('Memproses...'); var old = currentAccount.balance; var ok =
-                await addCashToAccount(amt); if (ok) { var trx = { type: 'topup', deviceId: currentAccount.deviceId,
-                    accountName: currentAccount.name, amount: amt, oldBalance: old, newBalance: currentAccount.balance,
-                    operator: currentUser.username, timestamp: Date.now(), status: 'success' };
-                await callRevanstore('transactions', 'POST', trx);
-                hideLoading();
-                showReceipt(trx);
-                showAlert('Berhasil!', 'success'); } else { hideLoading();
-                showAlert('Gagal!', 'error'); } }
-
-        async function processKuras() { if (!currentAccount) return; var amt = parseAmount(document.getElementById(
-                'kurasAmount').value.trim()) || currentAccount.balance; if (amt <= 0 || amt > currentAccount
-            .balance) { showAlert('Saldo tidak cukup!', 'error'); return; }
-            showConfirm('KURAS', 'Kuras ' + formatCurrency(amt) + '?', 'kuras', { amount: amt }); }
-
-        async function executeKuras(amt) { showLoading('Memproses...'); var old = currentAccount.balance; var ok =
-                await addCashToAccount(-amt); if (ok) { var trx = { type: 'kuras', deviceId: currentAccount.deviceId,
-                    accountName: currentAccount.name, amount: amt, oldBalance: old, newBalance: currentAccount.balance,
-                    operator: currentUser.username, timestamp: Date.now(), status: 'success' };
-                await callRevanstore('transactions', 'POST', trx);
-                hideLoading();
-                showReceipt(trx);
-                showAlert('Berhasil!', 'success'); } else { hideLoading();
-                showAlert('Gagal!', 'error'); } }
+        async function processTopup() { if (!currentAccount) return; var amt = parseAmount(document.getElementById('topupAmount').value.trim()); if (amt <= 0) { showAlert('Jumlah tidak valid!', 'error'); return; } showConfirm('TOP UP', 'Top up ' + formatCurrency(amt) + '?', 'topup', { amount: amt }); }
+        async function executeTopup(amt) { showLoading('Memproses...'); var old = currentAccount.balance; var ok = await addCashToAccount(amt); if (ok) { var trx = { type: 'topup', deviceId: currentAccount.deviceId, accountName: currentAccount.name, amount: amt, oldBalance: old, newBalance: currentAccount.balance, operator: currentUser.username, timestamp: Date.now(), status: 'success' }; await callRevanstore('transactions', 'POST', trx); hideLoading(); showReceipt(trx); showAlert('Berhasil!', 'success'); } else { hideLoading(); showAlert('Gagal!', 'error'); } }
+        async function processKuras() { if (!currentAccount) return; var amt = parseAmount(document.getElementById('kurasAmount').value.trim()) || currentAccount.balance; if (amt <= 0 || amt > currentAccount.balance) { showAlert('Saldo tidak cukup!', 'error'); return; } showConfirm('KURAS', 'Kuras ' + formatCurrency(amt) + '?', 'kuras', { amount: amt }); }
+        async function executeKuras(amt) { showLoading('Memproses...'); var old = currentAccount.balance; var ok = await addCashToAccount(-amt); if (ok) { var trx = { type: 'kuras', deviceId: currentAccount.deviceId, accountName: currentAccount.name, amount: amt, oldBalance: old, newBalance: currentAccount.balance, operator: currentUser.username, timestamp: Date.now(), status: 'success' }; await callRevanstore('transactions', 'POST', trx); hideLoading(); showReceipt(trx); showAlert('Berhasil!', 'success'); } else { hideLoading(); showAlert('Gagal!', 'error'); } }
 
         async function addCashToAccount(amt) {
             if (!currentAuthToken) return false;
-            try { var res = await callRvnstore('/Client/ExecuteCloudScript', 'POST', { FunctionName: "AddRp",
-                    FunctionParameter: { addValue: amt }, RevisionSelection: "Live", GeneratePlayStreamEvent: true },
-                    currentAuthToken); if (res.data) { await new Promise(function(r) { setTimeout(r, 2000); }); var info =
-                    await getUserInfoFromPlayFab(); if (info) { currentAccount.balance = info.balance;
-                    currentAccount.facebook = info.facebook;
-                    currentAccount.facebookAvatarUrl = info.facebookAvatarUrl;
-                    currentAccount.playFabId = info.playFabId;
-                    showAccountInfo(currentAccount); return true; } } return false; } catch (e) { return false; }
+            try { var res = await callRvnstore('/Client/ExecuteCloudScript', 'POST', { FunctionName: "AddRp", FunctionParameter: { addValue: amt }, RevisionSelection: "Live", GeneratePlayStreamEvent: true }, currentAuthToken); if (res.data) { await new Promise(function(r) { setTimeout(r, 2000); }); var info = await getUserInfoFromPlayFab(); if (info) { currentAccount.balance = info.balance; currentAccount.facebook = info.facebook; currentAccount.facebookAvatarUrl = info.facebookAvatarUrl; currentAccount.playFabId = info.playFabId; showAccountInfo(currentAccount); return true; } } return false; } catch (e) { return false; }
         }
 
         function showReceipt(trx) {
             hideAllSections();
-            var typeText = trx.type === 'topup' ? 'TOP UP' : 'KURAS',
-                sign = trx.type === 'topup' ? '+' : '-';
-            document.getElementById('receiptContent').innerHTML =
-                '<div class="receipt-content"><div class="receipt-header"><h3>BUSSID</h3><p>Detail Transaksi</p></div><div class="receipt-details"><div class="receipt-row"><span>Akun:</span><span>' +
-                sanitize(trx.accountName) + '</span></div><div class="receipt-row"><span>Jenis:</span><span>' + typeText +
-                '</span></div><div class="receipt-row"><span>Jumlah:</span><span style="color:' + (trx.type === 'topup' ?
-                    '#10b981' : '#f59e0b') + '">' + sign + formatCurrency(trx.amount) +
-                '</span></div><div class="receipt-row"><span>Saldo Awal:</span><span>' + formatCurrency(trx.oldBalance) +
-                '</span></div><div class="receipt-row"><span>Saldo Akhir:</span><span>' + formatCurrency(trx.newBalance) +
-                '</span></div><div class="receipt-row"><span>Tanggal:</span><span>' + new Date(trx.timestamp).toLocaleString(
-                    'id-ID') +
-                '</span></div><div class="receipt-row"><span>Status:</span><span style="color:#10b981;">BERHASIL</span></div></div></div><div style="display:flex;gap:8px;margin-top:20px;"><button class="btn btn-primary" onclick="window._showTrxModal()" style="flex:1;">TRX LAGI</button><button class="btn btn-secondary" onclick="window._goHome()" style="flex:1;">HOME</button></div>';
+            var typeText = trx.type === 'topup' ? 'TOP UP' : 'KURAS', sign = trx.type === 'topup' ? '+' : '-';
+            document.getElementById('receiptContent').innerHTML = '<div class="receipt-content"><div class="receipt-header"><h3>BUSSID</h3><p>Detail Transaksi</p></div><div class="receipt-details"><div class="receipt-row"><span>Akun:</span><span>' + sanitize(trx.accountName) + '</span></div><div class="receipt-row"><span>Jenis:</span><span>' + typeText + '</span></div><div class="receipt-row"><span>Jumlah:</span><span style="color:' + (trx.type === 'topup' ? '#10b981' : '#f59e0b') + '">' + sign + formatCurrency(trx.amount) + '</span></div><div class="receipt-row"><span>Saldo Awal:</span><span>' + formatCurrency(trx.oldBalance) + '</span></div><div class="receipt-row"><span>Saldo Akhir:</span><span>' + formatCurrency(trx.newBalance) + '</span></div><div class="receipt-row"><span>Tanggal:</span><span>' + new Date(trx.timestamp).toLocaleString('id-ID') + '</span></div><div class="receipt-row"><span>Status:</span><span style="color:#10b981;">BERHASIL</span></div></div></div><div style="display:flex;gap:8px;margin-top:20px;"><button class="btn btn-primary" onclick="window._showTrxModal()" style="flex:1;">TRX LAGI</button><button class="btn btn-secondary" onclick="window._goHome()" style="flex:1;">HOME</button></div>';
             document.getElementById('receiptSection').style.display = 'block';
         }
 
-        window._showTrxModal = function() { var modal = document.getElementById('trxLagiModal'); if (modal) { modal.style
-                .display = 'flex';
-                modal.style.opacity = '1';
-                modal.style.visibility = 'visible'; } };
-        window._tutupTrxModal = function() { var modal = document.getElementById('trxLagiModal'); if (modal) modal.style
-            .display = 'none'; };
-        window._pilihTopup = function() { window._tutupTrxModal();
-            showTopupFromAccount(); };
-        window._pilihKuras = function() { window._tutupTrxModal();
-            showKurasFromAccount(); };
+        window._showTrxModal = function() { var modal = document.getElementById('trxLagiModal'); if (modal) { modal.style.display = 'flex'; modal.style.opacity = '1'; modal.style.visibility = 'visible'; } };
+        window._tutupTrxModal = function() { var modal = document.getElementById('trxLagiModal'); if (modal) modal.style.display = 'none'; };
+        window._pilihTopup = function() { window._tutupTrxModal(); showTopupFromAccount(); };
+        window._pilihKuras = function() { window._tutupTrxModal(); showKurasFromAccount(); };
         window._goHome = function() { showHome(); };
-
         function backToHome() { showHome(); }
 
-        async function showHistory() {
-            hideAllSections();
-            document.getElementById('historySection').style.display = 'block';
-            showLoading('Mengambil data...');
-            try {
-                var data = await callRevanstore('transactions', 'GET');
-                var list = document.getElementById('transactionsList');
-                if (!data || typeof data !== 'object' || Object.keys(data).length === 0) {
-                    list.innerHTML = '<p style="text-align:center;color:#666;padding:40px 20px;">Belum ada transaksi</p>';
-                    hideLoading();
-                    return;
-                }
-                var arr = Object.keys(data).map(function(k) { return { id: k, type: data[k].type, accountName: data[k]
-                        .accountName, amount: data[k].amount, oldBalance: data[k].oldBalance, newBalance: data[k]
-                        .newBalance, operator: data[k].operator, timestamp: data[k].timestamp }; }).sort(function(a,
-                    b) { return b.timestamp - a.timestamp; });
-                if (arr.length === 0) {
-                    list.innerHTML = '<p style="text-align:center;color:#666;padding:40px 20px;">Belum ada transaksi</p>';
-                    hideLoading();
-                    return;
-                }
-                var html = '';
-                arr.forEach(function(t) { var typeText = t.type === 'topup' ? 'TOP UP' : t.type === 'kuras' ? 'KURAS' :
-                        'GANTI NAMA'; var sign = t.type === 'topup' ? '+' : t.type === 'kuras' ? '-' : '';
-                    html += '<div class="transaction-item ' + t.type +
-                        '"><div class="transaction-header"><div>' + sanitize(t.accountName) +
-                        '</div><div class="transaction-amount">' + sign + formatCurrency(t.amount) +
-                        '</div></div><div class="transaction-details"><div>' + typeText + '</div><div>' + new Date(t
-                            .timestamp).toLocaleString('id-ID') +
-                        '</div></div><div class="transaction-balance"><span>Sebelum: ' + formatCurrency(t.oldBalance) +
-                        '</span><span>→</span><span>Sesudah: ' + formatCurrency(t.newBalance) +
-                        '</span></div></div>'; });
-                list.innerHTML = html;
-                hideLoading();
-            } catch (e) { hideLoading();
-                showAlert('Gagal!', 'error'); }
-        }
+        function showConfirm(title, message, action, data) { document.getElementById('modalConfirmTitle').innerHTML = sanitize(title); document.getElementById('modalConfirmMessage').innerHTML = sanitize(message); pendingAction = action; pendingData = data; document.getElementById('confirmModal').classList.add('active'); }
+        function cancelConfirm() { pendingAction = null; pendingData = null; document.getElementById('confirmModal').classList.remove('active'); }
 
-        function showSettings() { hideAllSections();
-            document.getElementById('settingsSection').style.display = 'block';
-            updateProfileInfo(); }
-
-        function showConfirm(title, message, action, data) { document.getElementById('modalConfirmTitle').innerHTML =
-                sanitize(title);
-            document.getElementById('modalConfirmMessage').innerHTML = sanitize(message);
-            pendingAction = action;
-            pendingData = data;
-            document.getElementById('confirmModal').classList.add('active'); }
-
-        function cancelConfirm() { pendingAction = null;
-            pendingData = null;
-            document.getElementById('confirmModal').classList.remove('active'); }
-
-        async function confirmAction() { if (!pendingAction || !pendingData) return;
-            document.getElementById('confirmModal').classList.remove('active'); if (pendingAction === 'topup')
-            await executeTopup(pendingData.amount); else if (pendingAction === 'kuras')
-            await executeKuras(pendingData.amount); else if (pendingAction === 'changename')
-            await executeChangeName(pendingData);
-            pendingAction = null;
-            pendingData = null; }
-
-        async function checkNameAvailability() { var d = document.getElementById('nameAvailability');
-            d.innerHTML = 'Mengecek...';
-            d.style.display = 'block';
-            setTimeout(function() { d.innerHTML = '✅ Tersedia!'; }, 1000); }
-
-        async function changeAccountNameSimple() { var name = sanitize(document.getElementById('newAccountName').value
-            .trim()); if (!name) { showAlert('Masukkan nama!', 'error'); return; } if (!currentAccount || !
-                currentAuthToken) { showAlert('Cari akun dulu!', 'error'); return; }
-            showConfirm('GANTI NAMA', 'Ganti ke "' + name + '"?', 'changename', name); }
+        async function confirmAction() { if (!pendingAction || !pendingData) return; document.getElementById('confirmModal').classList.remove('active'); if (pendingAction === 'topup') await executeTopup(pendingData.amount); else if (pendingAction === 'kuras') await executeKuras(pendingData.amount); else if (pendingAction === 'changename') await executeChangeName(pendingData); pendingAction = null; pendingData = null; }
+        async function checkNameAvailability() { var d = document.getElementById('nameAvailability'); d.innerHTML = 'Mengecek...'; d.style.display = 'block'; setTimeout(function() { d.innerHTML = '✅ Tersedia!'; }, 1000); }
+        async function changeAccountNameSimple() { var name = sanitize(document.getElementById('newAccountName').value.trim()); if (!name) { showAlert('Masukkan nama!', 'error'); return; } if (!currentAccount || !currentAuthToken) { showAlert('Cari akun dulu!', 'error'); return; } showConfirm('GANTI NAMA', 'Ganti ke "' + name + '"?', 'changename', name); }
 
         async function executeChangeName(newName) {
             showLoading('Mengubah...');
-            try { var res = await callRvnstore('/Client/UpdateUserTitleDisplayName', 'POST', { DisplayName: newName },
-                    currentAuthToken); if (res.data && res.data.DisplayName) { var old = currentAccount.name;
-                    currentAccount.name = newName;
-                    document.getElementById('accountName').textContent = newName;
-                    await callRevanstore('transactions', 'POST', { type: 'gantinama', accountName: currentAccount.name,
-                        oldName: old, newName: newName, operator: currentUser.username, timestamp: Date.now(),
-                        status: 'success' });
-                    hideAllSections();
-                    document.getElementById('receiptContent').innerHTML =
-                        '<div class="receipt-content"><div class="receipt-header"><h3>GANTI NAMA</h3></div><div class="receipt-details"><div class="receipt-row"><span>Lama:</span><span>' +
-                        sanitize(old) +
-                        '</span></div><div class="receipt-row"><span>Baru:</span><span style="color:#0ea5e9;">' + sanitize(
-                            newName) +
-                        '</span></div></div></div><button class="btn btn-primary btn-block" onclick="window._goBackAccount()">KEMBALI</button>';
-                    document.getElementById('receiptSection').style.display = 'block';
-                    hideLoading();
-                    showAlert('Berhasil!', 'success'); } else { hideLoading();
-                    showAlert('Gagal!', 'error'); } } catch (e) { hideLoading();
-                showAlert('Gagal!', 'error'); }
+            try { var res = await callRvnstore('/Client/UpdateUserTitleDisplayName', 'POST', { DisplayName: newName }, currentAuthToken); if (res.data && res.data.DisplayName) { var old = currentAccount.name; currentAccount.name = newName; document.getElementById('accountName').textContent = newName; await callRevanstore('transactions', 'POST', { type: 'gantinama', accountName: currentAccount.name, oldName: old, newName: newName, operator: currentUser.username, timestamp: Date.now(), status: 'success' }); hideAllSections(); document.getElementById('receiptContent').innerHTML = '<div class="receipt-content"><div class="receipt-header"><h3>GANTI NAMA</h3></div><div class="receipt-details"><div class="receipt-row"><span>Lama:</span><span>' + sanitize(old) + '</span></div><div class="receipt-row"><span>Baru:</span><span style="color:#0ea5e9;">' + sanitize(newName) + '</span></div></div></div><button class="btn btn-primary btn-block" onclick="window._goBackAccount()">KEMBALI</button>'; document.getElementById('receiptSection').style.display = 'block'; hideLoading(); showAlert('Berhasil!', 'success'); } else { hideLoading(); showAlert('Gagal!', 'error'); } } catch (e) { hideLoading(); showAlert('Gagal!', 'error'); }
         }
 
         window._goBackAccount = function() { backToAccount(); };
-
-        function showNameChangeModal(msg, type) { var m = document.getElementById('nameChangeModal');
-            document.getElementById('nameChangeMessage').innerHTML = sanitize(msg);
-            m.classList.add('active'); }
-
+        function showNameChangeModal(msg, type) { var m = document.getElementById('nameChangeModal'); document.getElementById('nameChangeMessage').innerHTML = sanitize(msg); m.classList.add('active'); }
         function closeNameChangeModal() { document.getElementById('nameChangeModal').classList.remove('active'); }
-
-        function setupQuickAmounts() { var q = document.querySelector('.quick-amounts'); if (q) q.innerHTML =
-                '<button class="btn-quick" onclick="setAmount(\'2M\')">2M</button><button class="btn-quick" onclick="setAmount(\'1M\')">1M</button><button class="btn-quick" onclick="setAmount(\'500JT\')">500JT</button><button class="btn-quick" onclick="setAmount(\'100JT\')">100JT</button><button class="btn-quick" onclick="setAmount(\'50JT\')">50JT</button>'; }
-
-        function setupEventListeners() { var u = document.getElementById('username'); if (u) u.addEventListener('keypress',
-                function(e) { if (e.key === 'Enter') document.getElementById('password').focus(); }); var p = document
-                .getElementById('password'); if (p) p.addEventListener('keypress', function(e) { if (e.key === 'Enter')
-                login(); }); var t = document.getElementById('topupAmount'); if (t) t.addEventListener('keypress',
-                function(e) { if (e.key === 'Enter') processTopup(); }); var d = document.getElementById('deviceId'); if (
-                d) d.addEventListener('keypress', function(e) { if (e.key === 'Enter') searchAccount(); }); }
+        function setupQuickAmounts() { var q = document.querySelector('.quick-amounts'); if (q) q.innerHTML = '<button class="btn-quick" onclick="setAmount(\'2M\')">2M</button><button class="btn-quick" onclick="setAmount(\'1M\')">1M</button><button class="btn-quick" onclick="setAmount(\'500JT\')">500JT</button><button class="btn-quick" onclick="setAmount(\'100JT\')">100JT</button><button class="btn-quick" onclick="setAmount(\'50JT\')">50JT</button>'; }
+        function setupEventListeners() { var u = document.getElementById('username'); if (u) u.addEventListener('keypress', function(e) { if (e.key === 'Enter') document.getElementById('password').focus(); }); var p = document.getElementById('password'); if (p) p.addEventListener('keypress', function(e) { if (e.key === 'Enter') login(); }); var t = document.getElementById('topupAmount'); if (t) t.addEventListener('keypress', function(e) { if (e.key === 'Enter') processTopup(); }); var d = document.getElementById('deviceId'); if (d) d.addEventListener('keypress', function(e) { if (e.key === 'Enter') searchAccount(); }); }
 
         document.addEventListener('DOMContentLoaded', async function() {
-            setupEventListeners();
-            setupQuickAmounts();
+            setupEventListeners(); setupQuickAmounts();
             document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
-            document.addEventListener('keydown', function(e) { if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && e
-                    .key === 'I') || (e.ctrlKey && e.key === 'U')) { e.preventDefault(); return false; } });
+            document.addEventListener('keydown', function(e) { if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && e.key === 'I') || (e.ctrlKey && e.key === 'U')) { e.preventDefault(); return false; } });
             var ls = document.getElementById('loginScreen');
-            ls.style.display = 'flex';
-            ls.style.alignItems = 'center';
-            ls.style.justifyContent = 'center';
+            ls.style.display = 'flex'; ls.style.alignItems = 'center'; ls.style.justifyContent = 'center';
             if (!fingerprint) fingerprint = await getFingerprint();
             var blocked = await checkIfBlocked();
             if (blocked) { showBlockedScreen(); return; }
             var saved = storageGet('bussid_session');
             if (saved) {
                 try {
-                    var session = JSON.parse(saved),
-                        age = Date.now() - (session.timestamp || 0);
+                    var session = JSON.parse(saved), age = Date.now() - (session.timestamp || 0);
                     if (age > 7 * 24 * 60 * 60 * 1000) { storageRemove('bussid_session'); return; }
                     document.getElementById('username').value = session.username;
                     document.getElementById('password').value = session.password;
