@@ -1,5 +1,5 @@
-import rateLimit from 'express-rate-limit';
-import { createProxyMiddleware } from 'http-proxy-middleware';
+const rateLimit = require('express-rate-limit');
+const { createProxyMiddleware } = require('http-proxy-middleware');
 
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -26,7 +26,7 @@ const proxy = createProxyMiddleware({
   }
 });
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Authorization, X-Requested-With');
@@ -56,4 +56,4 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: error.message });
     }
   });
-}
+};
