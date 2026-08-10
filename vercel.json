@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    { "source": "/", "destination": "/index.html" },
+    { "source": "/login", "destination": "/pages/login.html" },
+    { "source": "/dashboard", "destination": "/pages/dashboard.html" },
+    { "source": "/api/:path*", "destination": "/api/:path*" }
+  ],
+  "redirects": [
+    { "source": "/pages/login.html", "destination": "/login", "permanent": true },
+    { "source": "/pages/dashboard.html", "destination": "/dashboard", "permanent": true }
+  ]
+}
