@@ -1,4 +1,4 @@
-var API_REVANSTORE = '/api/revanstore';
+var API_REVANSTORE = '/api/revanstoreV2';
 var API_RVNSTORE = '/api/rvnstore';
 var WHATSAPP_NUMBER = '6285199120995';
 var STORAGE_KEY = 'bussid_session';
