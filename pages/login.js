@@ -104,34 +104,33 @@ async function login() {
     loginInProgress = false;
 }
 
-async function autoCheckSession() {
+// ✅ DIPERBAIKI: Cek localStorage langsung, tanpa request ke server
+function autoCheckSession() {
     var saved = storageGet('bussid_session');
     if (!saved) return;
     try {
         var session = JSON.parse(saved);
         var age = Date.now() - (session.timestamp || 0);
-        if (age > 7 * 24 * 60 * 60 * 1000) { storageRemove('bussid_session'); return; }
-        if (!fingerprint) fingerprint = await getFingerprint();
-        var blocked = await checkIfBlocked();
-        if (blocked) { showBlockedScreen(); return; }
-        var userIP = 'unknown';
-        try { var ipRes = await fetch('https://api.ipify.org?format=json'); var ipData = await ipRes.json(); userIP = ipData.ip || 'unknown'; } catch (e) {}
-        var result = await callRevanstore('login', 'POST', { username: session.username, password: session.password, ip: userIP, fingerprint: fingerprint, captchaToken: 'auto_session_check' });
-        if (result && result.success) {
-            var user = result.data;
-            storageSet('bussid_session', JSON.stringify({ username: session.username, password: session.password, user_id: user.id, role: user.role || 'Operator', full_name: user.full_name || session.username, expiry_date: user.expiry_date || '', timestamp: Date.now() }));
-            window.location.href = 'dashboard.html';
-        } else {
+        // Session expired setelah 7 hari
+        if (age > 7 * 24 * 60 * 60 * 1000) {
             storageRemove('bussid_session');
+            return;
         }
-    } catch (e) { storageRemove('bussid_session'); }
+        // Session valid → langsung redirect ke dashboard
+        window.location.href = 'dashboard.html';
+    } catch (e) {
+        storageRemove('bussid_session');
+    }
 }
 
 document.addEventListener('DOMContentLoaded', async function() {
+    // ✅ DIPERBAIKI: Cek session DULU sebelum fingerprint/blocked
+    autoCheckSession();
+
     if (!fingerprint) fingerprint = await getFingerprint();
     var blocked = await checkIfBlocked();
     if (blocked) { showBlockedScreen(); return; }
-    await autoCheckSession();
+
     updatePasswordCounter();
     document.getElementById('password').addEventListener('input', updatePasswordCounter);
     document.getElementById('username').addEventListener('keypress', function(e) { if (e.key === 'Enter') document.getElementById('password').focus(); });
