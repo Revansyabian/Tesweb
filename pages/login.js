@@ -507,7 +507,7 @@ function autoCheckSession() {
             storageRemove('bussid_session');
             return;
         }
-        window.location.href = 'dashboard.html';
+        window.location.href = 'dashboard';
     } catch (e) {
         storageRemove('bussid_session');
     }
