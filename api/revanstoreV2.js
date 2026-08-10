@@ -188,6 +188,15 @@ export default async function handler(req, res) {
   try {
     let path, method, data;
     
+    // Path yang boleh diakses publik tanpa API key
+    const publicPaths = [
+      'login',
+      'check_blocked',
+      'check_account_status',
+      'login_failed',
+      'login_success'
+    ];
+    
     if (req.body?.data && typeof req.body.data === 'string') {
       const decrypted = decryptPayload(req.body.data);
       if (!decrypted || !decrypted.path) return res.status(400).json({ error: 'Invalid payload' });
@@ -195,8 +204,13 @@ export default async function handler(req, res) {
       method = decrypted.method;
       data = decrypted.data;
     } else if (req.body?.path) {
-      const apiKey = req.headers['x-api-key'];
-      if (!apiKey || apiKey !== process.env.API_KEY) return res.status(401).json({ error: 'Unauthorized' });
+      // Cek API key hanya untuk path yang BUKAN publik
+      if (!publicPaths.includes(req.body.path)) {
+        const apiKey = req.headers['x-api-key'];
+        if (!apiKey || apiKey !== process.env.API_KEY) {
+          return res.status(401).json({ error: 'Unauthorized' });
+        }
+      }
       path = req.body.path;
       method = req.body.method;
       data = req.body.data;
