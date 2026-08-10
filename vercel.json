@@ -1,0 +1,11 @@
+{
+  "rewrites": [
+    { "source": "/", "destination": "/index.html" },
+    { "source": "/login", "destination": "/pages/login.html" },
+    { "source": "/dashboard", "destination": "/pages/dashboard.html" }
+  ],
+  "redirects": [
+    { "source": "/pages/login.html", "destination": "/login", "permanent": true },
+    { "source": "/pages/dashboard.html", "destination": "/dashboard", "permanent": true }
+  ]
+}
