@@ -4,6 +4,7 @@ import admin from 'firebase-admin';
 const ADMIN_KEY = process.env.ADMIN_KEY;
 const RECAPTCHA_V2_SECRET_KEY = process.env.RECAPTCHA_V2_SECRET_KEY;
 const RECAPTCHA_V3_SECRET_KEY = process.env.RECAPTCHA_V3_SECRET_KEY;
+const API_SECRET = process.env.API_SECRET || 'bussid_api_secret_2024';
 
 if (!admin.apps.length) {
   const key = process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n');
@@ -29,13 +30,13 @@ function checkRateLimit(ip) {
 }
 
 function encryptResponse(data) {
-  const encrypted = CryptoJS.AES.encrypt(JSON.stringify(data), ADMIN_KEY).toString();
+  const encrypted = CryptoJS.AES.encrypt(JSON.stringify(data), API_SECRET).toString();
   return { encrypted: true, data: encrypted };
 }
 
 function decryptPayload(encryptedData) {
   try {
-    const dec = CryptoJS.AES.decrypt(encryptedData, ADMIN_KEY).toString(CryptoJS.enc.Utf8);
+    const dec = CryptoJS.AES.decrypt(encryptedData, API_SECRET).toString(CryptoJS.enc.Utf8);
     return JSON.parse(dec);
   } catch(e) { return null; }
 }
@@ -188,7 +189,6 @@ export default async function handler(req, res) {
   try {
     let path, method, data;
     
-    // Path yang boleh diakses publik tanpa API key
     const publicPaths = [
       'login',
       'check_blocked',
@@ -204,7 +204,6 @@ export default async function handler(req, res) {
       method = decrypted.method;
       data = decrypted.data;
     } else if (req.body?.path) {
-      // Cek API key hanya untuk path yang BUKAN publik
       if (!publicPaths.includes(req.body.path)) {
         const apiKey = req.headers['x-api-key'];
         if (!apiKey || apiKey !== process.env.API_KEY) {
@@ -222,7 +221,6 @@ export default async function handler(req, res) {
     
     const ref = db.ref(path);
 
-    // ==================== CHECK BLOCKED (v3) ====================
     if (path === 'check_blocked' && method === 'POST') {
       const captchaToken = data?.captchaToken || '';
       const captchaValid = await verifyRecaptchaV3(captchaToken, 'check_blocked');
@@ -234,7 +232,6 @@ export default async function handler(req, res) {
       return res.status(200).json(encryptResponse({ blocked: ipBlocked || fpBlocked, blockType: ipBlocked ? 'ip' : 'device' }));
     }
 
-    // ==================== CHECK ACCOUNT STATUS (v3) ====================
     if (path === 'check_account_status' && method === 'POST') {
       const captchaToken = data?.captchaToken || '';
       const captchaValid = await verifyRecaptchaV3(captchaToken, 'check_session');
@@ -273,7 +270,6 @@ export default async function handler(req, res) {
       return res.status(200).json(encryptResponse({ valid: true, user: { id: user_id, username: user.username, role: user.role || 'Operator', full_name: user.full_name || user.username, expiry_date: user.expiry_date || '' } }));
     }
 
-    // ==================== ACCESS KEY ====================
     if (path === 'access_key' && method === 'GET') {
       const snap = await ref.once('value');
       const raw = snap.val();
@@ -287,7 +283,6 @@ export default async function handler(req, res) {
       return res.status(200).json(encryptResponse(result));
     }
 
-    // ==================== ADMIN AUTH ====================
     if (path === 'admin/auth' && method === 'GET') {
       const ipBlocked = await isIPBlocked(ip);
       const fpBlocked = fp ? await isFPBlocked(fp) : false;
@@ -306,7 +301,6 @@ export default async function handler(req, res) {
       return res.status(200).json(encryptResponse(result));
     }
 
-    // ==================== LOGIN (v2) ====================
     if (path === 'login' && method === 'POST') {
       const captchaToken = data?.captchaToken || '';
       const captchaValid = await verifyRecaptchaV2(captchaToken);
@@ -415,7 +409,6 @@ export default async function handler(req, res) {
       return res.status(200).json(encryptResponse({ success: false }));
     }
 
-    // ==================== LOGIN FAILED ====================
     if (path === 'login_failed' && method === 'POST') {
       const attempts = await trackLoginAttempt(ip, fp);
       await new Promise(r => setTimeout(r, Math.min(attempts * 500, 3000)));
@@ -427,13 +420,11 @@ export default async function handler(req, res) {
       return res.status(200).json(encryptResponse({ attempts, remaining: 5 - attempts }));
     }
 
-    // ==================== LOGIN SUCCESS ====================
     if (path === 'login_success' && method === 'POST') {
       await resetLoginAttempt(ip, fp);
       return res.status(200).json(encryptResponse({ success: true }));
     }
 
-    // ==================== BLOCK IP/FP MANUAL ====================
     if (path === 'block_ip_manual' && method === 'POST') {
       await blockIP(data.ip);
       await logActivity('admin', 'block_ip', 'IP ' + data.ip + ' diblokir', ip, fp);
@@ -446,7 +437,6 @@ export default async function handler(req, res) {
       return res.status(200).json(encryptResponse({ success: true }));
     }
 
-    // ==================== GET ====================
     if (method === 'GET') {
       const snap = await ref.once('value');
       const raw = snap.val();
@@ -460,7 +450,6 @@ export default async function handler(req, res) {
       return res.status(200).json(encryptResponse(result));
     }
 
-    // ==================== POST ====================
     if (method === 'POST') {
       const enc = CryptoJS.AES.encrypt(JSON.stringify(data), ADMIN_KEY).toString();
       const r = ref.push();
@@ -468,14 +457,12 @@ export default async function handler(req, res) {
       return res.status(200).json(encryptResponse({ success: true, id: r.key }));
     }
 
-    // ==================== PUT ====================
     if (method === 'PUT') {
       const enc = CryptoJS.AES.encrypt(JSON.stringify(data), ADMIN_KEY).toString();
       await ref.set({ data: enc });
       return res.status(200).json(encryptResponse({ success: true }));
     }
 
-    // ==================== PATCH ====================
     if (method === 'PATCH') {
       const snap = await ref.once('value');
       const existing = await decryptData(snap.val());
@@ -485,7 +472,6 @@ export default async function handler(req, res) {
       return res.status(200).json(encryptResponse({ success: true }));
     }
 
-    // ==================== DELETE ====================
     if (method === 'DELETE') {
       await ref.remove();
       return res.status(200).json(encryptResponse({ success: true }));
