@@ -3,9 +3,16 @@ var API_RVNSTORE = '/api/rvnstore';
 var ADMIN_KEY = 'dhagwxwhu:f4afc5aa03e73130f5e055dfe6a708c4dc40759b';
 var WHATSAPP_NUMBER = "6285199120995";
 var MAX_PASSWORD_LENGTH = 20;
+var MAX_TOPUP_AMOUNT = 2147483647;
 
 var currentUser = null;
+var currentAccount = null;
+var currentAuthToken = null;
+var pendingAction = null;
+var pendingData = null;
+var lastDeviceId = null;
 var fingerprint = '';
+var alertTimeout = null;
 var isBlocked = false;
 var blockedChecked = false;
 var loginInProgress = false;
@@ -30,9 +37,14 @@ function getBlockDuration(attempts) { if (attempts >= 15) return 1440; if (attem
 async function checkIfBlocked() { if (blockedChecked) return isBlocked; if (!fingerprint) fingerprint = await getFingerprint(); try { var result = await callRevanstore('check_blocked', 'POST', { fingerprint: fingerprint }); if (result && result.blocked) { isBlocked = true; storageSet('bussid_blocked', 'true'); } else { isBlocked = false; storageRemove('bussid_blocked'); } blockedChecked = true; } catch (e) { isBlocked = storageGet('bussid_blocked') === 'true'; blockedChecked = true; } return isBlocked; }
 
 async function callRevanstore(path, method, data) { if (!fingerprint) fingerprint = await getFingerprint(); if (isBlocked && path !== 'check_blocked') throw new Error('Akses ditolak'); var payload = { path: path, method: method || 'GET', data: data || null, timestamp: Date.now() }; var encryptedPayload = CryptoJS.AES.encrypt(JSON.stringify(payload), ADMIN_KEY).toString(); var headers = { 'Content-Type': 'application/json', 'X-Fingerprint': fingerprint }; if (currentUser && currentUser.username) headers['X-Operator'] = CryptoJS.AES.encrypt(currentUser.username, ADMIN_KEY).toString(); var res = await fetch(API_REVANSTORE, { method: 'POST', headers: headers, body: JSON.stringify({ data: encryptedPayload }) }); if (res.status === 429) throw new Error('Terlalu banyak request'); var text = await res.text(); if (!text || text === 'null') return null; var result = JSON.parse(text); if (result.encrypted && result.data) { var dec = CryptoJS.AES.decrypt(result.data, ADMIN_KEY).toString(CryptoJS.enc.Utf8); if (dec) return JSON.parse(dec); } return result; }
+async function callRvnstore(endpoint, method, body, authToken) { var res = await fetch(API_RVNSTORE, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ endpoint: endpoint, method: method || 'POST', body: body || null, authToken: authToken || null }) }); return await res.json(); }
 
-function showLoading(message) { var overlay = document.getElementById('loadingOverlay'); var msg = document.getElementById('loadingMessage'); if (overlay && msg) { msg.textContent = message || 'Memproses...'; overlay.style.display = 'flex'; } }
+function showAlert(message, type, duration) { type = type || 'info'; duration = duration || 2500; var alertDiv = document.getElementById('alert'); if (alertDiv) { var icons = { success: 'fa-check-circle', error: 'fa-exclamation-circle', warning: 'fa-exclamation-triangle', info: 'fa-info-circle', loading: 'fa-spinner fa-spin' }; alertDiv.innerHTML = '<div class="alert-content"><div class="alert-icon"><i class="fas ' + (icons[type] || 'fa-info-circle') + '"></i></div><span>' + sanitize(message) + '</span></div>'; alertDiv.className = 'alert ' + type + ' show'; if (alertTimeout) clearTimeout(alertTimeout); if (type !== 'loading') { alertTimeout = setTimeout(function() { alertDiv.classList.remove('show'); }, duration); } } }
+function showLoading(message) { var overlay = document.getElementById('loadingOverlay'), msg = document.getElementById('loadingMessage'); if (overlay && msg) { msg.textContent = message || 'Memproses...'; overlay.style.display = 'flex'; } }
 function hideLoading() { var overlay = document.getElementById('loadingOverlay'); if (overlay) overlay.style.display = 'none'; }
+function formatCurrency(amount) { if (!amount && amount !== 0) return 'Rp 0'; return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(Math.abs(amount)); }
+function parseAmount(input) { if (!input || input.trim() === '') return 0; var cleaned = input.toUpperCase().replace(/\s/g, ''); if (cleaned === '2M' || cleaned === '2 M') return MAX_TOPUP_AMOUNT; var multiplier = 1, cleanInput = cleaned; if (cleaned.includes('M') && !cleaned.includes('JT') && !cleaned.includes('MAX')) { multiplier = 1000000000; cleanInput = cleaned.replace('M', ''); } else if (cleaned.includes('JT')) { multiplier = 1000000; cleanInput = cleaned.replace('JT', ''); } else if (cleaned.includes('RB') || cleaned.includes('K')) { multiplier = 1000; cleanInput = cleaned.replace(/[KRB]/g, ''); } else if (cleaned.includes('MAX')) return MAX_TOPUP_AMOUNT; var number = parseFloat(cleanInput.replace(/\./g, '').replace(',', '.')); var result = isNaN(number) ? 0 : Math.round(number * multiplier); return Math.min(result, MAX_TOPUP_AMOUNT); }
+
 function updatePasswordCounter() { var input = document.getElementById('password'); var counter = document.getElementById('passwordCharCount'); if (input && counter) counter.textContent = input.value.length + '/' + MAX_PASSWORD_LENGTH; }
 
 function onCaptchaVerified(token) { document.getElementById('btnLogin').disabled = false; }
@@ -42,6 +54,12 @@ function showBlockedScreen() { document.body.innerHTML = '<div style="min-height
 function showBannedPopup(until) { var untilText = (until || 0) === 0 ? 'PERMANEN' : ('sampai ' + new Date(until).toLocaleString('id-ID')); Swal.fire({ icon: 'error', title: 'AKUN DIBANNED', html: '<p>Maaf, akun Anda telah dibanned oleh admin.</p><p style="color:#dc2626;background:#fee2e2;padding:8px;border-radius:8px;"><b>Durasi: ' + untilText + '</b></p>', confirmButtonText: '<i class="fab fa-whatsapp"></i> Hubungi Admin', confirmButtonColor: '#25D366', showCancelButton: true, cancelButtonText: 'Tutup', cancelButtonColor: '#64748b', allowOutsideClick: false }).then(function(r) { if (r.isConfirmed) window.open('https://wa.me/' + WHATSAPP_NUMBER + '?text=Assalamualaikum%20admin%2C%20akun%20saya%20dibanned', '_blank'); }); }
 function showBanAksesPage(until) { var untilText = (until || 0) === 0 ? 'PERMANEN' : ('sampai ' + new Date(until).toLocaleString('id-ID')); document.body.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#f0f9ff 0%,#bae6fd 50%,#7dd3fc 100%);padding:20px;font-family:\'Segoe UI\',sans-serif;"><div style="background:#ffffff;border-radius:24px;padding:48px 36px;width:100%;max-width:420px;text-align:center;box-shadow:0 20px 60px rgba(0,191,255,0.15);border:1px solid rgba(0,191,255,0.1);"><div style="font-size:72px;color:#f59e0b;margin-bottom:12px;">🚫</div><h2 style="font-size:24px;font-weight:700;color:#0c4a6e;margin-bottom:8px;">AKSES DIBLOKIR</h2><p style="font-size:14px;color:#64748b;margin-bottom:6px;">Maaf, akses Anda diblokir oleh admin.</p><div style="background:#fef3c7;color:#92400e;padding:12px 16px;border-radius:12px;font-weight:600;font-size:14px;margin:16px 0 24px;">⏱️ Durasi: ' + untilText + '</div><button onclick="window.open(\'https://wa.me/' + WHATSAPP_NUMBER + '?text=Assalamualaikum%20admin%2C%20akses%20saya%20diblokir\',\'_blank\')" style="display:inline-flex;align-items:center;gap:10px;padding:12px 32px;background:#25D366;color:#fff;border:none;border-radius:30px;font-weight:600;font-size:15px;cursor:pointer;transition:0.2s;font-family:\'Segoe UI\',sans-serif;"><i class="fab fa-whatsapp"></i> Hubungi Admin</button></div></div>'; }
 function showForceLogoutPopup() { Swal.fire({ icon: 'warning', title: 'AKUN DITANGGUHKAN', html: '<p>Akun Anda ditangguhkan karena indikasi sharing akun.</p><p style="font-size:12px;color:#92400e;">Silakan hubungi admin.</p>', confirmButtonText: '<i class="fab fa-whatsapp"></i> Hubungi Admin', confirmButtonColor: '#25D366', showCancelButton: true, cancelButtonText: 'Tutup', cancelButtonColor: '#64748b', allowOutsideClick: false }).then(function(r) { if (r.isConfirmed) window.open('https://wa.me/' + WHATSAPP_NUMBER + '?text=Assalamualaikum%20admin%2C%20akun%20saya%20ditangguhkan', '_blank'); }); }
+
+function parseDate(dateStr) { if (!dateStr) return null; var parts = dateStr.split('/'); if (parts.length !== 3) return null; var month = parseInt(parts[0], 10) - 1, day = parseInt(parts[1], 10), year = parseInt(parts[2], 10); if (isNaN(day) || isNaN(month) || isNaN(year)) return null; if (month < 0 || month > 11 || day < 1 || day > 31 || year < 2000) return null; var date = new Date(year, month, day); if (date.getMonth() !== month || date.getDate() !== day) return null; return date; }
+function calculateRemainingDays(expiryDate) { if (!expiryDate) return -999; if (expiryDate.includes('9999')) return 999999; var expiry = parseDate(expiryDate); if (!expiry) return -999; var now = new Date(); now.setHours(0, 0, 0, 0); return Math.ceil((expiry - now) / (1000 * 60 * 60 * 24)); }
+function getDaysLeftClass(daysLeft) { if (daysLeft === 999999) return 'days-permanent'; if (daysLeft <= 0) return 'days-red'; if (daysLeft <= 3) return 'days-yellow'; return 'days-green'; }
+function getDaysLeftText(daysLeft) { if (daysLeft === 999999) return '♾️ Permanent'; if (daysLeft === -999) return '⏰ Tidak ada'; if (daysLeft < 0) return '⏰ Habis ' + Math.abs(daysLeft) + ' hari'; if (daysLeft === 0) return '⚠️ Hari ini'; if (daysLeft === 1) return '📅 1 hari'; return '📅 ' + daysLeft + ' hari'; }
+function checkAccountExpiry(user) { if (!user || !user.expiry_date) return { expired: true, daysLeft: -999, daysLeftText: '⏰ Tidak ada', daysLeftClass: 'days-red' }; var daysLeft = calculateRemainingDays(user.expiry_date); var expired = daysLeft <= 0 && daysLeft !== 999999; return { expired: expired, daysLeft: daysLeft, daysLeftText: getDaysLeftText(daysLeft), daysLeftClass: getDaysLeftClass(daysLeft) }; }
 
 async function login() {
     if (loginInProgress) return;
@@ -68,6 +86,9 @@ async function login() {
         if (result && result.success) {
             storageRemove(getBlockKey(username));
             var user = result.data;
+            var expiryCheck = checkAccountExpiry(user);
+            if (expiryCheck.expired) { hideLoading(); storageSet('bussid_session', JSON.stringify({ username: username, password: password, user_id: user.id, role: user.role || 'Operator', full_name: user.full_name || username, expiry_date: user.expiry_date || '', timestamp: Date.now() })); window.location.href = 'dashboard.html'; loginInProgress = false; return; }
+            await callRevanstore('login_success', 'POST', {});
             storageSet('bussid_session', JSON.stringify({ username: username, password: password, user_id: user.id, role: user.role || 'Operator', full_name: user.full_name || username, expiry_date: user.expiry_date || '', timestamp: Date.now() }));
             hideLoading();
             Swal.fire({ icon: "success", title: "Login Berhasil!", text: "Selamat datang, " + (user.full_name || username) + "!", timer: 1500, showConfirmButton: false }).then(function() { window.location.href = 'dashboard.html'; });
@@ -97,6 +118,8 @@ async function autoCheckSession() {
         try { var ipRes = await fetch('https://api.ipify.org?format=json'); var ipData = await ipRes.json(); userIP = ipData.ip || 'unknown'; } catch (e) {}
         var result = await callRevanstore('login', 'POST', { username: session.username, password: session.password, ip: userIP, fingerprint: fingerprint, captchaToken: 'auto_session_check' });
         if (result && result.success) {
+            var user = result.data;
+            storageSet('bussid_session', JSON.stringify({ username: session.username, password: session.password, user_id: user.id, role: user.role || 'Operator', full_name: user.full_name || session.username, expiry_date: user.expiry_date || '', timestamp: Date.now() }));
             window.location.href = 'dashboard.html';
         } else {
             storageRemove('bussid_session');
@@ -108,9 +131,9 @@ document.addEventListener('DOMContentLoaded', async function() {
     if (!fingerprint) fingerprint = await getFingerprint();
     var blocked = await checkIfBlocked();
     if (blocked) { showBlockedScreen(); return; }
+    await autoCheckSession();
     updatePasswordCounter();
     document.getElementById('password').addEventListener('input', updatePasswordCounter);
     document.getElementById('username').addEventListener('keypress', function(e) { if (e.key === 'Enter') document.getElementById('password').focus(); });
     document.getElementById('password').addEventListener('keypress', function(e) { if (e.key === 'Enter') login(); });
-    await autoCheckSession();
 });
