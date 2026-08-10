@@ -64,6 +64,7 @@
         .info-row:last-child { border-bottom: none; }
         .info-label { min-width: 100px; color: #64748b; font-weight: 500; font-size: 13px; }
         .info-value { color: #1e293b; font-weight: 500; font-size: 13px; flex: 1; }
+
         .playfab-id-full { font-family: monospace; font-size: 13px; background: #f1f5f9; padding: 4px 10px; border-radius: 6px; word-break: break-all; }
         .status-active { color: #10b981; background: #d1fae5; padding: 4px 10px; border-radius: 20px; display: inline-block; font-size: 13px; font-weight: 600; }
 
@@ -165,6 +166,8 @@
         .expired-content p { color: #64748b; font-size: 15px; margin-bottom: 24px; }
         .expired-close { position: absolute; top: 16px; right: 16px; background: #f1f5f9; border: none; color: #64748b; font-size: 18px; cursor: pointer; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease; }
         .expired-close:hover { background: #e2e8f0; }
+        .expired-icon { font-size: 50px; color: #ef4444; margin-bottom: 16px; animation: pulse 1.5s ease-in-out infinite; }
+        @keyframes pulse { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.15); opacity: 0.7; } }
 
         .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-around; padding: 8px 0; z-index: 100; box-shadow: 0 -2px 12px rgba(0,0,0,0.04); }
         .bottom-nav a { display: flex; flex-direction: column; align-items: center; text-decoration: none; color: #94a3b8; font-size: 10px; gap: 3px; transition: 0.2s; cursor: pointer; padding: 4px 12px; }
@@ -180,6 +183,8 @@
         .input-with-button .form-input { flex: 1; }
         .input-with-button .btn { padding: 14px 18px; white-space: nowrap; }
         .name-availability { margin-top: 10px; padding: 10px; border-radius: 8px; font-size: 13px; display: none; }
+
+        .grecaptcha-badge { visibility: hidden !important; }
 
         @media(max-width:768px) {
             .header { flex-direction: column; gap: 16px; text-align: center; }
@@ -267,13 +272,142 @@
                 </div>
             </div>
 
-            <div id="accountInfo" class="card" style="display:none"></div>
-            <div id="topupSection" class="card" style="display:none"></div>
-            <div id="kurasSection" class="card" style="display:none"></div>
-            <div id="changeNameSection" class="card" style="display:none"></div>
-            <div id="historySection" class="card" style="display:none"></div>
-            <div id="settingsSection" class="card" style="display:none"></div>
-            <div id="receiptSection" class="card" style="display:none"></div>
+            <div id="accountInfo" class="card" style="display:none">
+                <div class="card-header">
+                    <h2><i class="fas fa-user-circle"></i> INFORMASI AKUN BUSSID</h2>
+                    <button class="btn-icon" onclick="refreshAccountInfo()"><i class="fas fa-sync-alt"></i> Refresh</button>
+                </div>
+                <div class="card-body">
+                    <div class="account-profile">
+                        <div class="profile-photo-container">
+                            <div class="profile-photo" id="profilePhoto"><i class="fas fa-user"></i></div>
+                        </div>
+                        <div class="profile-info">
+                            <h3 id="accountName">-</h3>
+                            <p class="account-balance" id="accountBalance">Rp 0</p>
+                        </div>
+                    </div>
+                    <div class="facebook-info-section">
+                        <h4><i class="fab fa-facebook" style="color:#1877F2"></i> INFORMASI AKUN FACEBOOK</h4>
+                        <div class="facebook-info-details" id="facebookDetails">
+                            <div class="fb-info-row">
+                                <span class="fb-info-label"><i class="fab fa-facebook"></i> Status:</span>
+                                <span class="fb-info-value">Memuat data Facebook...</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bussid-info-section">
+                        <h4><i class="fas fa-bus"></i> INFORMASI BUSSID</h4>
+                        <div class="bussid-info-details">
+                            <div class="info-row">
+                                <span class="info-label"><i class="fas fa-id-card"></i> PlayFab ID:</span>
+                                <span class="info-value playfab-id-full" id="playfabId">-</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label"><i class="fas fa-circle"></i> Status:</span>
+                                <span class="info-value status-active"><i class="fas fa-check-circle"></i> AKTIF</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="account-actions">
+                        <button class="btn btn-success action-btn" onclick="showTopupFromAccount()"><i class="fas fa-arrow-up"></i> TOP UP</button>
+                        <button class="btn btn-warning action-btn" onclick="showKurasFromAccount()"><i class="fas fa-arrow-down"></i> KURAS</button>
+                        <button class="btn btn-purple action-btn" onclick="showChangeNameSection()"><i class="fas fa-user-edit"></i> GANTI NAMA AKUN</button>
+                    </div>
+                    <button class="btn btn-primary btn-block" onclick="showHome()" style="margin-top:10px"><i class="fas fa-home"></i> KEMBALI KE HOME</button>
+                </div>
+            </div>
+
+            <div id="topupSection" class="card" style="display:none">
+                <div class="card-header"><h2><i class="fas fa-money-bill-wave"></i> TOP UP SALDO BUSSID</h2></div>
+                <div class="card-body">
+                    <div class="current-account-info">
+                        <p><i class="fas fa-user"></i> <strong>Akun:</strong> <span id="topupAccountName">-</span></p>
+                        <p><i class="fas fa-coins"></i> <strong>Saldo Saat Ini:</strong> <span id="topupCurrentBalance">Rp 0</span></p>
+                    </div>
+                    <div class="form-group">
+                        <label for="topupAmount"><i class="fas fa-coins"></i> Jumlah Top Up <span class="max-badge">MAX: 2.147M</span></label>
+                        <input type="text" id="topupAmount" placeholder="Contoh: 2M, 1M, 500JT, MAX" class="form-input" oninput="validateTopupAmount()">
+                        <div id="amountPreview" class="amount-preview" style="display:none">
+                            <div class="label">Jumlah Top Up</div>
+                            <div class="value" id="amountPreviewValue">Rp 0</div>
+                        </div>
+                    </div>
+                    <div class="quick-amounts"></div>
+                    <button class="btn btn-success btn-block" onclick="processTopup()"><i class="fas fa-check-circle"></i> PROSES TOP UP</button>
+                    <button class="btn btn-primary btn-block" onclick="backToAccount()" style="margin-top:10px"><i class="fas fa-home"></i> KEMBALI</button>
+                </div>
+            </div>
+
+            <div id="kurasSection" class="card" style="display:none">
+                <div class="card-header"><h2><i class="fas fa-exchange-alt"></i> KURAS SALDO BUSSID</h2></div>
+                <div class="card-body">
+                    <div class="current-account-info">
+                        <p><i class="fas fa-user"></i> <strong>Akun:</strong> <span id="kurasAccountName">-</span></p>
+                        <p><i class="fas fa-coins"></i> <strong>Saldo Saat Ini:</strong> <span id="kurasCurrentBalance">Rp 0</span></p>
+                    </div>
+                    <div class="form-group">
+                        <label for="kurasAmount"><i class="fas fa-coins"></i> Jumlah Kuras</label>
+                        <input type="text" id="kurasAmount" placeholder="Kosongkan untuk kuras semua" class="form-input">
+                        <small class="form-hint">Biarkan kosong untuk menguras semua saldo</small>
+                    </div>
+                    <button class="btn btn-warning btn-block" onclick="processKuras()"><i class="fas fa-bolt"></i> PROSES KURAS</button>
+                    <button class="btn btn-primary btn-block" onclick="backToAccount()" style="margin-top:10px"><i class="fas fa-home"></i> KEMBALI</button>
+                </div>
+            </div>
+
+            <div id="changeNameSection" class="card" style="display:none">
+                <div class="card-header"><h2><i class="fas fa-user-edit"></i> GANTI NAMA AKUN</h2></div>
+                <div class="card-body">
+                    <div class="current-account-info">
+                        <p><i class="fas fa-user"></i> <strong>Akun:</strong> <span id="changeNameAccountLabel">-</span></p>
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-user-plus"></i> Nama Baru (Maks 25 karakter)</label>
+                        <div class="input-with-button">
+                            <input type="text" id="newAccountName" placeholder="Masukkan nama baru" class="form-input" maxlength="25">
+                            <button class="btn btn-primary" onclick="checkNameAvailability()"><i class="fas fa-search"></i> Cek</button>
+                        </div>
+                        <div class="name-availability" id="nameAvailability" style="display:none"></div>
+                    </div>
+                    <button class="btn btn-success btn-block" onclick="changeAccountNameSimple()"><i class="fas fa-check"></i> GANTI NAMA</button>
+                    <button class="btn btn-primary btn-block" onclick="backToAccount()" style="margin-top:10px"><i class="fas fa-home"></i> KEMBALI</button>
+                </div>
+            </div>
+
+            <div id="historySection" class="card" style="display:none">
+                <div class="card-header">
+                    <h2><i class="fas fa-history"></i> RIWAYAT TRANSAKSI</h2>
+                    <div class="history-header-actions">
+                        <button class="btn-icon btn-danger" onclick="showDeleteHistoryConfirm()"><i class="fas fa-trash"></i> Hapus Semua</button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="history-info"><p><i class="fas fa-info-circle"></i> Riwayat otomatis terhapus setelah 2 hari</p></div>
+                    <div id="transactionsList"></div>
+                </div>
+            </div>
+
+            <div id="settingsSection" class="card" style="display:none">
+                <div class="card-header"><h2><i class="fas fa-cog"></i> PENGATURAN AKUN</h2></div>
+                <div class="card-body">
+                    <div class="user-profile-info">
+                        <div class="profile-item"><span class="profile-label"><i class="fas fa-user"></i> Username:</span><span class="profile-value highlight-black" id="profileUsername">-</span></div>
+                        <div class="profile-item"><span class="profile-label"><i class="fas fa-user"></i> Nama:</span><span class="profile-value highlight-black" id="profileName">-</span></div>
+                        <div class="profile-item"><span class="profile-label"><i class="fas fa-user-tag"></i> Role:</span><span class="profile-value role-biru" id="profileRole">-</span></div>
+                        <div class="profile-item"><span class="profile-label"><i class="fas fa-calendar-alt"></i> Masa Aktif:</span><span class="profile-value" id="profileExpiry">-</span></div>
+                    </div>
+                    <div class="settings-divider"><h3><i class="fas fa-key"></i> Ubah Password</h3></div>
+                    <p style="text-align:center;color:#64748b;padding:15px;font-size:14px"><i class="fas fa-info-circle"></i> Hubungi admin via WhatsApp untuk ubah password</p>
+                    <button class="btn btn-whatsapp btn-block" onclick="openWhatsAppPassword()"><i class="fab fa-whatsapp"></i> Ubah Password</button>
+                    <button class="btn btn-danger btn-block" onclick="logout()" style="margin-top:20px"><i class="fas fa-sign-out-alt"></i> LOGOUT</button>
+                </div>
+            </div>
+
+            <div id="receiptSection" class="card" style="display:none">
+                <div class="card-header"><h2><i class="fas fa-receipt"></i> DETAIL TRANSAKSI</h2></div>
+                <div class="card-body"><div id="receiptContent"></div></div>
+            </div>
         </div>
     </div>
 
@@ -283,6 +417,18 @@
         <a href="#" onclick="navigateBottom('pengaturan')"><i class="fas fa-cog"></i> Pengaturan</a>
     </nav>
 
+    <div id="confirmOverlay" class="confirm-overlay" style="display:none">
+        <div class="confirm-box">
+            <div class="confirm-icon"><i class="fas fa-exclamation-triangle"></i></div>
+            <h3 id="confirmTitle" style="color:#1a1a2e;margin-bottom:10px"></h3>
+            <p class="confirm-message" id="confirmMessage"></p>
+            <div class="confirm-buttons">
+                <button class="confirm-btn confirm-no" id="confirmNo"><i class="fas fa-times"></i> BATAL</button>
+                <button class="confirm-btn confirm-yes" id="confirmYes"><i class="fas fa-check"></i> HAPUS</button>
+            </div>
+        </div>
+    </div>
+
     <div id="confirmModal" class="modal">
         <div class="modal-content">
             <h3 id="modalConfirmTitle"></h3>
@@ -291,6 +437,14 @@
                 <button class="btn btn-secondary" onclick="cancelConfirm()"><i class="fas fa-times"></i> BATAL</button>
                 <button class="btn btn-danger" onclick="confirmAction()"><i class="fas fa-check"></i> LANJUTKAN</button>
             </div>
+        </div>
+    </div>
+
+    <div id="nameChangeModal" class="modal">
+        <div class="modal-content">
+            <h3><i class="fas fa-user-edit"></i> Ganti Nama Akun</h3>
+            <p id="nameChangeMessage"></p>
+            <div class="modal-buttons"><button class="btn btn-primary" onclick="closeNameChangeModal()"><i class="fas fa-check"></i> OKE</button></div>
         </div>
     </div>
 
