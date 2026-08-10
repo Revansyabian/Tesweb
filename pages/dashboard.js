@@ -1,4 +1,4 @@
-var API_REVANSTORE = '/api/revanstore';
+var API_REVANSTORE = '/api/revanstoreV2';
 var API_RVNSTORE = '/api/rvnstore';
 var ADMIN_KEY = 'dhagwxwhu:f4afc5aa03e73130f5e055dfe6a708c4dc40759b';
 var WHATSAPP_NUMBER = "6285199120995";
