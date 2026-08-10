@@ -193,178 +193,6 @@
         .btn-icon:hover { background: #e0f2fe; }
         .btn-whatsapp { background: #25D366; color: #fff; }
         .btn-whatsapp:hover { background: #128C7E; }
-        .btn-quick {
-            background: #fff;
-            color: #0ea5e9;
-            border: 2px solid #e0f2fe;
-            padding: 12px 16px;
-            border-radius: 10px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            font-weight: 600;
-            flex: 1;
-            text-align: center;
-        }
-        .btn-quick:hover { background: #0ea5e9; color: #fff; border-color: #0ea5e9; }
-        .quick-amounts {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
-            gap: 10px;
-            margin: 20px 0;
-        }
-        .current-account-info {
-            background: #f8fafc;
-            padding: 16px;
-            border-radius: 12px;
-            margin-bottom: 20px;
-            border-left: 3px solid #0ea5e9;
-        }
-        .current-account-info p { margin-bottom: 8px; font-size: 15px; color: #475569; }
-        .current-account-info p:last-child { margin-bottom: 0; }
-        .user-profile-info {
-            background: #f8fafc;
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 24px;
-        }
-        .profile-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px 0;
-            border-bottom: 1px solid #e2e8f0;
-        }
-        .profile-item:last-child { border-bottom: none; }
-        .profile-label { color: #64748b; font-weight: 500; font-size: 14px; }
-        .profile-value { font-weight: 600; color: #1e293b; font-size: 14px; }
-        .highlight-black { background: #e2e8f0; padding: 4px 10px; border-radius: 6px; }
-        .role-biru { color: #0ea5e9 !important; background: #e0f2fe; padding: 4px 10px; border-radius: 6px; }
-        .expiry-days-left {
-            font-size: 11px;
-            padding: 2px 8px;
-            border-radius: 12px;
-            display: inline-block;
-            font-weight: 600;
-        }
-        .days-green { background: #d1fae5; color: #059669; }
-        .days-yellow { background: #fef3c7; color: #d97706; }
-        .days-red { background: #fee2e2; color: #dc2626; }
-        .days-permanent { background: #e0e7ff; color: #6366f1; }
-        .settings-divider {
-            margin: 24px 0 16px;
-            padding-bottom: 12px;
-            border-bottom: 1px solid #e2e8f0;
-        }
-        .settings-divider h3 { color: #0c4a6e; font-size: 16px; font-weight: 600; }
-        .transaction-item {
-            background: #f8fafc;
-            border-radius: 12px;
-            padding: 16px;
-            margin-bottom: 10px;
-            border-left: 3px solid #0ea5e9;
-            transition: all 0.2s ease;
-        }
-        .transaction-item:hover { background: #f1f5f9; transform: translateX(3px); }
-        .transaction-item.topup { border-left-color: #10b981; }
-        .transaction-item.kuras { border-left-color: #f59e0b; }
-        .transaction-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 6px;
-        }
-        .transaction-amount { font-weight: 700; font-size: 16px; }
-        .transaction-details {
-            display: flex;
-            justify-content: space-between;
-            color: #64748b;
-            font-size: 13px;
-        }
-        .transaction-balance {
-            display: flex;
-            justify-content: space-between;
-            color: #8899aa;
-            font-size: 11px;
-            margin-top: 6px;
-            gap: 8px;
-        }
-        .history-header-actions { display: flex; gap: 10px; }
-        .history-header-actions .btn-icon.btn-danger { color: #ef4444; border-color: #fecaca; }
-        .history-header-actions .btn-icon.btn-danger:hover { background: #fee2e2; }
-        .history-info {
-            background: #fef3c7;
-            border-radius: 8px;
-            padding: 12px;
-            margin-bottom: 16px;
-            color: #92400e;
-            font-size: 13px;
-        }
-        .receipt-content {
-            background: #f8fafc;
-            border-radius: 12px;
-            padding: 24px;
-        }
-        .receipt-header {
-            text-align: center;
-            margin-bottom: 20px;
-            padding-bottom: 16px;
-            border-bottom: 2px dashed #e2e8f0;
-        }
-        .receipt-header h3 { color: #0c4a6e; font-size: 22px; font-weight: 700; }
-        .receipt-details { display: grid; gap: 10px; margin-bottom: 20px; }
-        .receipt-row {
-            display: flex;
-            justify-content: space-between;
-            padding: 10px 0;
-            border-bottom: 1px solid #f1f5f9;
-            font-size: 14px;
-        }
-        .receipt-row:last-child { border-bottom: none; }
-        .modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(15, 23, 42, 0.5);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 99999;
-            opacity: 0;
-            visibility: hidden;
-            transition: all 0.25s ease;
-            padding: 20px;
-        }
-        .modal.active { opacity: 1; visibility: visible; }
-        .modal-content {
-            background: #fff;
-            border-radius: 20px;
-            padding: 36px;
-            max-width: 460px;
-            width: 100%;
-            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.12);
-            transform: scale(0.9);
-            transition: transform 0.25s ease;
-        }
-        .modal.active .modal-content { transform: scale(1); }
-        .modal-content h3 { color: #0c4a6e; font-size: 22px; margin-bottom: 16px; text-align: center; }
-        .modal-content p { color: #64748b; font-size: 15px; line-height: 1.6; margin-bottom: 24px; text-align: center; }
-        .modal-buttons { display: flex; gap: 12px; justify-content: center; }
-        .modal-buttons .btn { min-width: 110px; padding: 12px 20px; flex: 1; }
-        .spinner {
-            width: 40px;
-            height: 40px;
-            border: 4px solid #e2e8f0;
-            border-top: 4px solid #0ea5e9;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-            margin: 0 auto 15px;
-        }
-        @keyframes spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-        }
         .bottom-nav {
             position: fixed;
             bottom: 0;
@@ -392,22 +220,28 @@
         }
         .bottom-nav a.active { color: #0ea5e9; }
         .bottom-nav a i { font-size: 20px; }
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #e2e8f0;
+            border-top: 4px solid #0ea5e9;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 15px;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
         @media(max-width:768px) {
             .header { flex-direction: column; gap: 16px; text-align: center; }
             .user-info { width: 100%; justify-content: center; }
             .card-header { flex-direction: column; gap: 12px; text-align: center; }
             .card-header h2 { flex-direction: column; gap: 8px; font-size: 18px; }
-            .history-header-actions { flex-direction: column; width: 100%; }
-            .modal-buttons { flex-direction: column; }
-            .modal-buttons .btn { width: 100%; }
-            .quick-amounts { grid-template-columns: repeat(2, 1fr); }
-            .profile-item { flex-direction: column; align-items: flex-start; gap: 4px; }
             .btn { font-size: 14px; padding: 12px 18px; }
-            .modal-content { padding: 24px; }
         }
         @media(max-width:480px) {
             .btn { padding: 12px 18px; font-size: 14px; }
-            .quick-amounts { grid-template-columns: 1fr; }
             .card-body { padding: 16px; }
             .card-header { padding: 16px; }
             .header { padding: 16px; }
@@ -448,13 +282,6 @@
                     <button class="btn btn-primary btn-block" onclick="searchAccount()"><i class="fas fa-search"></i> CARI AKUN</button>
                 </div>
             </div>
-
-            <div id="accountInfo" class="card" style="display:none"></div>
-            <div id="topupSection" class="card" style="display:none"></div>
-            <div id="kurasSection" class="card" style="display:none"></div>
-            <div id="historySection" class="card" style="display:none"></div>
-            <div id="settingsSection" class="card" style="display:none"></div>
-            <div id="receiptSection" class="card" style="display:none"></div>
         </div>
     </div>
 
@@ -466,200 +293,6 @@
 
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
-    <script>
-        var API_REVANSTORE = '/api/revanstore';
-        var API_RVNSTORE = '/api/rvnstore';
-        var WHATSAPP_NUMBER = '6285199120995';
-        var STORAGE_KEY = 'bussid_session';
-        var STORAGE_SECRET = 'bussid_session_secret_key';
-        var MAX_TOPUP_AMOUNT = 2147483647;
-        var RECAPTCHA_SITE_KEY_V3 = '6LcVBn4tAAAAAINTTIleUbUZr1ZykvyB6WA-oOfT';
-
-        var currentUser = null;
-        var currentAccount = null;
-        var currentAuthToken = null;
-        var fingerprint = '';
-        var alertTimeout = null;
-        var statusCheckInterval = null;
-
-        function storageGet() {
-            try {
-                var encrypted = localStorage.getItem(STORAGE_KEY);
-                if (!encrypted) return null;
-                var decrypted = CryptoJS.AES.decrypt(encrypted, STORAGE_SECRET).toString(CryptoJS.enc.Utf8);
-                return JSON.parse(decrypted) || null;
-            } catch (e) { return null; }
-        }
-
-        function storageRemove() {
-            localStorage.removeItem(STORAGE_KEY);
-        }
-
-        function sanitize(str) {
-            if (!str) return '';
-            return String(str).replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#x27;');
-        }
-
-        function showAlert(message, type, duration) {
-            type = type || 'info';
-            duration = duration || 2500;
-            var alertDiv = document.getElementById('alert');
-            if (!alertDiv) return;
-            var icons = { success: 'fa-check-circle', error: 'fa-exclamation-circle', warning: 'fa-exclamation-triangle', info: 'fa-info-circle', loading: 'fa-spinner fa-spin' };
-            alertDiv.innerHTML = '<div class="alert-content"><div class="alert-icon"><i class="fas ' + (icons[type] || 'fa-info-circle') + '"></i></div><span>' + sanitize(message) + '</span></div>';
-            alertDiv.className = 'alert ' + type + ' show';
-            if (alertTimeout) clearTimeout(alertTimeout);
-            if (type !== 'loading') { alertTimeout = setTimeout(function() { alertDiv.classList.remove('show'); }, duration); }
-        }
-
-        function showLoading(message) {
-            document.getElementById('loadingMessage').textContent = message || 'Memproses...';
-            document.getElementById('loadingOverlay').style.display = 'flex';
-        }
-
-        function hideLoading() {
-            document.getElementById('loadingOverlay').style.display = 'none';
-        }
-
-        function formatCurrency(amount) {
-            if (!amount && amount !== 0) return 'Rp 0';
-            return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(Math.abs(amount));
-        }
-
-        async function getFingerprint() {
-            var fp = '';
-            fp += navigator.userAgent || '';
-            fp += navigator.language || '';
-            fp += (screen.width || 0) + 'x' + (screen.height || 0);
-            fp += screen.colorDepth || '';
-            fp += new Date().getTimezoneOffset();
-            fp += navigator.hardwareConcurrency || '';
-            fp += navigator.deviceMemory || '';
-            fp += navigator.platform || '';
-            return CryptoJS.MD5(fp).toString();
-        }
-
-        async function checkAccountStatus() {
-            if (!currentUser) return;
-            try {
-                var res = await fetch(API_REVANSTORE, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-Fingerprint': fingerprint },
-                    body: JSON.stringify({
-                        path: 'check_account_status',
-                        method: 'POST',
-                        data: { username: currentUser.username, user_id: currentUser.user_id, fingerprint: fingerprint }
-                    })
-                });
-                var result = await res.json();
-                if (result.encrypted && result.data) {
-                    var decrypted = CryptoJS.AES.decrypt(result.data, STORAGE_SECRET).toString(CryptoJS.enc.Utf8);
-                    if (decrypted) result = JSON.parse(decrypted);
-                }
-
-                if (result && result.banned) {
-                    var until = result.bannedUntil || 0;
-                    var untilText = until === 0 ? 'PERMANEN' : ('sampai ' + new Date(until).toLocaleString('id-ID'));
-                    Swal.fire({
-                        icon: 'error', title: 'AKUN DIBANNED',
-                        html: 'Maaf, akun Anda telah dibanned oleh admin.<br><br>⏱️ Durasi: ' + untilText,
-                        confirmButtonText: 'OK', confirmButtonColor: '#ef4444',
-                        allowOutsideClick: false
-                    }).then(function() { autoLogout(); });
-                    return;
-                }
-
-                if (result && result.banAkses) {
-                    var untilA = result.banAksesUntil || 0;
-                    var untilTextA = untilA === 0 ? 'PERMANEN' : ('sampai ' + new Date(untilA).toLocaleString('id-ID'));
-                    Swal.fire({
-                        icon: 'error', title: 'AKSES DIBLOKIR',
-                        html: 'Maaf, akses Anda diblokir oleh admin.<br><br>⏱️ Durasi: ' + untilTextA,
-                        confirmButtonText: 'OK', confirmButtonColor: '#ef4444',
-                        allowOutsideClick: false
-                    }).then(function() { autoLogout(); });
-                    return;
-                }
-
-                if (result && result.forceLogout) {
-                    Swal.fire({
-                        icon: 'warning', title: 'AKUN DITANGGUHKAN',
-                        html: 'Akun Anda ditangguhkan karena indikasi sharing akun.<br><br>Silakan hubungi admin.',
-                        confirmButtonText: 'OK', confirmButtonColor: '#ef4444',
-                        allowOutsideClick: false
-                    }).then(function() { autoLogout(); });
-                    return;
-                }
-            } catch (e) {}
-        }
-
-        function autoLogout() {
-            storageRemove();
-            if (statusCheckInterval) clearInterval(statusCheckInterval);
-            window.location.href = '../index.html';
-        }
-
-        function logout() {
-            storageRemove();
-            if (statusCheckInterval) clearInterval(statusCheckInterval);
-            window.location.href = '../index.html';
-        }
-
-        function checkAuth() {
-            var saved = storageGet();
-            if (!saved || !saved.value || !saved.value.username) {
-                window.location.href = '../index.html';
-                return false;
-            }
-            var session = saved.value;
-            var age = Date.now() - (session.timestamp || 0);
-            if (age > 7 * 24 * 60 * 60 * 1000) {
-                storageRemove();
-                window.location.href = '../index.html';
-                return false;
-            }
-            currentUser = session;
-            return true;
-        }
-
-        function navigateBottom(page) {
-            document.querySelectorAll('.bottom-nav a').forEach(function(a) { a.classList.remove('active'); });
-            event.target.classList.add('active');
-            if (page === 'home') showHome();
-            else if (page === 'riwayat') showHistory();
-            else if (page === 'pengaturan') showSettings();
-        }
-
-        function showHome() {
-            document.querySelector('.search-card').style.display = 'block';
-        }
-
-        async function searchAccount() {
-            var id = document.getElementById('deviceId').value.trim();
-            if (!id) { showAlert('Masukkan Device ID!', 'error'); return; }
-            showAlert('Fitur search account dalam pengembangan', 'info');
-        }
-
-        function showHistory() { showAlert('Fitur riwayat dalam pengembangan', 'info'); }
-        function showSettings() { showAlert('Fitur pengaturan dalam pengembangan', 'info'); }
-
-        document.addEventListener('DOMContentLoaded', async function() {
-            if (!checkAuth()) return;
-
-            document.getElementById('mainApp').style.display = 'block';
-            document.getElementById('bottomNav').style.display = 'flex';
-            showHome();
-
-            if (!fingerprint) fingerprint = await getFingerprint();
-
-            await checkAccountStatus();
-
-            statusCheckInterval = setInterval(checkAccountStatus, 30000);
-
-            document.getElementById('deviceId').addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') searchAccount();
-            });
-        });
-    </script>
+    <script src="dashboard.js"></script>
 </body>
 </html>
