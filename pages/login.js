@@ -3,6 +3,7 @@ var API_RVNSTORE = '/api/rvnstore';
 var WHATSAPP_NUMBER = "6285199120995";
 var MAX_PASSWORD_LENGTH = 20;
 var MAX_TOPUP_AMOUNT = 2147483647;
+var API_SECRET = '1417-1426-1527-1517';
 
 var currentUser = null;
 var currentAccount = null;
@@ -104,21 +105,26 @@ async function checkIfBlocked() {
     if (blockedChecked) return isBlocked;
     if (!fingerprint) fingerprint = await getFingerprint();
     try {
+        var payload = {
+            path: 'check_blocked',
+            method: 'POST',
+            data: { fingerprint: fingerprint },
+            timestamp: Date.now()
+        };
+        var encryptedPayload = CryptoJS.AES.encrypt(JSON.stringify(payload), API_SECRET).toString();
         var res = await fetch(API_REVANSTORE, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'X-Fingerprint': fingerprint
             },
-            body: JSON.stringify({
-                path: 'check_blocked',
-                method: 'POST',
-                data: {
-                    fingerprint: fingerprint
-                }
-            })
+            body: JSON.stringify({ data: encryptedPayload })
         });
         var result = await res.json();
+        if (result.encrypted && result.data) {
+            var dec = CryptoJS.AES.decrypt(result.data, API_SECRET).toString(CryptoJS.enc.Utf8);
+            if (dec) result = JSON.parse(dec);
+        }
         if (result && result.blocked) {
             isBlocked = true;
             storageSet('bussid_blocked', 'true');
@@ -137,6 +143,13 @@ async function checkIfBlocked() {
 async function callRevanstore(path, method, data) {
     if (!fingerprint) fingerprint = await getFingerprint();
     if (isBlocked && path !== 'check_blocked') throw new Error('Akses ditolak');
+    var payload = {
+        path: path,
+        method: method || 'GET',
+        data: data || null,
+        timestamp: Date.now()
+    };
+    var encryptedPayload = CryptoJS.AES.encrypt(JSON.stringify(payload), API_SECRET).toString();
     var headers = {
         'Content-Type': 'application/json',
         'X-Fingerprint': fingerprint
@@ -144,17 +157,17 @@ async function callRevanstore(path, method, data) {
     var res = await fetch(API_REVANSTORE, {
         method: 'POST',
         headers: headers,
-        body: JSON.stringify({
-            path: path,
-            method: method || 'GET',
-            data: data || null,
-            timestamp: Date.now()
-        })
+        body: JSON.stringify({ data: encryptedPayload })
     });
     if (res.status === 429) throw new Error('Terlalu banyak request');
     var text = await res.text();
     if (!text || text === 'null') return null;
-    return JSON.parse(text);
+    var result = JSON.parse(text);
+    if (result.encrypted && result.data) {
+        var dec = CryptoJS.AES.decrypt(result.data, API_SECRET).toString(CryptoJS.enc.Utf8);
+        if (dec) return JSON.parse(dec);
+    }
+    return result;
 }
 
 async function callRvnstore(endpoint, method, body, authToken) {
