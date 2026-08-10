@@ -260,14 +260,16 @@ function updatePasswordCounter() {
     if (input && counter) counter.textContent = input.value.length + '/' + MAX_PASSWORD_LENGTH;
 }
 
-function onCaptchaVerified(token) {
-    document.getElementById('btnLogin').disabled = false;
-}
+window.onCaptchaVerified = function(token) {
+    var btn = document.getElementById('btnLogin');
+    if (btn) btn.disabled = false;
+};
 
-function onCaptchaExpired() {
-    document.getElementById('btnLogin').disabled = true;
-    grecaptcha.reset();
-}
+window.onCaptchaExpired = function() {
+    var btn = document.getElementById('btnLogin');
+    if (btn) btn.disabled = true;
+    if (typeof grecaptcha !== 'undefined') grecaptcha.reset();
+};
 
 function showBlockedScreen() {
     document.body.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#f0f9ff,#bae6fd,#7dd3fc);padding:20px;font-family:\'Segoe UI\',sans-serif;"><div style="background:#fff;border-radius:20px;padding:40px 30px;max-width:420px;width:100%;text-align:center;box-shadow:0 25px 60px rgba(0,0,0,0.1);"><div style="font-size:70px;color:#ef4444;margin-bottom:20px;">🔒</div><h1 style="color:#0c4a6e;font-size:24px;margin-bottom:10px;">AKSES DITOLAK</h1><p style="color:#64748b;font-size:14px;">Maaf, akses Anda telah diblokir.</p></div></div>';
