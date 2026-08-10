@@ -2,1163 +2,168 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RevanStore • Admin Panel</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <title>Top Up BUSSID</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <meta name="theme-color" content="#0ea5e9">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon-192.png">
     <style>
-        :root {
-            --sidebar: 240px;
-            --nav-height: 60px;
-            --blue: #00BFFF;
-            --blue-dark: #0099CC;
-            --blue-light: #E6F9FF;
-            --border: #e2e8f0;
-            --text: #0c4a6e;
-            --sub: #64748b;
-            --radius: 10px;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
-        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: 'Inter', sans-serif;
-            background: #f0f9ff;
-            color: #0c4a6e;
-            min-height: 100vh;
-        }
-        #loginWrapper {
+            background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 50%, #7dd3fc 100%);
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
-            background: linear-gradient(135deg, #f0f9ff 0%, #bae6fd 50%, #7dd3fc 100%);
             padding: 20px;
         }
-        #keyScreen, #loginScreen {
-            background: #ffffff;
-            border-radius: 24px;
-            padding: 40px 36px;
-            width: 100%;
-            max-width: 400px;
-            box-shadow: 0 20px 60px rgba(0, 191, 255, 0.2);
-            border: 1px solid rgba(0, 191, 255, 0.1);
-        }
-        #keyScreen .logo, #loginScreen .logo {
+        .loading-container {
             text-align: center;
-            font-size: 32px;
-            color: var(--blue);
+            animation: fadeIn 0.4s ease;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .loading-icon {
+            font-size: 80px;
+            color: #0ea5e9;
+            margin-bottom: 20px;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.7; }
+        }
+        .loading-title {
+            color: #0c4a6e;
+            font-size: 28px;
+            font-weight: 700;
             margin-bottom: 8px;
-        }
-        #keyScreen h2, #loginScreen h2 {
-            text-align: center;
-            font-size: 24px;
-            font-weight: 700;
-            color: #0c4a6e;
-            margin-bottom: 4px;
-        }
-        #keyScreen p, #loginScreen p {
-            text-align: center;
-            font-size: 14px;
-            color: #64748b;
-            margin-bottom: 24px;
-        }
-        .input-group { margin-bottom: 16px; }
-        .input-group label {
-            display: block;
-            font-size: 12px;
-            font-weight: 600;
-            color: #64748b;
-            margin-bottom: 4px;
-            text-transform: uppercase;
-            letter-spacing: 0.04em;
-        }
-        .input-group label i { margin-right: 6px; color: var(--blue); }
-        .input-group input, .input-group select {
-            width: 100%;
-            padding: 12px 0;
-            border: none;
-            border-bottom: 2px solid #e2e8f0;
-            font-size: 15px;
-            background: transparent;
-            transition: 0.2s;
-            font-family: 'Inter', sans-serif;
-            outline: none;
-            color: #0c4a6e;
-        }
-        .input-group input:focus, .input-group select:focus {
-            border-bottom-color: var(--blue);
-        }
-        .input-group select {
-            appearance: none;
-            -webkit-appearance: none;
-            cursor: pointer;
-        }
-        .input-group input[readonly] {
-            background: #f8fafc;
-            color: #94a3b8;
-            cursor: not-allowed;
-            border-radius: 6px;
-            padding: 12px;
-            border: 1px solid var(--border);
-        }
-        .input-with-btn {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-        }
-        .input-with-btn input { flex: 1; }
-        .input-with-btn .btn { flex-shrink: 0; }
-        .btn {
-            padding: 12px 24px;
-            border: none;
-            border-radius: var(--radius);
-            font-weight: 600;
-            font-size: 14px;
-            cursor: pointer;
-            font-family: 'Inter', sans-serif;
-            transition: 0.2s;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-        }
-        .btn-primary {
-            background: var(--blue);
-            color: #fff;
-            width: 100%;
-            box-shadow: 0 4px 16px rgba(0, 191, 255, 0.3);
-        }
-        .btn-primary:hover {
-            background: var(--blue-dark);
-            transform: translateY(-2px);
-            box-shadow: 0 6px 24px rgba(0, 191, 255, 0.4);
-        }
-        .btn-success { background: #10b981; color: #fff; }
-        .btn-success:hover { background: #059669; transform: translateY(-1px); }
-        .btn-danger { background: #ef4444; color: #fff; }
-        .btn-danger:hover { background: #dc2626; transform: translateY(-1px); }
-        .btn-outline {
-            background: #fff;
-            border: 1.5px solid var(--border);
-            color: var(--text);
-        }
-        .btn-outline:hover { background: var(--blue-light); border-color: var(--blue); }
-        .btn-sm { padding: 6px 14px; font-size: 12px; }
-        .btn-xs { padding: 4px 10px; font-size: 11px; }
-        .btn-block { width: 100%; }
-        #appContainer {
-            display: none;
-            min-height: 100vh;
-            background: #f0f9ff;
-        }
-        .navbar {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: var(--nav-height);
-            background: #ffffff;
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0 20px;
-            z-index: 100;
-            box-shadow: 0 2px 8px rgba(0, 191, 255, 0.08);
-        }
-        .navbar-brand {
-            font-weight: 700;
-            font-size: 18px;
-            color: var(--text);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            cursor: pointer;
-            text-decoration: none;
-        }
-        .navbar-brand i { color: var(--blue); font-size: 22px; }
-        .navbar-brand span { color: var(--blue); }
-        .navbar-right {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-        }
-        .navbar-clock {
-            font-size: 13px;
-            color: var(--sub);
-        }
-        .navbar-clock i { margin-right: 4px; color: var(--blue); }
-        .navbar-user {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 14px;
-            font-weight: 500;
-        }
-        .navbar-user .avatar {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            background: var(--blue-light);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 14px;
-            font-weight: 600;
-            color: var(--blue);
-        }
-        .navbar-toggle {
-            display: none;
-            background: none;
-            border: none;
-            font-size: 20px;
-            cursor: pointer;
-            color: var(--text);
-        }
-        .sidebar {
-            position: fixed;
-            top: var(--nav-height);
-            left: 0;
-            width: var(--sidebar);
-            height: calc(100vh - var(--nav-height));
-            background: #ffffff;
-            border-right: 1px solid var(--border);
-            overflow-y: auto;
-            padding: 12px 10px;
-            z-index: 90;
-            transition: transform 0.3s ease;
-        }
-        .sidebar-nav {
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-        }
-        .sidebar-nav .label {
-            font-size: 10px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.06em;
-            color: var(--sub);
-            padding: 10px 12px 4px;
-            opacity: 0.5;
-        }
-        .sidebar-nav .label i { margin-right: 4px; }
-        .sidebar-nav a {
-            display: flex;
-            align-items: center;
             gap: 10px;
-            padding: 8px 12px;
-            border-radius: var(--radius);
-            color: var(--sub);
-            text-decoration: none;
-            font-size: 13px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: 0.2s;
         }
-        .sidebar-nav a:hover { background: var(--blue-light); color: var(--blue); }
-        .sidebar-nav a.active {
-            background: var(--blue-light);
-            color: var(--blue);
-            font-weight: 600;
-        }
-        .sidebar-nav a i { width: 18px; font-size: 14px; text-align: center; }
-        .sidebar-divider {
-            height: 1px;
-            background: var(--border);
-            margin: 6px 12px;
-        }
-        .sidebar-footer {
-            border-top: 1px solid var(--border);
-            padding: 12px 12px 0;
-            margin-top: 8px;
-        }
-        .sidebar-footer .logout-btn {
-            width: 100%;
-            padding: 8px;
-            border: none;
-            background: transparent;
-            color: var(--sub);
-            font-weight: 600;
-            font-size: 13px;
-            cursor: pointer;
-            border-radius: var(--radius);
-            transition: 0.2s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
-        }
-        .sidebar-footer .logout-btn:hover {
-            background: #fef2f2;
-            color: #dc2626;
-        }
-        .main-content {
-            margin-left: var(--sidebar);
-            padding-top: var(--nav-height);
-            min-height: 100vh;
-            padding: calc(var(--nav-height) + 20px) 24px 24px;
-        }
-        .page { display: none; }
-        .page.active { display: block; }
-        .page-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-            gap: 12px;
-        }
-        .page-header h1 {
-            font-size: 22px;
-            font-weight: 700;
-            color: var(--text);
-        }
-        .page-header h1 i { color: var(--blue); margin-right: 8px; }
-        .page-header p { font-size: 14px; color: var(--sub); }
-        .stats {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 14px;
-            margin-bottom: 20px;
-        }
-        .stat {
-            background: #ffffff;
-            border-radius: var(--radius);
-            padding: 16px 18px;
-            border: 1px solid var(--border);
-            box-shadow: 0 2px 8px rgba(0, 191, 255, 0.06);
-        }
-        .stat .num {
-            font-size: 26px;
-            font-weight: 700;
-            line-height: 1.2;
-            color: var(--blue);
-        }
-        .stat .label {
-            font-size: 12px;
-            color: var(--sub);
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.04em;
-        }
-        .card {
-            background: #ffffff;
-            border-radius: var(--radius);
-            padding: 18px 20px;
-            border: 1px solid var(--border);
-            margin-bottom: 16px;
-            box-shadow: 0 2px 8px rgba(0, 191, 255, 0.06);
-        }
-        .card-header {
-            font-weight: 600;
-            font-size: 15px;
-            margin-bottom: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            flex-wrap: wrap;
-            gap: 8px;
-            color: var(--text);
-        }
-        .card-header i { margin-right: 6px; color: var(--blue); }
-        .table-wrap { overflow-x: auto; }
-        table { width: 100%; border-collapse: collapse; }
-        th {
-            text-align: left;
-            padding: 8px 10px;
-            font-size: 11px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.04em;
-            color: var(--sub);
-            border-bottom: 2px solid var(--border);
-        }
-        td {
-            padding: 8px 10px;
-            font-size: 13px;
-            border-bottom: 1px solid var(--border);
-        }
-        tr:hover { background: var(--blue-light); }
-        .badge {
-            display: inline-block;
-            padding: 2px 10px;
-            border-radius: 20px;
-            font-size: 10px;
-            font-weight: 700;
-            text-transform: uppercase;
-        }
-        .badge-red { background: #fef2f2; color: #dc2626; }
-        .badge-yellow { background: #fffbeb; color: #d97706; }
-        .badge-orange { background: #fff7ed; color: #ea580c; }
-        .badge-green { background: #ecfdf5; color: #16a34a; }
-        .badge-blue { background: var(--blue-light); color: var(--blue); }
-        .activity-list {
-            max-height: 400px;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-        .activity-item {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 8px 12px;
-            border-radius: var(--radius);
-            background: #f8fafc;
-            font-size: 13px;
-        }
-        .activity-item:hover { background: var(--blue-light); }
-        .activity-item.suspicious { background: #fef2f2; }
-        .activity-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            flex-shrink: 0;
-        }
-        .activity-dot.login_success { background: #10b981; }
-        .activity-dot.login_failed { background: #ef4444; }
-        .activity-dot.banned, .activity-dot.ban_akses { background: #ef4444; }
-        .activity-dot.unbanned, .activity-dot.unban_akses { background: #10b981; }
-        .activity-dot.force_logout { background: #f59e0b; }
-        .activity-dot.unforce_logout { background: #10b981; }
-        .activity-dot.sharing_detected { background: #ef4444; }
-        .activity-dot.topup { background: var(--blue); }
-        .activity-info { flex: 1; }
-        .activity-user { font-weight: 600; }
-        .activity-desc { color: var(--sub); }
-        .activity-time { font-size: 11px; color: var(--sub); white-space: nowrap; }
-        .empty-state {
-            text-align: center;
-            padding: 40px 20px;
-            color: var(--sub);
-        }
-        .empty-state i { font-size: 32px; opacity: 0.3; display: block; margin-bottom: 8px; color: var(--blue); }
-        .web-stats {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 14px;
-        }
-        .web-stat {
-            background: #ffffff;
-            border-radius: var(--radius);
-            padding: 16px;
-            border: 1px solid var(--border);
-            text-align: center;
-            box-shadow: 0 2px 8px rgba(0, 191, 255, 0.06);
-        }
-        .web-stat .num { font-size: 22px; font-weight: 700; color: var(--blue); }
-        .web-stat .label { font-size: 11px; color: var(--sub); text-transform: uppercase; letter-spacing: 0.04em; }
-        .dist-grid {
-            display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
-        }
-        .dist-item {
-            flex: 1;
-            min-width: 80px;
-            padding: 12px;
-            border-radius: var(--radius);
-            text-align: center;
-            background: #f8fafc;
-        }
-        .dist-item .num { font-size: 20px; font-weight: 700; }
-        .dist-item .label { font-size: 11px; color: var(--sub); }
-        .modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(15, 23, 42, 0.4);
-            backdrop-filter: blur(4px);
-            z-index: 200;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            visibility: hidden;
-            opacity: 0;
-            transition: 0.25s;
-        }
-        .modal.show { visibility: visible; opacity: 1; }
-        .modal-box {
-            background: #ffffff;
-            border-radius: 16px;
-            padding: 24px;
-            width: 92%;
-            max-width: 480px;
-            max-height: 85vh;
-            overflow-y: auto;
-            box-shadow: 0 20px 60px rgba(0, 191, 255, 0.15);
-            border: 1px solid rgba(0, 191, 255, 0.1);
-        }
-        .modal-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            font-weight: 600;
-            font-size: 16px;
-            margin-bottom: 16px;
-            color: var(--text);
-        }
-        .modal-header i { color: var(--blue); margin-right: 6px; }
-        .modal-close {
-            background: none;
-            border: none;
-            font-size: 18px;
-            cursor: pointer;
-            color: var(--sub);
-            padding: 4px;
-        }
-        .modal-close:hover { color: var(--text); }
-        .user-check {
-            padding: 8px 12px;
-            border: 1.5px solid var(--border);
-            border-radius: var(--radius);
-            cursor: pointer;
-            font-size: 13px;
-            margin-bottom: 4px;
-            transition: 0.2s;
-            background: #fff;
-        }
-        .user-check:hover { background: var(--blue-light); border-color: var(--blue); }
-        .user-check.selected { border-color: var(--blue); background: #dbeafe; }
-        .alert-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(15, 23, 42, 0.4);
-            backdrop-filter: blur(4px);
-            z-index: 300;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            visibility: hidden;
-            opacity: 0;
-            transition: 0.25s;
-        }
-        .alert-overlay.show { visibility: visible; opacity: 1; }
-        .alert-box {
-            background: #ffffff;
-            border-radius: 20px;
-            padding: 32px;
-            text-align: center;
-            width: 92%;
-            max-width: 360px;
-            box-shadow: 0 20px 60px rgba(0, 191, 255, 0.15);
-            border: 1px solid rgba(0, 191, 255, 0.1);
-        }
-        .alert-box .icon { font-size: 56px; margin-bottom: 12px; }
-        .alert-box .title { font-weight: 700; font-size: 18px; margin-bottom: 4px; color: var(--text); }
-        .alert-box .msg { font-size: 14px; color: var(--sub); }
-        .confirm-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(15, 23, 42, 0.4);
-            backdrop-filter: blur(4px);
-            z-index: 250;
-            display: none;
-            align-items: center;
-            justify-content: center;
-        }
-        .confirm-box {
-            background: #ffffff;
-            border-radius: 16px;
-            padding: 24px;
-            width: 92%;
-            max-width: 360px;
-            text-align: center;
-            box-shadow: 0 20px 60px rgba(0, 191, 255, 0.15);
-            border: 1px solid rgba(0, 191, 255, 0.1);
-        }
-        .confirm-box .btns { display: flex; gap: 10px; justify-content: center; margin-top: 16px; }
+        .loading-title i { color: #0ea5e9; }
+        .loading-subtitle { color: #64748b; font-size: 14px; margin-bottom: 24px; }
         .spinner {
-            width: 36px;
-            height: 36px;
-            border: 3px solid var(--border);
-            border-top-color: var(--blue);
+            width: 44px;
+            height: 44px;
+            border: 4px solid #e0f2fe;
+            border-top: 4px solid #0ea5e9;
             border-radius: 50%;
-            animation: spin 0.6s linear infinite;
+            animation: spin 0.8s linear infinite;
             margin: 0 auto;
         }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .status-badge {
-            display: inline-block;
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 10px;
-            font-weight: 700;
-            text-transform: uppercase;
-            margin-left: 6px;
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
         }
-        .status-badge.banned { background: #fef2f2; color: #dc2626; border: 1px solid #dc2626; }
-        .status-badge.banakses { background: #fffbeb; color: #d97706; border: 1px solid #d97706; }
-        .status-badge.force { background: #fff7ed; color: #ea580c; border: 1px solid #ea580c; }
-        .key-verified {
-            background: #ecfdf5;
-            border: 1px solid #10b981;
-            border-radius: var(--radius);
-            padding: 12px;
-            margin-top: 12px;
+        .loading-text { color: #64748b; font-size: 13px; margin-top: 16px; }
+        .blocked-container {
+            background: #fff;
+            border-radius: 24px;
+            padding: 48px 36px;
+            width: 100%;
+            max-width: 440px;
+            text-align: center;
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.1);
+            animation: fadeIn 0.4s ease;
             display: none;
         }
-        .key-verified .label {
-            font-size: 11px;
+        .blocked-icon { font-size: 72px; margin-bottom: 16px; }
+        .blocked-title { color: #dc2626; font-size: 22px; font-weight: 700; margin-bottom: 8px; }
+        .blocked-message { color: #64748b; font-size: 14px; margin-bottom: 24px; line-height: 1.6; }
+        .blocked-box {
+            background: #fef3c7;
+            color: #92400e;
+            padding: 12px 16px;
+            border-radius: 12px;
             font-weight: 600;
-            color: #059669;
-            text-transform: uppercase;
-            letter-spacing: 0.04em;
+            font-size: 14px;
+            margin-bottom: 24px;
         }
-        .sensor-text {
-            font-family: 'Inter', monospace;
-            letter-spacing: 2px;
-            color: #94a3b8;
+        .btn {
+            padding: 14px 28px;
+            border: none;
+            border-radius: 30px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            color: #fff;
+            letter-spacing: 0.3px;
+            text-decoration: none;
         }
-        @media (max-width: 1024px) {
-            .stats { grid-template-columns: repeat(2, 1fr); }
-            .web-stats { grid-template-columns: repeat(2, 1fr); }
-        }
-        @media (max-width: 768px) {
-            .navbar-toggle { display: block; }
-            .navbar-clock { display: none; }
-            .sidebar {
-                transform: translateX(-100%);
-                width: 280px;
-            }
-            .sidebar.open { transform: translateX(0); }
-            .main-content {
-                margin-left: 0;
-                padding: calc(var(--nav-height) + 16px) 14px 16px;
-            }
-            .stats { grid-template-columns: 1fr 1fr; gap: 10px; }
-            .stat .num { font-size: 20px; }
-            .web-stats { grid-template-columns: 1fr 1fr; }
-        }
-        @media (max-width: 480px) {
-            .navbar { padding: 0 12px; }
-            .navbar-brand { font-size: 15px; }
-            .navbar-user .name { display: none; }
-            .stats { grid-template-columns: 1fr 1fr; gap: 8px; }
-            .stat { padding: 12px; }
-            .stat .num { font-size: 17px; }
-            .page-header h1 { font-size: 18px; }
-            .card { padding: 14px; }
-            .modal-box { padding: 18px; }
-            #keyScreen, #loginScreen { padding: 28px 20px; }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15); }
+        .btn-whatsapp { background: #25D366; }
+        .btn-whatsapp:hover { background: #128C7E; }
+        @media(max-width:480px) {
+            .loading-title { font-size: 22px; }
+            .loading-icon { font-size: 60px; }
+            .blocked-container { padding: 36px 24px; }
+            .blocked-icon { font-size: 56px; }
+            .blocked-title { font-size: 18px; }
         }
     </style>
+    <script src="https://www.google.com/recaptcha/api.js?render=6LcVBn4tAAAAAINTTIleUbUZr1ZykvyB6WA-oOfT"></script>
 </head>
 <body>
 
-    <div id="loginWrapper">
-        <div id="keyScreen">
-            <div class="logo"><i class="fas fa-shield-alt"></i></div>
-            <h2>Admin Access</h2>
-            <p>Masukkan key untuk melanjutkan</p>
-            <div class="input-group">
-                <label><i class="fas fa-key"></i> Access Key</label>
-                <input type="password" id="accessKey" placeholder="Masukkan access key">
-            </div>
-            <button class="btn btn-primary" onclick="verifyKey()"><i class="fas fa-arrow-right"></i> Verifikasi</button>
-        </div>
-        <div id="loginScreen" style="display:none;">
-            <div class="logo"><i class="fas fa-user-shield"></i></div>
-            <h2>Admin Login</h2>
-            <p>Masukkan email & password</p>
-            <div class="input-group">
-                <label><i class="fas fa-envelope"></i> Email</label>
-                <input type="email" id="loginEmail" placeholder="admin@email.com">
-            </div>
-            <div class="input-group">
-                <label><i class="fas fa-lock"></i> Password</label>
-                <input type="password" id="loginPassword" placeholder="Password">
-            </div>
-            <button class="btn btn-primary" onclick="login()"><i class="fas fa-sign-in-alt"></i> Login</button>
-        </div>
+    <div id="loadingScreen" class="loading-container">
+        <div class="loading-icon"><i class="fas fa-bus"></i></div>
+        <div class="loading-title"><i class="fas fa-shield-alt"></i> TOP UP BUSSID</div>
+        <p class="loading-subtitle">Memeriksa keamanan...</p>
+        <div class="spinner"></div>
+        <p class="loading-text" id="loadingText">Menghubungkan ke server...</p>
     </div>
 
-    <div id="appContainer">
-
-        <nav class="navbar">
-            <button class="navbar-toggle" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
-            <a href="#" class="navbar-brand" onclick="switchPage('dashboard')"><i class="fas fa-shield-alt"></i> Revan<span>Store</span></a>
-            <div class="navbar-right">
-                <span class="navbar-clock" id="clockDisplay"><i class="far fa-clock"></i> --:--</span>
-                <div class="navbar-user">
-                    <span class="name" id="navbarUserName">Admin</span>
-                    <div class="avatar"><i class="fas fa-user"></i></div>
-                </div>
-            </div>
-        </nav>
-
-        <aside class="sidebar" id="sidebar">
-            <nav class="sidebar-nav">
-                <div class="label"><i class="fas fa-th-large"></i> Utama</div>
-                <a class="active" data-page="dashboard" onclick="switchPage('dashboard')"><i class="fas fa-home"></i> Dashboard</a>
-                <a data-page="all-users" onclick="switchPage('all-users')"><i class="fas fa-users"></i> Semua User</a>
-                <div class="sidebar-divider"></div>
-                <div class="label"><i class="fas fa-user-cog"></i> Manajemen</div>
-                <a data-page="ban-user" onclick="switchPage('ban-user')"><i class="fas fa-ban"></i> Banned User</a>
-                <a data-page="unbanned-users" onclick="switchPage('unbanned-users')"><i class="fas fa-check-circle"></i> Unban User</a>
-                <a data-page="banakses-users" onclick="switchPage('banakses-users')"><i class="fas fa-shield-alt"></i> Ban Akses</a>
-                <a data-page="unbanakses-users" onclick="switchPage('unbanakses-users')"><i class="fas fa-check-circle"></i> Unban Akses</a>
-                <a data-page="force-users" onclick="switchPage('force-users')"><i class="fas fa-eject"></i> Tangguhkan</a>
-                <a data-page="unforce-users" onclick="switchPage('unforce-users')"><i class="fas fa-check-circle"></i> Lepas Tangguh</a>
-                <a data-page="problem-users" onclick="switchPage('problem-users')"><i class="fas fa-exclamation-triangle"></i> User Bermasalah</a>
-                <div class="sidebar-divider"></div>
-                <div class="label"><i class="fas fa-chart-line"></i> Log & Statistik</div>
-                <a data-page="activity-log" onclick="switchPage('activity-log')"><i class="fas fa-history"></i> Log Aktivitas</a>
-                <a data-page="suspicious-log" onclick="switchPage('suspicious-log')"><i class="fas fa-exclamation-triangle"></i> Log Mencurigakan</a>
-                <a data-page="web-stats" onclick="switchPage('web-stats')"><i class="fas fa-chart-bar"></i> Statistik Web</a>
-                <div class="sidebar-divider"></div>
-                <div class="label"><i class="fas fa-cog"></i> Pengaturan</div>
-                <a data-page="settings" onclick="switchPage('settings')"><i class="fas fa-cog"></i> Settings</a>
-            </nav>
-            <div class="sidebar-footer">
-                <button class="logout-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
-            </div>
-        </aside>
-
-        <main class="main-content" id="mainContent">
-
-            <div class="page active" id="page-dashboard">
-                <div class="page-header">
-                    <div>
-                        <h1><i class="fas fa-home"></i>Dashboard</h1>
-                        <p>Selamat datang, <b id="loggedUser">Admin</b></p>
-                    </div>
-                    <button class="btn btn-primary" onclick="openAddUserModal()" style="width:auto;"><i class="fas fa-user-plus"></i> Tambah User</button>
-                </div>
-                <div class="stats">
-                    <div class="stat"><div class="num" id="statTotal">0</div><div class="label"><i class="fas fa-users"></i> Total User</div></div>
-                    <div class="stat"><div class="num" style="color:#10b981;" id="statActive">0</div><div class="label"><i class="fas fa-user-check"></i> User Aktif</div></div>
-                    <div class="stat"><div class="num" style="color:#dc2626;" id="statBanned">0</div><div class="label"><i class="fas fa-user-slash"></i> Banned</div></div>
-                    <div class="stat"><div class="num" style="color:#f59e0b;" id="statForce">0</div><div class="label"><i class="fas fa-pause-circle"></i> Tangguhkan</div></div>
-                </div>
-
-                <div class="card">
-                    <div class="card-header"><i class="fas fa-chart-pie"></i> Ringkasan</div>
-                    <div style="display:flex;flex-direction:column;gap:6px;">
-                        <div style="display:flex;justify-content:space-between;font-size:14px;"><span style="color:var(--sub);"><i class="fas fa-user-check" style="color:#10b981;"></i> User Aktif</span><span style="font-weight:700;color:#10b981;" id="ringkasanAktif">0</span></div>
-                        <div style="display:flex;justify-content:space-between;font-size:14px;"><span style="color:var(--sub);"><i class="fas fa-user-slash" style="color:#dc2626;"></i> User Banned</span><span style="font-weight:700;color:#dc2626;" id="ringkasanBanned">0</span></div>
-                        <div style="display:flex;justify-content:space-between;font-size:14px;"><span style="color:var(--sub);"><i class="fas fa-shield-alt" style="color:#d97706;"></i> Ban Akses</span><span style="font-weight:700;color:#d97706;" id="ringkasanBanAkses">0</span></div>
-                        <div style="display:flex;justify-content:space-between;font-size:14px;"><span style="color:var(--sub);"><i class="fas fa-pause-circle" style="color:#f59e0b;"></i> Tangguhkan</span><span style="font-weight:700;color:#f59e0b;" id="ringkasanForce">0</span></div>
-                    </div>
-                </div>
-
-                <div class="card">
-                    <div class="card-header">
-                        <span><i class="fas fa-history"></i> Aktivitas Terbaru</span>
-                        <button class="btn btn-danger btn-sm" onclick="clearAllLogs()"><i class="fas fa-trash"></i> Hapus Semua</button>
-                    </div>
-                    <div class="activity-list" id="activityListContainer">
-                        <div class="empty-state"><i class="fas fa-spinner fa-spin"></i> Memuat...</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="page" id="page-all-users">
-                <div class="page-header">
-                    <div><h1><i class="fas fa-users"></i>Semua User</h1><p>Total: <b id="allUsersCount">0</b> user</p></div>
-                    <button class="btn btn-primary" onclick="openAddUserModal()"><i class="fas fa-user-plus"></i> Tambah User</button>
-                </div>
-                <div class="card">
-                    <div class="table-wrap">
-                        <table>
-                            <thead><tr><th>Username</th><th>Role</th><th>Status</th><th>IP</th><th>FP</th><th>Expiry</th><th>Aksi</th></tr></thead>
-                            <tbody id="allUsersTable"></tbody>
-                        </table>
-                    </div>
-                    <div class="empty-state" id="allUsersEmpty" style="display:none;"><i class="fas fa-users"></i> Tidak ada user</div>
-                </div>
-            </div>
-
-            <div class="page" id="page-ban-user">
-                <div class="page-header"><h1><i class="fas fa-ban"></i>Banned User</h1><p>Ban user yang bermasalah</p></div>
-                <div class="card">
-                    <div class="card-header"><span><i class="fas fa-search"></i> Cari User</span></div>
-                    <div class="input-group">
-                        <label><i class="fas fa-user"></i> Username</label>
-                        <input type="text" id="banUserSearch" placeholder="Ketik username..." oninput="searchBanUser()">
-                    </div>
-                    <div id="banUserList" style="max-height:300px;overflow-y:auto;margin-top:12px;"></div>
-                    <div style="margin-top:12px;">
-                        <label><i class="fas fa-clock"></i> Durasi</label>
-                        <select id="banDuration" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:var(--radius);">
-                            <option value="3600000">1 Jam</option>
-                            <option value="10800000">3 Jam</option>
-                            <option value="86400000">24 Jam</option>
-                            <option value="604800000">1 Minggu</option>
-                            <option value="0">Permanen</option>
-                        </select>
-                    </div>
-                    <div id="banSelectedUser" style="margin:12px 0;font-size:13px;"></div>
-                    <button class="btn btn-danger" onclick="executeBanUser()" style="width:100%;"><i class="fas fa-ban"></i> Ban User</button>
-                </div>
-            </div>
-
-            <div class="page" id="page-unbanned-users">
-                <div class="page-header"><h1><i class="fas fa-check-circle"></i>Unban User</h1><p>User yang sedang di-ban</p></div>
-                <div class="card">
-                    <div class="table-wrap">
-                        <table>
-                            <thead><tr><th>Username</th><th>Role</th><th>Durasi</th><th>Aksi</th></tr></thead>
-                            <tbody id="unbannedUsersTable"></tbody>
-                        </table>
-                    </div>
-                    <div class="empty-state" id="unbannedUsersEmpty" style="display:none;"><i class="fas fa-check-circle"></i> Tidak ada user yang di-ban</div>
-                </div>
-            </div>
-
-            <div class="page" id="page-banakses-users">
-                <div class="page-header"><h1><i class="fas fa-shield-alt"></i>Ban Akses</h1><p>User yang belum di-ban akses</p></div>
-                <div class="card">
-                    <div class="table-wrap">
-                        <table>
-                            <thead><tr><th>Username</th><th>Role</th><th>Status</th><th>Aksi</th></tr></thead>
-                            <tbody id="banaksesUsersTable"></tbody>
-                        </table>
-                    </div>
-                    <div class="empty-state" id="banaksesUsersEmpty" style="display:none;"><i class="fas fa-shield-alt"></i> Semua user sudah di-ban akses</div>
-                </div>
-            </div>
-
-            <div class="page" id="page-unbanakses-users">
-                <div class="page-header"><h1><i class="fas fa-check-circle"></i>Unban Akses</h1><p>User yang sedang di-ban akses</p></div>
-                <div class="card">
-                    <div class="table-wrap">
-                        <table>
-                            <thead><tr><th>Username</th><th>Role</th><th>Aksi</th></tr></thead>
-                            <tbody id="unbanaksesUsersTable"></tbody>
-                        </table>
-                    </div>
-                    <div class="empty-state" id="unbanaksesUsersEmpty" style="display:none;"><i class="fas fa-check-circle"></i> Tidak ada user yang di-ban akses</div>
-                </div>
-            </div>
-
-            <div class="page" id="page-force-users">
-                <div class="page-header"><h1><i class="fas fa-eject"></i>Tangguhkan User</h1><p>User yang belum ditangguhkan</p></div>
-                <div class="card">
-                    <div class="table-wrap">
-                        <table>
-                            <thead><tr><th>Username</th><th>Role</th><th>Status</th><th>Aksi</th></tr></thead>
-                            <tbody id="forceUsersTable"></tbody>
-                        </table>
-                    </div>
-                    <div class="empty-state" id="forceUsersEmpty" style="display:none;"><i class="fas fa-eject"></i> Semua user sudah ditangguhkan</div>
-                </div>
-            </div>
-
-            <div class="page" id="page-unforce-users">
-                <div class="page-header"><h1><i class="fas fa-check-circle"></i>Lepas Tangguh</h1><p>User yang sedang ditangguhkan</p></div>
-                <div class="card">
-                    <div class="table-wrap">
-                        <table>
-                            <thead><tr><th>Username</th><th>Role</th><th>Aksi</th></tr></thead>
-                            <tbody id="unforceUsersTable"></tbody>
-                        </table>
-                    </div>
-                    <div class="empty-state" id="unforceUsersEmpty" style="display:none;"><i class="fas fa-check-circle"></i> Tidak ada user yang ditangguhkan</div>
-                </div>
-            </div>
-
-            <div class="page" id="page-problem-users">
-                <div class="page-header"><h1><i class="fas fa-exclamation-triangle"></i>User Bermasalah</h1><p>User yang memiliki masalah (Banned / Ban Akses / Tangguhkan)</p></div>
-                <div class="card">
-                    <div class="table-wrap">
-                        <table>
-                            <thead><tr><th>Username</th><th>Role</th><th>Status</th><th>Aksi</th></tr></thead>
-                            <tbody id="problemUsersTable"></tbody>
-                        </table>
-                    </div>
-                    <div class="empty-state" id="problemUsersEmpty" style="display:none;"><i class="fas fa-check-circle"></i> Tidak ada user bermasalah</div>
-                </div>
-            </div>
-
-            <div class="page" id="page-activity-log">
-                <div class="page-header">
-                    <div><h1><i class="fas fa-history"></i>Log Aktivitas</h1></div>
-                    <button class="btn btn-danger btn-sm" onclick="clearAllLogs()"><i class="fas fa-trash"></i> Hapus Semua</button>
-                </div>
-                <div class="card">
-                    <div class="activity-list" id="allActivityLog" style="max-height:600px;">
-                        <div class="empty-state"><i class="fas fa-spinner fa-spin"></i> Memuat...</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="page" id="page-suspicious-log">
-                <div class="page-header"><h1><i class="fas fa-exclamation-triangle"></i>Log Mencurigakan</h1></div>
-                <div class="card">
-                    <div class="activity-list" id="suspiciousActivityLog" style="max-height:600px;">
-                        <div class="empty-state"><i class="fas fa-spinner fa-spin"></i> Memuat...</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="page" id="page-web-stats">
-                <div class="page-header"><h1><i class="fas fa-chart-bar"></i>Statistik Web</h1></div>
-                <div class="web-stats">
-                    <div class="web-stat"><div class="num" id="webStatTotalUsers">0</div><div class="label"><i class="fas fa-users"></i> Total User</div></div>
-                    <div class="web-stat"><div class="num" style="color:#10b981;" id="webStatActiveUsers">0</div><div class="label"><i class="fas fa-user-check"></i> User Aktif</div></div>
-                    <div class="web-stat"><div class="num" style="color:#dc2626;" id="webStatBannedUsers">0</div><div class="label"><i class="fas fa-user-slash"></i> User Diblokir</div></div>
-                    <div class="web-stat"><div class="num" id="webStatTotalLogins">0</div><div class="label"><i class="fas fa-sign-in-alt"></i> Total Login</div></div>
-                    <div class="web-stat"><div class="num" style="color:#d97706;" id="webStatBanAkses">0</div><div class="label"><i class="fas fa-shield-alt"></i> Ban Akses</div></div>
-                    <div class="web-stat"><div class="num" style="color:#f59e0b;" id="webStatForce">0</div><div class="label"><i class="fas fa-pause-circle"></i> Tangguhkan</div></div>
-                </div>
-                <div class="card" style="margin-top:16px;">
-                    <div class="card-header"><i class="fas fa-chart-line"></i> Distribusi User</div>
-                    <div class="dist-grid">
-                        <div class="dist-item" style="background:#ecfdf5;"><div class="num" style="color:#10b981;" id="distAktif">0</div><div class="label"><i class="fas fa-user-check"></i> Aktif</div></div>
-                        <div class="dist-item" style="background:#fef2f2;"><div class="num" style="color:#dc2626;" id="distBanned">0</div><div class="label"><i class="fas fa-user-slash"></i> Banned</div></div>
-                        <div class="dist-item" style="background:#fffbeb;"><div class="num" style="color:#d97706;" id="distBanAkses">0</div><div class="label"><i class="fas fa-shield-alt"></i> Ban Akses</div></div>
-                        <div class="dist-item" style="background:#fff7ed;"><div class="num" style="color:#f59e0b;" id="distForce">0</div><div class="label"><i class="fas fa-pause-circle"></i> Tangguhkan</div></div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="page" id="page-settings">
-                <div class="page-header"><h1><i class="fas fa-cog"></i>Settings</h1></div>
-
-                <div class="card">
-                    <div class="card-header"><i class="fas fa-user-shield"></i> Admin Info</div>
-                    <div class="input-group">
-                        <label><i class="fas fa-envelope"></i> Email</label>
-                        <div class="input-with-btn">
-                            <input type="text" id="settingsEmail" readonly value="••••••••@••••••••">
-                            <button class="btn btn-outline btn-sm" onclick="openChangeEmailModal()"><i class="fas fa-edit"></i></button>
-                        </div>
-                    </div>
-                    <div class="input-group">
-                        <label><i class="fas fa-lock"></i> Password</label>
-                        <div class="input-with-btn">
-                            <input type="password" id="settingsPassword" readonly value="••••••••">
-                            <button class="btn btn-outline btn-sm" onclick="togglePassword()"><i class="fas fa-eye" id="togglePassIcon"></i></button>
-                            <button class="btn btn-outline btn-sm" onclick="openChangePasswordModal()"><i class="fas fa-edit"></i></button>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="card">
-                    <div class="card-header"><i class="fas fa-key"></i> Key Aksi</div>
-                    <div class="input-group">
-                        <label>Verifikasi Key Aksi</label>
-                        <div class="input-with-btn">
-                            <input type="password" id="actionKeyInput" placeholder="Masukkan key aksi...">
-                            <button class="btn btn-primary btn-sm" onclick="verifyActionKey()"><i class="fas fa-check"></i> Verifikasi</button>
-                        </div>
-                    </div>
-                    <div id="actionKeyVerified" class="key-verified">
-                        <div class="label"><i class="fas fa-check-circle" style="color:#10b981;"></i> Key Aksi Terverifikasi</div>
-                        <div style="margin-top:8px;">
-                            <div class="input-group"><label>Admin Key</label><input type="text" id="displayAdminKey" readonly style="background:#f8fafc;padding:8px;border:1px solid var(--border);border-radius:6px;width:100%;" value="••••••••"></div>
-                            <div class="input-group"><label>API Key</label><input type="text" id="displayApiKey" readonly style="background:#f8fafc;padding:8px;border:1px solid var(--border);border-radius:6px;width:100%;" value="🔑 API Key tersedia di environment variables"></div>
-                        </div>
-                    </div>
-
-                    <hr style="margin:16px 0;border-color:var(--border);">
-
-                    <div class="card-header"><i class="fas fa-list"></i> Daftar Key Aksi</div>
-                    <div class="input-group">
-                        <label>Tambah Key Aksi Baru</label>
-                        <div class="input-with-btn">
-                            <input type="text" id="newActionKey" placeholder="Key aksi baru...">
-                            <button class="btn btn-success btn-sm" onclick="addActionKey()"><i class="fas fa-plus"></i> Tambah</button>
-                        </div>
-                    </div>
-                    <div class="table-wrap"><table><thead><tr><th>Key</th><th>Dibuat</th><th>Aksi</th></tr></thead><tbody id="actionKeysTable"><tr><td colspan="3" style="text-align:center;">🔒 Verifikasi key aksi terlebih dahulu</td></tr></tbody></table></div>
-                </div>
-
-                <div class="card">
-                    <div class="card-header"><i class="fas fa-network-wired"></i> IP Whitelist</div>
-                    <div class="input-group">
-                        <label>Tambah IP</label>
-                        <div class="input-with-btn">
-                            <input type="text" id="newWhitelistIP" placeholder="192.168.1.1">
-                            <button class="btn btn-success btn-sm" onclick="addWhitelistIP()"><i class="fas fa-plus"></i> Tambah</button>
-                        </div>
-                    </div>
-                    <div class="table-wrap"><table><thead><tr><th>IP</th><th>Dibuat</th><th>Aksi</th></tr></thead><tbody id="ipWhitelistTable"><tr><td colspan="3" style="text-align:center;">🔒 Verifikasi key aksi terlebih dahulu</td></tr></tbody></table></div>
-                </div>
-
-                <div class="card">
-                    <div class="card-header"><i class="fas fa-fingerprint"></i> Fingerprint Whitelist</div>
-                    <div class="input-group">
-                        <label>Tambah Fingerprint</label>
-                        <div class="input-with-btn">
-                            <input type="text" id="newWhitelistFP" placeholder="a1b2c3d4...">
-                            <button class="btn btn-success btn-sm" onclick="addWhitelistFP()"><i class="fas fa-plus"></i> Tambah</button>
-                        </div>
-                    </div>
-                    <div class="table-wrap"><table><thead><tr><th>Fingerprint</th><th>Dibuat</th><th>Aksi</th></tr></thead><tbody id="fpWhitelistTable"><tr><td colspan="3" style="text-align:center;">🔒 Verifikasi key aksi terlebih dahulu</td></tr></tbody></table></div>
-                </div>
-
-                <div class="card" style="border: 2px solid var(--blue);">
-                    <div class="card-header"><i class="fas fa-key" style="color:var(--blue);"></i> 🔐 Opsi 2: Admin Key dari Server (Lebih Aman)</div>
-                    <p style="font-size:13px;color:var(--sub);margin-bottom:12px;">Admin Key diambil dari server setelah login, tidak di-hardcode di source code.</p>
-
-                    <div class="input-group">
-                        <label><i class="fas fa-key"></i> Session Key (Dari Server)</label>
-                        <input type="text" id="serverAdminKey" readonly value="Belum login" style="background:#f8fafc;padding:12px;border:1px solid var(--border);border-radius:6px;width:100%;">
-                    </div>
-
-                    <div style="display:flex;gap:8px;">
-                        <button class="btn btn-primary btn-sm" onclick="getAdminKeyFromServer()" style="flex:1;"><i class="fas fa-download"></i> Ambil Key dari Server</button>
-                        <button class="btn btn-danger btn-sm" onclick="clearServerKey()" style="flex:1;"><i class="fas fa-trash"></i> Hapus Key</button>
-                    </div>
-                    <div id="serverKeyStatus" style="margin-top:10px;font-size:12px;color:var(--sub);"></div>
-                </div>
-
-                <!-- Menu Maintenance (Switch On/Off) -->
-                <div class="card" style="border: 2px solid #f59e0b;">
-                    <div class="card-header"><i class="fas fa-tools" style="color:#f59e0b;"></i> Maintenance Mode</div>
-                    <div style="display:flex;align-items:center;gap:16px;">
-                        <label class="switch" style="position:relative;display:inline-block;width:60px;height:34px;">
-                            <input type="checkbox" id="maintenanceSwitch" onchange="toggleMaintenance()" style="opacity:0;width:0;height:0;">
-                            <span class="slider round" style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#ccc;transition:.4s;border-radius:34px;"></span>
-                        </label>
-                        <span id="maintenanceStatus" style="font-weight:600;color:var(--sub);">Mode Normal</span>
-                        <span id="maintenanceMessage" style="font-size:13px;color:var(--sub);">(Situs berjalan normal)</span>
-                    </div>
-                    <div style="margin-top:12px;">
-                        <label style="font-size:13px;font-weight:600;color:var(--sub);">Pesan Khusus Maintenance</label>
-                        <input type="text" id="maintenanceCustomMessage" placeholder="Ketik pesan khusus..." style="width:100%;padding:10px;border:1px solid var(--border);border-radius:var(--radius);margin-top:4px;">
-                        <button class="btn btn-primary btn-sm" onclick="updateMaintenanceMessage()" style="margin-top:8px;"><i class="fas fa-save"></i> Simpan Pesan</button>
-                    </div>
-                </div>
-                <!-- End Maintenance Menu -->
-
-            </div>
-
-        </main>
+    <div id="blockedScreen" class="blocked-container">
+        <div class="blocked-icon">🚫</div>
+        <div class="blocked-title" id="blockedTitle">AKSES DITOLAK</div>
+        <p class="blocked-message" id="blockedMessage">Maaf, akses Anda telah ditolak oleh sistem keamanan.</p>
+        <div class="blocked-box" id="blockedInfo">🔒 IP atau perangkat Anda terdeteksi mencurigakan.</div>
+        <button class="btn btn-whatsapp" onclick="contactAdmin()">
+            <i class="fab fa-whatsapp"></i> Hubungi Admin
+        </button>
     </div>
 
-    <!-- MODALS -->
-    <div class="modal" id="addUserModal">
-        <div class="modal-box">
-            <div class="modal-header">
-                <span><i class="fas fa-user-plus"></i> Tambah User</span>
-                <button class="modal-close" onclick="closeModal('addUserModal')"><i class="fas fa-times"></i></button>
-            </div>
-            <div class="input-group"><label><i class="fas fa-user"></i> Username *</label><input type="text" id="newUsername" placeholder="Username"></div>
-            <div class="input-group"><label><i class="fas fa-lock"></i> Password * (min 6)</label><input type="password" id="newPassword" placeholder="Password"></div>
-            <div class="input-group"><label><i class="fas fa-phone"></i> Nomor</label><input type="text" id="newPhone" placeholder="Nomor HP"></div>
-            <div class="input-group"><label><i class="fas fa-tag"></i> Role</label><select id="newRole"><option>Admin</option><option selected>Operator</option><option>User</option><option>VIP</option><option>Premium</option><option>Trial</option></select></div>
-            <div class="input-group"><label><i class="fas fa-calendar-alt"></i> Masa Aktif (MM/DD/YYYY)</label><input type="text" id="newExpiryDate" placeholder="MM/DD/YYYY"></div>
-            <button class="btn btn-success" style="width:100%;" onclick="addUserNow()"><i class="fas fa-user-plus"></i> Tambah User</button>
-        </div>
-    </div>
-
-    <div class="modal" id="editUserModal">
-        <div class="modal-box">
-            <div class="modal-header">
-                <span><i class="fas fa-edit"></i> Edit User</span>
-                <button class="modal-close" onclick="closeModal('editUserModal')"><i class="fas fa-times"></i></button>
-            </div>
-            <input type="hidden" id="editUserId">
-            <div class="input-group"><label><i class="fas fa-user"></i> Username</label><input type="text" id="editUsername"></div>
-            <div class="input-group"><label><i class="fas fa-lock"></i> Password (kosongkan jika tidak diubah)</label><input type="password" id="editPassword" placeholder="Kosongkan jika tidak diubah"></div>
-            <div class="input-group"><label><i class="fas fa-phone"></i> Nomor</label><input type="text" id="editPhone"></div>
-            <div class="input-group"><label><i class="fas fa-tag"></i> Role</label><select id="editRole"><option>Admin</option><option>Operator</option><option>User</option><option>VIP</option><option>Premium</option><option>Trial</option></select></div>
-            <div class="input-group"><label><i class="fas fa-calendar-alt"></i> Masa Aktif (MM/DD/YYYY)</label><input type="text" id="editExpiryDate"></div>
-            <div class="input-group"><label><i class="fas fa-network-wired"></i> IP</label><input type="text" id="editIP" readonly style="background:#f1f5f9;"></div>
-            <div class="input-group"><label><i class="fas fa-fingerprint"></i> Fingerprint</label><input type="text" id="editFP" readonly style="background:#f1f5f9;"></div>
-            <div style="display:flex;gap:8px;margin-top:12px;">
-                <button class="btn btn-primary" style="flex:1;" onclick="saveUserEdit()"><i class="fas fa-save"></i> Simpan</button>
-                <button class="btn btn-success" style="flex:1;" onclick="updateUserFormat()"><i class="fas fa-sync"></i> Update Format</button>
-            </div>
-        </div>
-    </div>
-
-    <div class="modal" id="changeEmailModal">
-        <div class="modal-box">
-            <div class="modal-header">
-                <span><i class="fas fa-envelope"></i> Ganti Email</span>
-                <button class="modal-close" onclick="closeModal('changeEmailModal')"><i class="fas fa-times"></i></button>
-            </div>
-            <div class="input-group"><label><i class="fas fa-envelope"></i> Email Baru</label><input type="email" id="newEmail" placeholder="admin@email.com"></div>
-            <button class="btn btn-primary" style="width:100%;" onclick="changeEmail()"><i class="fas fa-save"></i> Update Email</button>
-        </div>
-    </div>
-
-    <div class="modal" id="changePasswordModal">
-        <div class="modal-box">
-            <div class="modal-header">
-                <span><i class="fas fa-lock"></i> Ganti Password</span>
-                <button class="modal-close" onclick="closeModal('changePasswordModal')"><i class="fas fa-times"></i></button>
-            </div>
-            <div class="input-group"><label><i class="fas fa-lock"></i> Password Baru</label><input type="password" id="newPasswordSettings" placeholder="Password baru"></div>
-            <div class="input-group"><label><i class="fas fa-lock"></i> Konfirmasi Password</label><input type="password" id="confirmNewPassword" placeholder="Konfirmasi password baru"></div>
-            <button class="btn btn-primary" style="width:100%;" onclick="changePassword()"><i class="fas fa-save"></i> Update Password</button>
-        </div>
-    </div>
-
-    <div class="alert-overlay" id="alertOverlay">
-        <div class="alert-box">
-            <div class="icon" id="alertIcon">✅</div>
-            <div class="title" id="alertTitle">Berhasil</div>
-            <div class="msg" id="alertMessage">Proses berhasil</div>
-        </div>
-    </div>
-
-    <div class="confirm-overlay" id="confirmOverlay">
-        <div class="confirm-box">
-            <div id="confirmMessage">Yakin?</div>
-            <div class="btns">
-                <button class="btn btn-danger" id="confirmYes"><i class="fas fa-check"></i> Ya</button>
-                <button class="btn btn-outline" id="confirmNo"><i class="fas fa-times"></i> Batal</button>
-            </div>
-        </div>
-    </div>
-
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
     <script>
-        // ==================== ANTI DEVTOOLS ====================
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && e.key === 'I') || (e.ctrlKey && e.key === 'U')) {
-                e.preventDefault();
-                return false;
-            }
-        });
-        document.addEventListener('contextmenu', function(e) { e.preventDefault(); return false; });
+        var API_REVANSTORE = '/api/revanstore';
+        var WHATSAPP_NUMBER = '6285199120995';
+        var STORAGE_KEY = 'bussid_session';
+        var STORAGE_SECRET = 'bussid_session_secret_key';
+        var RECAPTCHA_SITE_KEY_V3 = '6LcVBn4tAAAAAINTTIleUbUZr1ZykvyB6WA-oOfT';
 
-        var devtoolsOpen = false;
-        setInterval(function() {
-            if (window.outerWidth - window.innerWidth > 160 || window.outerHeight - window.innerHeight > 160) {
-                if (!devtoolsOpen) {
-                    devtoolsOpen = true;
-                    document.body.innerHTML =
-                        '<div style="display:flex;justify-content:center;align-items:center;height:100vh;background:#1a1a2e;color:#fff;font-size:18px;font-family:sans-serif">DevTools terdeteksi! Tutup untuk melanjutkan.</div>';
-                }
-            } else { devtoolsOpen = false; }
-        }, 1000);
+        function showBlockedScreen(title, message, info) {
+            document.getElementById('loadingScreen').style.display = 'none';
+            document.getElementById('blockedScreen').style.display = 'block';
+            if (title) document.getElementById('blockedTitle').textContent = title;
+            if (message) document.getElementById('blockedMessage').textContent = message;
+            if (info) document.getElementById('blockedInfo').innerHTML = info;
+        }
 
-        // ==================== CONFIG ====================
-        var API_URL = '/api/revanstore';
+        function updateLoadingText(text) {
+            document.getElementById('loadingText').textContent = text;
+        }
 
-        var sessionId = null;
-        var currentAdmin = null;
-        var allUsers = [];
-        var allActivities = [];
-        var fingerprint = '';
-        var keyAttempts = 0;
-        var sessionTimer = null;
-        var pendingRequests = {};
-        var selectedBanUser = null;
-        var clockInterval = null;
-        var statsInterval = null;
-        var activityLoaded = false;
-        var actionKeyVerified = false;
-        var actionKeyChecked = false;
-        var serverAdminKey = null;
+        function contactAdmin() {
+            window.open('https://wa.me/' + WHATSAPP_NUMBER + '?text=Assalamualaikum%20admin%2C%20akses%20saya%20ditolak', '_blank');
+        }
 
-        // ==================== FINGERPRINT ====================
         async function getFingerprint() {
             var fp = '';
             fp += navigator.userAgent || '';
@@ -1172,1324 +177,157 @@
             return CryptoJS.MD5(fp).toString();
         }
 
-        // ==================== CRYPTO FUNCTIONS (LANGSUNG PAKE CryptoJS) ====================
-        function encryptData(payload) {
-            return CryptoJS.AES.encrypt(JSON.stringify(payload), 'dhagwxwhu:f4afc5aa03e73130f5e055dfe6a708c4dc40759b').toString();
-        }
-
-        function decryptData(encryptedData) {
-            var dec = CryptoJS.AES.decrypt(encryptedData, 'dhagwxwhu:f4afc5aa03e73130f5e055dfe6a708c4dc40759b').toString(CryptoJS.enc.Utf8);
-            return JSON.parse(dec);
-        }
-
-        // ==================== OPSI 2: AMBIL KEY DARI SERVER ====================
-        async function getAdminKeyFromServer() {
-            if (!currentAdmin) {
-                document.getElementById('serverKeyStatus').innerHTML = '⚠️ Login dulu!';
-                showAlert('Error', 'Login terlebih dahulu!', 'error');
-                return;
-            }
-
+        async function getRecaptchaToken(action) {
             try {
-                document.getElementById('serverKeyStatus').innerHTML = '⏳ Mengambil key dari server...';
-
-                var result = await apiCall('admin/get_key', 'GET', {});
-                if (result && result.adminKey) {
-                    serverAdminKey = result.adminKey;
-                    document.getElementById('serverAdminKey').value = '✅ Key didapat dari server!';
-                    document.getElementById('serverKeyStatus').innerHTML = '✅ Key berhasil diambil dari server!';
-                    showAlert('Berhasil', 'Admin Key berhasil diambil dari server!', 'success');
-                    localStorage.setItem('server_admin_key', result.adminKey);
-                } else {
-                    document.getElementById('serverKeyStatus').innerHTML = '❌ Gagal mengambil key!';
-                    showAlert('Error', 'Gagal mengambil key dari server!', 'error');
-                }
-            } catch(e) {
-                document.getElementById('serverKeyStatus').innerHTML = '❌ Error: ' + e.message;
-                showAlert('Error', e.message, 'error');
-            }
-        }
-
-        function clearServerKey() {
-            serverAdminKey = null;
-            localStorage.removeItem('server_admin_key');
-            document.getElementById('serverAdminKey').value = 'Belum login';
-            document.getElementById('serverKeyStatus').innerHTML = '🗑️ Key dihapus dari memori.';
-            showAlert('Info', 'Key berhasil dihapus.', 'info');
-        }
-
-        function loadServerKeyFromStorage() {
-            var saved = localStorage.getItem('server_admin_key');
-            if (saved) {
-                document.getElementById('serverAdminKey').value = '✅ Key tersedia (dari penyimpanan)';
-                document.getElementById('serverKeyStatus').innerHTML = '💾 Key tersedia di localStorage (terenkripsi)';
-            }
-        }
-
-        // ==================== MAINTENANCE FUNCTIONS ====================
-        function toggleMaintenance() {
-            const switchEl = document.getElementById('maintenanceSwitch');
-            const statusEl = document.getElementById('maintenanceStatus');
-            const msgEl = document.getElementById('maintenanceMessage');
-            const isChecked = switchEl.checked;
-
-            if (isChecked) {
-                statusEl.textContent = 'Mode Maintenance Aktif';
-                statusEl.style.color = '#f59e0b';
-                msgEl.textContent = '⚠️ Situs dalam perbaikan!';
-                showAlert('Maintenance', 'Mode Maintenance diaktifkan!', 'info');
-            } else {
-                statusEl.textContent = 'Mode Normal';
-                statusEl.style.color = 'var(--sub)';
-                msgEl.textContent = '(Situs berjalan normal)';
-                showAlert('Maintenance', 'Mode Maintenance dinonaktifkan.', 'info');
-            }
-        }
-
-        function updateMaintenanceMessage() {
-            const customMsg = document.getElementById('maintenanceCustomMessage').value.trim();
-            const msgEl = document.getElementById('maintenanceMessage');
-            if (customMsg) {
-                msgEl.textContent = '📌 ' + customMsg;
-                showAlert('Pesan Maintenance', 'Pesan berhasil diperbarui!', 'success');
-            } else {
-                showAlert('Error', 'Pesan tidak boleh kosong!', 'error');
-            }
-        }
-
-        // ==================== ALERT ====================
-        function showAlert(title, msg, type) {
-            var overlay = document.getElementById('alertOverlay');
-            var icon = document.getElementById('alertIcon');
-            var titleEl = document.getElementById('alertTitle');
-            var msgEl = document.getElementById('alertMessage');
-            if (!overlay) {
-                Swal.fire({
-                    icon: type === 'success' ? 'success' : type === 'error' ? 'error' : 'info',
-                    title: title,
-                    text: msg,
-                    confirmButtonColor: '#00BFFF'
-                });
-                return;
-            }
-            titleEl.textContent = title;
-            msgEl.textContent = msg;
-            if (type === 'loading') icon.innerHTML = '<div class="spinner"></div>';
-            else if (type === 'success') icon.innerHTML = '<i class="fas fa-check-circle" style="color:#10b981;"></i>';
-            else if (type === 'error') icon.innerHTML = '<i class="fas fa-times-circle" style="color:#ef4444;"></i>';
-            else icon.innerHTML = '<i class="fas fa-info-circle" style="color:#00BFFF;"></i>';
-            overlay.classList.add('show');
-            if (type !== 'loading') setTimeout(function() { overlay.classList.remove('show'); }, 2000);
-        }
-
-        function hideAlert() {
-            var o = document.getElementById('alertOverlay');
-            if (o) o.classList.remove('show');
-        }
-
-        // ==================== HELPERS ====================
-        function formatDate(d) {
-            return String(d.getMonth() + 1).padStart(2, '0') + '/' + String(d.getDate()).padStart(2, '0') + '/' + d.getFullYear();
-        }
-
-        function calculateDaysLeft(e) {
-            if (!e) return -9999;
-            var p = e.split('/');
-            if (p.length !== 3) return -9999;
-            var ex = new Date(parseInt(p[2]), parseInt(p[0]) - 1, parseInt(p[1]));
-            if (ex.getFullYear() === 9999) return 999999;
-            var n = new Date();
-            n.setHours(0, 0, 0, 0);
-            return Math.floor((ex - n) / (1000 * 60 * 60 * 24));
-        }
-
-        function esc(s) {
-            if (!s) return '';
-            return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        }
-
-        function debounce(key, fn, delay) {
-            if (pendingRequests[key]) return;
-            pendingRequests[key] = true;
-            fn().finally(function() { setTimeout(function() { pendingRequests[key] = false; }, delay || 1500); });
-        }
-
-        function closeModal(id) {
-            var m = document.getElementById(id);
-            if (m) m.classList.remove('show');
-        }
-
-        // ==================== API CALL (PAKE SESSION) ====================
-        async function apiCall(path, method, data) {
-            if (!fingerprint) fingerprint = await getFingerprint();
-
-            var payload = {
-                path: path,
-                method: method || 'GET',
-                data: data || {},
-                timestamp: Date.now()
-            };
-
-            var encryptedPayload = encryptData(payload);
-
-            var headers = {
-                'Content-Type': 'application/json',
-                'X-Fingerprint': fingerprint
-            };
-
-            if (sessionId) {
-                headers['X-Session'] = sessionId;
-            }
-
-            if (currentAdmin) {
-                headers['X-Operator'] = encryptData({ value: currentAdmin });
-            }
-
-            var res = await fetch(API_URL, {
-                method: 'POST',
-                headers: headers,
-                body: JSON.stringify({ data: encryptedPayload })
-            });
-
-            if (res.status === 401) {
-                // SESSION EXPIRED
-                localStorage.removeItem('sessionId');
-                sessionId = null;
-                showAlert('Sesi Berakhir', 'Silakan login ulang.', 'error');
-                logout();
+                return await grecaptcha.execute(RECAPTCHA_SITE_KEY_V3, { action: action });
+            } catch (e) {
                 return null;
             }
-
-            if (res.status === 429) throw new Error('Terlalu banyak request');
-            var text = await res.text();
-            if (!text || text === 'null') return null;
-
-            var result = JSON.parse(text);
-
-            if (result.data) {
-                var decrypted = decryptData(result.data);
-                return decrypted;
-            }
-
-            return result;
         }
 
-        // ==================== NAVIGATION ====================
-        function switchPage(pageName) {
-            document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
-            document.querySelectorAll('.sidebar-nav a').forEach(function(a) { a.classList.remove('active'); });
-
-            var page = document.getElementById('page-' + pageName);
-            if (page) page.classList.add('active');
-
-            document.querySelectorAll('.sidebar-nav a').forEach(function(link) {
-                if (link.getAttribute('data-page') === pageName) {
-                    link.classList.add('active');
-                }
-            });
-
-            var sidebar = document.getElementById('sidebar');
-            if (sidebar && window.innerWidth <= 768) sidebar.classList.remove('open');
-
-            if (pageName === 'all-users') renderAllUsersTable();
-            if (pageName === 'ban-user') searchBanUser();
-            if (pageName === 'unbanned-users') renderUnbannedTable();
-            if (pageName === 'banakses-users') renderBanAksesTable();
-            if (pageName === 'unbanakses-users') renderUnbanAksesTable();
-            if (pageName === 'force-users') renderForceTable();
-            if (pageName === 'unforce-users') renderUnforceTable();
-            if (pageName === 'problem-users') renderProblemTable();
-            if (pageName === 'activity-log') renderActivityLogPage();
-            if (pageName === 'suspicious-log') renderSuspiciousLogPage();
-            if (pageName === 'web-stats') renderWebStats();
-            if (pageName === 'settings') loadSettings();
-            if (pageName === 'dashboard') { updateRingkasan(); loadUsers(); loadActivity(); }
+        function storageGet() {
+            try {
+                var encrypted = localStorage.getItem(STORAGE_KEY);
+                if (!encrypted) return null;
+                var decrypted = CryptoJS.AES.decrypt(encrypted, STORAGE_SECRET).toString(CryptoJS.enc.Utf8);
+                return JSON.parse(decrypted) || null;
+            } catch (e) { return null; }
         }
 
-        function toggleSidebar() {
-            document.getElementById('sidebar').classList.toggle('open');
-        }
+        async function checkBlocked() {
+            updateLoadingText('Memeriksa fingerprint...');
+            var fingerprint = await getFingerprint();
+            var captchaToken = await getRecaptchaToken('check_blocked');
 
-        // ==================== VERIFY KEY ====================
-        function verifyKey() {
-            var key = document.getElementById('accessKey').value.trim();
-            if (!key) { showAlert('Error', 'Key wajib diisi!', 'error'); return; }
-            showAlert('Verifikasi', 'Memeriksa key...', 'loading');
-            apiCall('access_key', 'GET').then(function(r) {
-                if (r && r.key === key) {
-                    keyAttempts = 0;
-                    document.getElementById('keyScreen').style.display = 'none';
-                    document.getElementById('loginScreen').style.display = 'block';
-                    document.getElementById('accessKey').value = '';
-                    hideAlert();
-                    showAlert('Berhasil', 'Key valid!', 'success');
-                } else {
-                    keyAttempts++;
-                    document.getElementById('accessKey').value = '';
-                    hideAlert();
-                    if (keyAttempts >= 3) {
-                        showAlert('Error', 'Key salah 3x! Diblokir.', 'error');
-                        setTimeout(function() { showBlockedScreen(); }, 1500);
-                        return;
-                    }
-                    showAlert('Error', 'Key salah! Sisa ' + (3 - keyAttempts), 'error');
-                }
-            }).catch(function(e) { hideAlert(); showAlert('Error', e.message, 'error'); });
-        }
-
-        function showBlockedScreen() {
-            document.body.innerHTML =
-                '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0f172a;padding:20px;font-family:\'Inter\',sans-serif;"><div style="background:rgba(30,41,59,0.9);border-radius:20px;padding:40px;max-width:440px;width:100%;text-align:center;border:1px solid rgba(239,68,68,0.3);"><div style="font-size:70px;margin-bottom:20px;">🔒</div><h1 style="color:#ef4444;font-size:24px;">AKSES DITOLAK</h1><p style="color:#94a3b8;">Akses Anda telah diblokir permanen.</p></div></div>';
-        }
-
-        // ==================== LOGIN (PAKE SESSION) ====================
-        function login() {
-            var email = document.getElementById('loginEmail').value.trim();
-            var pass = document.getElementById('loginPassword').value.trim();
-            if (!email || !pass) { showAlert('Error', 'Email & password wajib!', 'error'); return; }
-            showAlert('Verifikasi', 'Mohon tunggu...', 'loading');
-            apiCall('admin/auth', 'GET').then(function(r) {
-                if (r && r.blocked) { hideAlert(); showBlockedScreen(); return; }
-                if (r && r.email === email && r.password === pass) {
-                    apiCall('admin/login_success', 'POST', { email: email }).then(function(loginResult) {
-                        if (loginResult && loginResult.success && loginResult.sessionId) {
-                            sessionId = loginResult.sessionId;
-                            localStorage.setItem('sessionId', sessionId);
-
-                            currentAdmin = email;
-                            document.getElementById('loggedUser').textContent = email;
-                            document.getElementById('navbarUserName').textContent = email;
-                            document.getElementById('loginScreen').style.display = 'none';
-                            document.getElementById('loginWrapper').style.display = 'none';
-                            document.getElementById('appContainer').style.display = 'block';
-                            hideAlert();
-                            showAlert('Berhasil', 'Login berhasil!', 'success');
-                            startBg();
-                            loadUsers();
-                            loadActivity();
-                            switchPage('dashboard');
-                            if (sessionTimer) clearTimeout(sessionTimer);
-                            sessionTimer = setTimeout(function() {
-                                if (currentAdmin) { logout(); showAlert('Sesi Berakhir', '30 menit idle.', 'info'); }
-                            }, 1800000);
-                        } else {
-                            hideAlert();
-                            showAlert('Gagal', 'Login gagal!', 'error');
+            updateLoadingText('Memeriksa keamanan IP & perangkat...');
+            try {
+                var res = await fetch(API_REVANSTORE, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Fingerprint': fingerprint
+                    },
+                    body: JSON.stringify({
+                        path: 'check_blocked',
+                        method: 'POST',
+                        data: {
+                            fingerprint: fingerprint,
+                            captchaToken: captchaToken
                         }
-                    });
-                } else {
-                    apiCall('admin/login_failed', 'POST', {}).then(function() {
-                        hideAlert();
-                        showAlert('Gagal', 'Email atau password salah!', 'error');
-                    });
-                }
-            }).catch(function(e) { hideAlert(); showAlert('Error', e.message, 'error'); });
-        }
-
-        function logout() {
-            if (sessionId) {
-                apiCall('logout', 'POST', {}).catch(function() {});
-            }
-            sessionId = null;
-            localStorage.removeItem('sessionId');
-            currentAdmin = null;
-            activityLoaded = false;
-            actionKeyVerified = false;
-            actionKeyChecked = false;
-            serverAdminKey = null;
-            localStorage.removeItem('server_admin_key');
-            document.getElementById('serverAdminKey').value = 'Belum login';
-            document.getElementById('serverKeyStatus').innerHTML = '';
-
-            if (sessionTimer) clearTimeout(sessionTimer);
-            if (clockInterval) clearInterval(clockInterval);
-            if (statsInterval) clearInterval(statsInterval);
-            document.getElementById('appContainer').style.display = 'none';
-            document.getElementById('loginWrapper').style.display = 'flex';
-            document.getElementById('loginScreen').style.display = 'block';
-            document.getElementById('keyScreen').style.display = 'none';
-            document.getElementById('loginPassword').value = '';
-            document.getElementById('loginEmail').value = '';
-            document.getElementById('actionKeyVerified').style.display = 'none';
-            showAlert('Logout', 'Anda telah logout.', 'info');
-        }
-
-        // ==================== BACKGROUND ====================
-        function startBg() {
-            updateClock();
-            clockInterval = setInterval(updateClock, 60000);
-            statsInterval = setInterval(function() { if (currentAdmin) { loadUsers(); } }, 60000);
-        }
-
-        function updateClock() {
-            var el = document.getElementById('clockDisplay');
-            if (el) el.textContent = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
-        }
-
-        // ==================== USERS ====================
-        function loadUsers() {
-            apiCall('users', 'GET').then(function(data) {
-                allUsers = [];
-                for (var key in data) {
-                    if (data[key] && data[key].username) {
-                        data[key].id = key;
-                        data[key].banned = data[key].banned || false;
-                        data[key].banAkses = data[key].banAkses || false;
-                        data[key].forceLogout = data[key].forceLogout || false;
-                        data[key].ip = data[key].ip || '';
-                        data[key].fingerprint = data[key].fingerprint || '';
-                        data[key].phone = data[key].phone || '';
-                        data[key].expiry_date = data[key].expiry_date || '';
-                        allUsers.push(data[key]);
-                    }
-                }
-                updateStats();
-                updateAllTables();
-            }).catch(function() {});
-        }
-
-        function updateStats() {
-            var total = allUsers.length;
-            var active = allUsers.filter(function(u) { return !u.banned && !u.banAkses && !u.forceLogout && calculateDaysLeft(u.expiry_date) > 0; }).length;
-            var banned = allUsers.filter(function(u) { return u.banned; }).length;
-            var banAkses = allUsers.filter(function(u) { return u.banAkses; }).length;
-            var force = allUsers.filter(function(u) { return u.forceLogout; }).length;
-
-            document.getElementById('statTotal').textContent = total;
-            document.getElementById('statActive').textContent = active;
-            document.getElementById('statBanned').textContent = banned;
-            document.getElementById('statForce').textContent = force;
-
-            document.getElementById('ringkasanAktif').textContent = active;
-            document.getElementById('ringkasanBanned').textContent = banned;
-            document.getElementById('ringkasanBanAkses').textContent = banAkses;
-            document.getElementById('ringkasanForce').textContent = force;
-        }
-
-        // ==================== ACTIVITIES ====================
-        function loadActivity() {
-            apiCall('activity_logs', 'GET').then(function(data) {
-                allActivities = [];
-                var logs = [];
-                for (var key in data) {
-                    if (data[key] && data[key].username) {
-                        data[key].id = key;
-                        allActivities.push(data[key]);
-                        logs.push(data[key]);
-                    }
-                }
-                logs.sort(function(a, b) { return (b.timestamp || 0) - (a.timestamp || 0); });
-                var recentLogs = logs.slice(0, 30);
-                renderDashboardLog(recentLogs);
-                activityLoaded = true;
-            }).catch(function() { activityLoaded = false; });
-        }
-
-        function renderDashboardLog(logs) {
-            var container = document.getElementById('activityListContainer');
-            if (!container) return;
-            if (!logs || !logs.length) {
-                container.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i> Belum ada aktivitas</div>';
-                return;
-            }
-            container.innerHTML = buildLogHTML(logs);
-        }
-
-        function renderActivityLogPage() {
-            var container = document.getElementById('allActivityLog');
-            if (!container) return;
-            if (!allActivities.length) {
-                container.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i> Tidak ada aktivitas</div>';
-                return;
-            }
-            container.innerHTML = buildLogHTML(allActivities);
-        }
-
-        function renderSuspiciousLogPage() {
-            var container = document.getElementById('suspiciousActivityLog');
-            if (!container) return;
-            var suspicious = allActivities.filter(function(l) {
-                return ['sharing_detected', 'ip_changed', 'fp_changed', 'login_failed'].includes(l.action);
-            });
-            if (!suspicious.length) {
-                container.innerHTML = '<div class="empty-state"><i class="fas fa-shield-alt"></i> Tidak ada aktivitas mencurigakan</div>';
-                return;
-            }
-            container.innerHTML = buildLogHTML(suspicious);
-        }
-
-        function buildLogHTML(logs) {
-            var labels = {
-                sharing_detected: '🔴 SHARING DETEKSI',
-                banned: 'Ban User',
-                unbanned: 'Unban User',
-                ban_akses: 'Ban Akses',
-                unban_akses: 'Unban Akses',
-                force_logout: 'Tangguhkan',
-                unforce_logout: 'Lepas Tangguh',
-                topup: 'Top Up',
-                kuras: 'Kuras',
-                gantinama: 'Ganti Nama',
-                login_success: 'Login Sukses',
-                login_failed: 'Gagal Login',
-                ip_changed: 'IP Berubah',
-                fp_changed: 'FP Berubah'
-            };
-
-            var html = '';
-            logs.forEach(function(l) {
-                var time = l.timestamp ? new Date(l.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-';
-                var label = labels[l.action] || l.action;
-                var isSuspicious = ['sharing_detected', 'login_failed', 'ip_changed', 'fp_changed'].includes(l.action);
-                var details = l.details ? ' — ' + l.details : '';
-                html += '<div class="activity-item' + (isSuspicious ? ' suspicious' : '') + '">' +
-                    '<div class="activity-dot ' + (l.action || '') + '"></div>' +
-                    '<div class="activity-info"><span class="activity-user">' + esc(l.username) + '</span> <span class="activity-desc">' + label + details + '</span></div>' +
-                    '<div class="activity-time">' + time + '</div></div>';
-            });
-            return html;
-        }
-
-        // ==================== CLEAR LOG ====================
-        function clearAllLogs() {
-            showConfirm('Hapus SEMUA log secara permanen?', function() {
-                showAlert('Proses', 'Menghapus semua log...', 'loading');
-                apiCall('activity_logs', 'GET').then(function(data) {
-                    if (!data || Object.keys(data).length === 0) {
-                        hideAlert();
-                        showAlert('Info', 'Log sudah kosong!', 'info');
-                        return;
-                    }
-                    var keys = Object.keys(data);
-                    var count = 0;
-                    var promises = [];
-                    keys.forEach(function(key) {
-                        promises.push(apiCall('activity_logs/' + key, 'DELETE').then(function() { count++; }));
-                    });
-                    Promise.all(promises).then(function() {
-                        allActivities = [];
-                        activityLoaded = false;
-                        document.getElementById('activityListContainer').innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i> Log kosong</div>';
-                        document.getElementById('allActivityLog').innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i> Log kosong</div>';
-                        document.getElementById('suspiciousActivityLog').innerHTML = '<div class="empty-state"><i class="fas fa-shield-alt"></i> Tidak ada</div>';
-                        hideAlert();
-                        showAlert('Berhasil', count + ' log berhasil dihapus permanen!', 'success');
-                    });
-                }).catch(function() {
-                    hideAlert();
-                    showAlert('Error', 'Gagal menghapus log!', 'error');
+                    })
                 });
-            });
-        }
 
-        // ==================== ADD USER ====================
-        function openAddUserModal() {
-            var nm = new Date();
-            nm.setMonth(nm.getMonth() + 1);
-            document.getElementById('newExpiryDate').value = formatDate(nm);
-            document.getElementById('newUsername').value = '';
-            document.getElementById('newPassword').value = '';
-            document.getElementById('newPhone').value = '';
-            document.getElementById('newRole').value = 'Operator';
-            document.getElementById('addUserModal').classList.add('show');
-        }
+                var result = await res.json();
 
-        function addUserNow() {
-            var u = document.getElementById('newUsername').value.trim();
-            var p = document.getElementById('newPassword').value.trim();
-            var ph = document.getElementById('newPhone').value.trim();
-            var r = document.getElementById('newRole').value;
-            var e = document.getElementById('newExpiryDate').value.trim();
-
-            if (!u || !p || !e) { showAlert('Error', 'Username, password, dan masa aktif wajib diisi!', 'error'); return; }
-            if (p.length < 6) { showAlert('Error', 'Password minimal 6 karakter!', 'error'); return; }
-
-            showAlert('Proses', 'Menambahkan user...', 'loading');
-
-            var userData = {
-                username: u,
-                password: p,
-                phone: ph,
-                role: r,
-                expiry_date: e,
-                banned: false,
-                banAkses: false,
-                forceLogout: false,
-                ip: '',
-                fingerprint: '',
-                banAksesUntil: 0,
-                bannedUntil: 0,
-                createdAt: Date.now()
-            };
-
-            apiCall('users', 'POST', userData).then(function() {
-                showAlert('Berhasil', 'User "' + u + '" berhasil ditambahkan!', 'success');
-                closeModal('addUserModal');
-                loadUsers();
-                activityLoaded = false;
-                loadActivity();
-            }).catch(function(e) { showAlert('Error', e.message, 'error'); });
-        }
-
-        // ==================== DELETE USER ====================
-        function deleteUser(id) {
-            var u = allUsers.find(function(x) { return x.id === id; });
-            if (!u) return;
-            showConfirm('Hapus user "' + u.username + '" secara permanen?', function() {
-                showAlert('Proses', 'Menghapus user...', 'loading');
-                apiCall('users/' + id, 'DELETE').then(function() {
-                    showAlert('Berhasil', 'User berhasil dihapus!', 'success');
-                    loadUsers();
-                    activityLoaded = false;
-                    loadActivity();
-                }).catch(function(e) { showAlert('Error', e.message, 'error'); });
-            });
-        }
-
-        // ==================== EDIT USER ====================
-        function openEditUserModal(id) {
-            var u = allUsers.find(function(x) { return x.id === id; });
-            if (!u) return;
-
-            document.getElementById('editUserId').value = u.id;
-            document.getElementById('editUsername').value = u.username;
-            document.getElementById('editPassword').value = '';
-            document.getElementById('editPhone').value = u.phone || '';
-            document.getElementById('editRole').value = u.role || 'Operator';
-            document.getElementById('editExpiryDate').value = u.expiry_date || '';
-            document.getElementById('editIP').value = u.ip || '-';
-            document.getElementById('editFP').value = u.fingerprint ? u.fingerprint.substring(0, 20) + '...' : '-';
-            document.getElementById('editUserModal').classList.add('show');
-        }
-
-        function saveUserEdit() {
-            var id = document.getElementById('editUserId').value;
-            var u = document.getElementById('editUsername').value.trim();
-            var p = document.getElementById('editPassword').value.trim();
-            var ph = document.getElementById('editPhone').value.trim();
-            var r = document.getElementById('editRole').value;
-            var e = document.getElementById('editExpiryDate').value.trim();
-
-            if (!u) { showAlert('Error', 'Username wajib diisi!', 'error'); return; }
-
-            showAlert('Proses', 'Menyimpan perubahan...', 'loading');
-
-            var d = { username: u, role: r, expiry_date: e };
-            if (p) d.password = p;
-            if (ph) d.phone = ph;
-
-            apiCall('users/' + id, 'PATCH', d).then(function() {
-                showAlert('Berhasil', 'User berhasil diupdate!', 'success');
-                closeModal('editUserModal');
-                loadUsers();
-                activityLoaded = false;
-                loadActivity();
-            }).catch(function(e) { showAlert('Error', e.message, 'error'); });
-        }
-
-        function updateUserFormat() {
-            var id = document.getElementById('editUserId').value;
-            var u = document.getElementById('editUsername').value.trim();
-            var p = document.getElementById('editPassword').value.trim();
-            var ph = document.getElementById('editPhone').value.trim();
-            var r = document.getElementById('editRole').value;
-            var e = document.getElementById('editExpiryDate').value.trim();
-            var ip = document.getElementById('editIP').value.trim();
-            var fp = document.getElementById('editFP').value.trim();
-
-            if (!u) { showAlert('Error', 'Username wajib diisi!', 'error'); return; }
-
-            showConfirm('Update format user "' + u + '"?', function() {
-                showAlert('Proses', 'Mengupdate format...', 'loading');
-
-                var d = {
-                    username: u,
-                    role: r,
-                    expiry_date: e,
-                    phone: ph || '',
-                    ip: ip || '',
-                    fingerprint: fp || ''
-                };
-                if (p) d.password = p;
-
-                apiCall('users/' + id, 'PATCH', d).then(function() {
-                    showAlert('Berhasil', 'Format user diupdate!', 'success');
-                    closeModal('editUserModal');
-                    loadUsers();
-                    activityLoaded = false;
-                    loadActivity();
-                }).catch(function(e) { showAlert('Error', e.message, 'error'); });
-            });
-        }
-
-        // ==================== BAN USER ====================
-        function searchBanUser() {
-            var q = document.getElementById('banUserSearch') ? document.getElementById('banUserSearch').value.toLowerCase() : '';
-            var list = document.getElementById('banUserList');
-            if (!list) return;
-
-            var filtered = allUsers.filter(function(u) {
-                return u.username.toLowerCase().includes(q) && u.banned === false;
-            });
-
-            if (!filtered.length) {
-                list.innerHTML = '<div style="padding:12px;color:var(--sub);text-align:center;"><i class="fas fa-search"></i> Tidak ditemukan atau sudah di-ban</div>';
-                selectedBanUser = null;
-                document.getElementById('banSelectedUser').innerHTML = '';
-                return;
-            }
-
-            list.innerHTML = filtered.map(function(u) {
-                var isSel = selectedBanUser && selectedBanUser.id === u.id;
-                var badges = '';
-                if (u.banAkses) badges += ' <span class="badge badge-yellow">AKSES</span>';
-                if (u.forceLogout) badges += ' <span class="badge badge-orange">FORCE</span>';
-                return '<div class="user-check' + (isSel ? ' selected' : '') + '" onclick="selectBanUser(\'' + u.id + '\')">' +
-                    esc(u.username) + ' · ' + esc(u.role) + badges + '</div>';
-            }).join('');
-        }
-
-        function selectBanUser(id) {
-            selectedBanUser = allUsers.find(function(u) { return u.id === id; });
-            var el = document.getElementById('banSelectedUser');
-            if (el) el.innerHTML = selectedBanUser ? '✅ Dipilih: <b>' + esc(selectedBanUser.username) + '</b>' : '';
-
-            document.querySelectorAll('#banUserList .user-check').forEach(function(el) {
-                el.classList.remove('selected');
-            });
-            if (selectedBanUser) {
-                var items = document.querySelectorAll('#banUserList .user-check');
-                items.forEach(function(el) {
-                    if (el.textContent.includes(selectedBanUser.username)) {
-                        el.classList.add('selected');
-                    }
-                });
-            }
-        }
-
-        function executeBanUser() {
-            if (!selectedBanUser) { showAlert('Error', 'Pilih user terlebih dahulu!', 'error'); return; }
-
-            var dur = parseInt(document.getElementById('banDuration').value);
-            var name = selectedBanUser.username;
-            var durText = dur === 0 ? 'PERMANEN' : 'sampai ' + new Date(Date.now() + dur).toLocaleString('id-ID');
-
-            showConfirm('Ban user "' + name + '" ' + durText + '?', function() {
-                showAlert('Proses', 'Memproses ban...', 'loading');
-
-                var patchData = { banned: true, bannedUntil: dur === 0 ? 0 : Date.now() + dur };
-
-                apiCall('users/' + selectedBanUser.id, 'PATCH', patchData).then(function() {
-                    showAlert('Berhasil', 'User "' + name + '" berhasil di-ban!', 'success');
-                    loadUsers();
-                    activityLoaded = false;
-                    loadActivity();
-                    selectedBanUser = null;
-                    document.getElementById('banSelectedUser').innerHTML = '';
-                    searchBanUser();
-                }).catch(function(e) { showAlert('Error', e.message, 'error'); });
-            });
-        }
-
-        // ==================== DO ACTION ====================
-        function doAction(action, target) {
-            showAlert('Proses', 'Memproses...', 'loading');
-
-            var patchData = {};
-
-            if (action === 'unban') {
-                patchData = { banned: false, bannedUntil: 0 };
-            } else if (action === 'banakses') {
-                var dur = 86400000;
-                patchData = { banAkses: true, banAksesUntil: Date.now() + dur };
-                if (target.ip && target.ip !== '-') {
-                    apiCall('block_ip_manual', 'POST', { ip: target.ip }).catch(function() {});
+                if (result.encrypted && result.data) {
+                    var decrypted = CryptoJS.AES.decrypt(result.data, STORAGE_SECRET).toString(CryptoJS.enc.Utf8);
+                    if (decrypted) result = JSON.parse(decrypted);
                 }
-                if (target.fingerprint && target.fingerprint !== '-') {
-                    apiCall('block_fp_manual', 'POST', { fp: target.fingerprint }).catch(function() {});
+
+                if (result && result.blocked) {
+                    var blockType = result.blockType || 'device';
+                    var until = result.blockedUntil || 0;
+                    var untilText = until === 0 ? 'PERMANEN' : ('sampai ' + new Date(until).toLocaleString('id-ID'));
+
+                    showBlockedScreen(
+                        'AKSES DITOLAK',
+                        'Maaf, akses Anda telah ditolak oleh sistem keamanan.',
+                        '⏱️ Durasi: ' + untilText + '<br>' + (blockType === 'ip' ? '🌐 IP Anda diblokir.' : '📱 Perangkat Anda diblokir.')
+                    );
+                    return { blocked: true };
                 }
-            } else if (action === 'unbanakses') {
-                patchData = { banAkses: false, banAksesUntil: 0 };
-                if (target.ip && target.ip !== '-') {
-                    apiCall('blocked_ips/' + target.ip.replace(/\./g, '_'), 'DELETE').catch(function() {});
-                }
-                if (target.fingerprint && target.fingerprint !== '-') {
-                    apiCall('blocked_fp/' + target.fingerprint, 'DELETE').catch(function() {});
-                }
-            } else if (action === 'force') {
-                patchData = { forceLogout: true };
-            } else if (action === 'unforce') {
-                patchData = { forceLogout: false };
-            }
 
-            apiCall('users/' + target.id, 'PATCH', patchData).then(function() {
-                showAlert('Berhasil', 'Aksi berhasil!', 'success');
-                loadUsers();
-                activityLoaded = false;
-                loadActivity();
-            }).catch(function(e) { showAlert('Error', e.message, 'error'); });
-        }
+                return { blocked: false, fingerprint: fingerprint };
 
-        // ==================== CONFIRM ====================
-        function showConfirm(msg, cb) {
-            var overlay = document.getElementById('confirmOverlay');
-            var msgEl = document.getElementById('confirmMessage');
-            if (!overlay) { if (confirm(msg)) cb(); return; }
-            msgEl.textContent = msg;
-            overlay.style.display = 'flex';
-            document.getElementById('confirmYes').onclick = function() { overlay.style.display = 'none'; cb(); };
-            document.getElementById('confirmNo').onclick = function() { overlay.style.display = 'none'; };
-        }
-
-        // ==================== TABLE RENDERS ====================
-        function updateAllTables() {
-            renderAllUsersTable();
-            renderUnbannedTable();
-            renderBanAksesTable();
-            renderUnbanAksesTable();
-            renderForceTable();
-            renderUnforceTable();
-            renderProblemTable();
-            updateRingkasan();
-            renderWebStats();
-        }
-
-        function renderAllUsersTable() {
-            var tbody = document.getElementById('allUsersTable');
-            var count = document.getElementById('allUsersCount');
-            if (!tbody) return;
-            if (count) count.textContent = allUsers.length;
-
-            if (!allUsers.length) {
-                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">Tidak ada user</td></tr>';
-                return;
-            }
-
-            tbody.innerHTML = allUsers.map(function(u) {
-                var badges = '';
-                if (u.banned) badges += '<span class="badge badge-red">Banned</span> ';
-                if (u.banAkses) badges += '<span class="badge badge-yellow">Ban Akses</span> ';
-                if (u.forceLogout) badges += '<span class="badge badge-orange">Tangguh</span> ';
-                var fpDisplay = u.fingerprint ? u.fingerprint.substring(0, 12) + '...' : '-';
-                return '<tr>' +
-                    '<td><b>' + esc(u.username) + '</b></td>' +
-                    '<td>' + esc(u.role || '-') + '</td>' +
-                    '<td>' + badges + '</td>' +
-                    '<td>' + (u.ip || '-') + '</td>' +
-                    '<td>' + fpDisplay + '</td>' +
-                    '<td>' + (u.expiry_date || '-') + '</td>' +
-                    '<td>' +
-                    '<button class="btn btn-outline btn-xs" onclick="openEditUserModal(\'' + u.id + '\')"><i class="fas fa-edit"></i></button> ' +
-                    '<button class="btn btn-danger btn-xs" onclick="deleteUser(\'' + u.id + '\')"><i class="fas fa-trash"></i></button>' +
-                    '</td>' +
-                    '</tr>';
-            }).join('');
-        }
-
-        function renderUnbannedTable() {
-            var tbody = document.getElementById('unbannedUsersTable');
-            if (!tbody) return;
-            var unbanned = allUsers.filter(function(u) { return u.banned === true; });
-
-            if (!unbanned.length) {
-                tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Tidak ada</td></tr>';
-                return;
-            }
-
-            tbody.innerHTML = unbanned.map(function(u) {
-                var durasi = u.bannedUntil === 0 ? 'Permanen' : new Date(u.bannedUntil).toLocaleString('id-ID');
-                return '<tr>' +
-                    '<td><b>' + esc(u.username) + '</b></td>' +
-                    '<td>' + esc(u.role || '-') + '</td>' +
-                    '<td>' + durasi + '</td>' +
-                    '<td><button class="btn btn-success btn-xs" onclick="doAction(\'unban\', allUsers.find(function(x){return x.id===\'' + u.id + '\'}))">Unban</button></td>' +
-                    '</tr>';
-            }).join('');
-        }
-
-        function renderBanAksesTable() {
-            var tbody = document.getElementById('banaksesUsersTable');
-            if (!tbody) return;
-            var users = allUsers.filter(function(u) { return u.banAkses === false; });
-
-            if (!users.length) {
-                tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Tidak ada</td></tr>';
-                return;
-            }
-
-            tbody.innerHTML = users.map(function(u) {
-                var statusBadge = '';
-                if (u.banned) statusBadge += '<span class="status-badge banned">BANNED</span> ';
-                if (u.forceLogout) statusBadge += '<span class="status-badge force">TANGGUH</span> ';
-                return '<tr>' +
-                    '<td><b>' + esc(u.username) + '</b> ' + statusBadge + '</td>' +
-                    '<td>' + esc(u.role || '-') + '</td>' +
-                    '<td><span class="badge badge-green">Belum</span></td>' +
-                    '<td><button class="btn btn-danger btn-xs" onclick="doAction(\'banakses\', allUsers.find(function(x){return x.id===\'' + u.id + '\'}))">Ban Akses</button></td>' +
-                    '</tr>';
-            }).join('');
-        }
-
-        function renderUnbanAksesTable() {
-            var tbody = document.getElementById('unbanaksesUsersTable');
-            if (!tbody) return;
-            var unbanakses = allUsers.filter(function(u) { return u.banAkses === true; });
-
-            if (!unbanakses.length) {
-                tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;">Tidak ada</td></tr>';
-                return;
-            }
-
-            tbody.innerHTML = unbanakses.map(function(u) {
-                return '<tr>' +
-                    '<td><b>' + esc(u.username) + '</b></td>' +
-                    '<td>' + esc(u.role || '-') + '</td>' +
-                    '<td><button class="btn btn-success btn-xs" onclick="doAction(\'unbanakses\', allUsers.find(function(x){return x.id===\'' + u.id + '\'}))">Unban Akses</button></td>' +
-                    '</tr>';
-            }).join('');
-        }
-
-        function renderForceTable() {
-            var tbody = document.getElementById('forceUsersTable');
-            if (!tbody) return;
-            var users = allUsers.filter(function(u) { return u.forceLogout === false; });
-
-            if (!users.length) {
-                tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Tidak ada</td></tr>';
-                return;
-            }
-
-            tbody.innerHTML = users.map(function(u) {
-                var statusBadge = '';
-                if (u.banned) statusBadge += '<span class="status-badge banned">BANNED</span> ';
-                if (u.banAkses) statusBadge += '<span class="status-badge banakses">BAN AKSES</span> ';
-                return '<tr>' +
-                    '<td><b>' + esc(u.username) + '</b> ' + statusBadge + '</td>' +
-                    '<td>' + esc(u.role || '-') + '</td>' +
-                    '<td><span class="badge badge-green">Belum</span></td>' +
-                    '<td><button class="btn btn-danger btn-xs" onclick="doAction(\'force\', allUsers.find(function(x){return x.id===\'' + u.id + '\'}))">Tangguhkan</button></td>' +
-                    '</tr>';
-            }).join('');
-        }
-
-        function renderUnforceTable() {
-            var tbody = document.getElementById('unforceUsersTable');
-            if (!tbody) return;
-            var unforce = allUsers.filter(function(u) { return u.forceLogout === true; });
-
-            if (!unforce.length) {
-                tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;">Tidak ada</td></tr>';
-                return;
-            }
-
-            tbody.innerHTML = unforce.map(function(u) {
-                return '<tr>' +
-                    '<td><b>' + esc(u.username) + '</b></td>' +
-                    '<td>' + esc(u.role || '-') + '</td>' +
-                    '<td><button class="btn btn-success btn-xs" onclick="doAction(\'unforce\', allUsers.find(function(x){return x.id===\'' + u.id + '\'}))">Lepas Tangguh</button></td>' +
-                    '</tr>';
-            }).join('');
-        }
-
-        function renderProblemTable() {
-            var tbody = document.getElementById('problemUsersTable');
-            if (!tbody) return;
-            var problems = allUsers.filter(function(u) {
-                return u.banned === true || u.banAkses === true || u.forceLogout === true;
-            });
-
-            if (!problems.length) {
-                tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Tidak ada</td></tr>';
-                return;
-            }
-
-            tbody.innerHTML = problems.map(function(u) {
-                var badges = '';
-                if (u.banned) badges += '<span class="badge badge-red">Banned</span> ';
-                if (u.banAkses) badges += '<span class="badge badge-yellow">Ban Akses</span> ';
-                if (u.forceLogout) badges += '<span class="badge badge-orange">Tangguh</span> ';
-                return '<tr>' +
-                    '<td><b>' + esc(u.username) + '</b></td>' +
-                    '<td>' + esc(u.role || '-') + '</td>' +
-                    '<td>' + badges + '</td>' +
-                    '<td><button class="btn btn-outline btn-xs" onclick="openEditUserModal(\'' + u.id + '\')">Edit</button></td>' +
-                    '</tr>';
-            }).join('');
-        }
-
-        function renderWebStats() {
-            var total = allUsers.length;
-            var active = allUsers.filter(function(u) { return !u.banned && !u.banAkses && !u.forceLogout && calculateDaysLeft(u.expiry_date) > 0; }).length;
-            var banned = allUsers.filter(function(u) { return u.banned; }).length;
-            var banAkses = allUsers.filter(function(u) { return u.banAkses; }).length;
-            var force = allUsers.filter(function(u) { return u.forceLogout; }).length;
-            var totalLogins = allActivities.filter(function(l) { return l.action === 'login_success'; }).length;
-
-            document.getElementById('webStatTotalUsers').textContent = total;
-            document.getElementById('webStatActiveUsers').textContent = active;
-            document.getElementById('webStatBannedUsers').textContent = banned;
-            document.getElementById('webStatBanAkses').textContent = banAkses;
-            document.getElementById('webStatForce').textContent = force;
-            document.getElementById('webStatTotalLogins').textContent = totalLogins;
-
-            document.getElementById('distAktif').textContent = active;
-            document.getElementById('distBanned').textContent = banned;
-            document.getElementById('distBanAkses').textContent = banAkses;
-            document.getElementById('distForce').textContent = force;
-        }
-
-        function updateRingkasan() {
-            var active = allUsers.filter(function(u) { return !u.banned && !u.banAkses && !u.forceLogout && calculateDaysLeft(u.expiry_date) > 0; }).length;
-            var banned = allUsers.filter(function(u) { return u.banned; }).length;
-            var banAkses = allUsers.filter(function(u) { return u.banAkses; }).length;
-            var force = allUsers.filter(function(u) { return u.forceLogout; }).length;
-
-            document.getElementById('ringkasanAktif').textContent = active;
-            document.getElementById('ringkasanBanned').textContent = banned;
-            document.getElementById('ringkasanBanAkses').textContent = banAkses;
-            document.getElementById('ringkasanForce').textContent = force;
-        }
-
-        // ==================== SETTINGS ====================
-        function loadSettings() {
-            apiCall('admin/auth', 'GET').then(function(r) {
-                if (r) {
-                    var email = r.email || '••••••••@••••••••';
-                    var pass = r.password || '••••••••';
-                    document.getElementById('settingsEmail').value = email;
-                    document.getElementById('settingsPassword').value = pass;
-                    document.getElementById('displayAdminKey').value = pass;
-                }
-            });
-            loadActionKeys();
-            loadWhitelistIP();
-            loadWhitelistFP();
-            checkActionKeyExists();
-            loadServerKeyFromStorage();
-        }
-
-        function togglePassword() {
-            var el = document.getElementById('settingsPassword');
-            var icon = document.getElementById('togglePassIcon');
-            if (!actionKeyVerified) {
-                showAlert('Error', 'Verifikasi key aksi terlebih dahulu untuk melihat password!', 'error');
-                return;
-            }
-            if (el.type === 'password') {
-                el.type = 'text';
-                icon.classList.remove('fa-eye');
-                icon.classList.add('fa-eye-slash');
-            } else {
-                el.type = 'password';
-                icon.classList.remove('fa-eye-slash');
-                icon.classList.add('fa-eye');
+            } catch (error) {
+                console.error('Gagal cek blokir:', error);
+                return { blocked: false, fingerprint: fingerprint };
             }
         }
 
-        // ==================== CHANGE EMAIL ====================
-        function openChangeEmailModal() {
-            if (!actionKeyVerified) {
-                showAlert('Error', 'Verifikasi key aksi terlebih dahulu!', 'error');
-                return;
+        async function checkSession(fingerprint) {
+            var saved = storageGet();
+            if (!saved || !saved.value || !saved.value.username) {
+                return { hasSession: false };
             }
-            document.getElementById('newEmail').value = '';
-            document.getElementById('changeEmailModal').classList.add('show');
-        }
 
-        function changeEmail() {
-            var email = document.getElementById('newEmail').value.trim();
-            if (!email) { showAlert('Error', 'Email baru wajib diisi!', 'error'); return; }
-            if (!actionKeyVerified) { showAlert('Error', 'Verifikasi key aksi terlebih dahulu!', 'error'); return; }
+            var session = saved.value;
+            var age = Date.now() - (session.timestamp || 0);
 
-            showAlert('Proses', 'Mengupdate email...', 'loading');
-            apiCall('admin/update_email', 'PATCH', { email: email }).then(function() {
-                showAlert('Berhasil', 'Email berhasil diupdate!', 'success');
-                closeModal('changeEmailModal');
-                loadSettings();
-            }).catch(function(e) { showAlert('Error', e.message, 'error'); });
-        }
-
-        // ==================== CHANGE PASSWORD ====================
-        function openChangePasswordModal() {
-            if (!actionKeyVerified) {
-                showAlert('Error', 'Verifikasi key aksi terlebih dahulu!', 'error');
-                return;
+            if (age > 7 * 24 * 60 * 60 * 1000) {
+                localStorage.removeItem(STORAGE_KEY);
+                return { hasSession: false };
             }
-            document.getElementById('newPasswordSettings').value = '';
-            document.getElementById('confirmNewPassword').value = '';
-            document.getElementById('changePasswordModal').classList.add('show');
-        }
 
-        function changePassword() {
-            var pass = document.getElementById('newPasswordSettings').value.trim();
-            var confirm = document.getElementById('confirmNewPassword').value.trim();
-            if (!pass) { showAlert('Error', 'Password baru wajib diisi!', 'error'); return; }
-            if (pass.length < 6) { showAlert('Error', 'Password minimal 6 karakter!', 'error'); return; }
-            if (pass !== confirm) { showAlert('Error', 'Password tidak cocok!', 'error'); return; }
-            if (!actionKeyVerified) { showAlert('Error', 'Verifikasi key aksi terlebih dahulu!', 'error'); return; }
+            updateLoadingText('Memverifikasi akun...');
 
-            showAlert('Proses', 'Mengupdate password...', 'loading');
-            apiCall('admin/update_password', 'PATCH', { password: pass }).then(function() {
-                showAlert('Berhasil', 'Password berhasil diupdate!', 'success');
-                closeModal('changePasswordModal');
-                loadSettings();
-            }).catch(function(e) { showAlert('Error', e.message, 'error'); });
-        }
-
-        // ==================== KEY AKSI ====================
-        function checkActionKeyExists() {
-            if (actionKeyChecked) return;
-            apiCall('action_keys', 'GET').then(function(data) {
-                var count = 0;
-                for (var k in data) {
-                    if (data[k] && data[k].key) count++;
-                }
-                if (count === 0) {
-                    apiCall('action_keys', 'POST', {
-                        key: 'RevanStore2026',
-                        createdAt: Date.now(),
-                        isDefault: true
-                    }).then(function() {
-                        loadActionKeys();
-                    });
-                }
-                actionKeyChecked = true;
-            });
-        }
-
-        function verifyActionKey() {
-            var key = document.getElementById('actionKeyInput').value.trim();
-            if (!key) { showAlert('Error', 'Masukkan key aksi!', 'error'); return; }
-
-            apiCall('action_keys', 'GET').then(function(data) {
-                var valid = false;
-                for (var k in data) {
-                    if (data[k] && data[k].key === key) {
-                        valid = true;
-                        break;
-                    }
-                }
-                if (valid) {
-                    actionKeyVerified = true;
-                    document.getElementById('actionKeyVerified').style.display = 'block';
-                    apiCall('admin/auth', 'GET').then(function(r) {
-                        if (r) {
-                            var pass = r.password || '••••••••';
-                            document.getElementById('displayAdminKey').value = pass;
-                            document.getElementById('settingsPassword').value = pass;
-                            document.getElementById('displayApiKey').value = '🔑 API Key tersedia di environment variables';
+            try {
+                var captchaToken = await getRecaptchaToken('check_session');
+                var res = await fetch(API_REVANSTORE, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Fingerprint': fingerprint
+                    },
+                    body: JSON.stringify({
+                        path: 'check_account_status',
+                        method: 'POST',
+                        data: {
+                            username: session.username,
+                            user_id: session.user_id,
+                            fingerprint: fingerprint,
+                            captchaToken: captchaToken
                         }
-                    });
-                    showAlert('Berhasil', 'Key aksi valid!', 'success');
-                    loadActionKeys();
-                    loadWhitelistIP();
-                    loadWhitelistFP();
+                    })
+                });
+
+                var result = await res.json();
+
+                if (result.encrypted && result.data) {
+                    var decrypted = CryptoJS.AES.decrypt(result.data, STORAGE_SECRET).toString(CryptoJS.enc.Utf8);
+                    if (decrypted) result = JSON.parse(decrypted);
+                }
+
+                if (result && result.banAkses) {
+                    var untilA = result.banAksesUntil || 0;
+                    var untilTextA = untilA === 0 ? 'PERMANEN' : ('sampai ' + new Date(untilA).toLocaleString('id-ID'));
+                    showBlockedScreen(
+                        'AKSES DIBLOKIR',
+                        'Maaf, akses Anda diblokir oleh admin.',
+                        '⏱️ Durasi: ' + untilTextA
+                    );
+                    localStorage.removeItem(STORAGE_KEY);
+                    return { hasSession: true, blocked: true };
+                }
+
+                if (result && result.valid) {
+                    return { hasSession: true, valid: true };
+                }
+
+                localStorage.removeItem(STORAGE_KEY);
+                return { hasSession: false };
+
+            } catch (error) {
+                console.error('Gagal cek session:', error);
+                return { hasSession: true, valid: true };
+            }
+        }
+
+        (async function() {
+            grecaptcha.ready(async function() {
+                var blockedCheck = await checkBlocked();
+                if (blockedCheck.blocked) return;
+
+                var sessionCheck = await checkSession(blockedCheck.fingerprint);
+                if (sessionCheck.blocked) return;
+
+                if (sessionCheck.hasSession && sessionCheck.valid) {
+                    window.location.href = 'pages/dashboard.html';
                 } else {
-                    showAlert('Error', 'Key aksi salah!', 'error');
+                    window.location.href = 'pages/login.html';
                 }
             });
-        }
-
-        function addActionKey() {
-            if (!actionKeyVerified) {
-                showAlert('Error', 'Verifikasi key aksi terlebih dahulu!', 'error');
-                return;
-            }
-            var key = document.getElementById('newActionKey').value.trim();
-            if (!key) { showAlert('Error', 'Masukkan key aksi baru!', 'error'); return; }
-
-            apiCall('action_keys', 'POST', { key: key, createdAt: Date.now() }).then(function() {
-                showAlert('Berhasil', 'Key aksi ditambahkan!', 'success');
-                document.getElementById('newActionKey').value = '';
-                loadActionKeys();
-            }).catch(function(e) { showAlert('Error', e.message, 'error'); });
-        }
-
-        function loadActionKeys() {
-            if (!actionKeyVerified) {
-                document.getElementById('actionKeysTable').innerHTML = '<tr><td colspan="3" style="text-align:center;">🔒 Verifikasi key aksi terlebih dahulu</td></tr>';
-                return;
-            }
-            apiCall('action_keys', 'GET').then(function(data) {
-                var html = '';
-                var count = 0;
-                for (var k in data) {
-                    if (data[k] && data[k].key) {
-                        count++;
-                        var masked = '••••' + data[k].key.substring(data[k].key.length - 4);
-                        var date = data[k].createdAt ? new Date(data[k].createdAt).toLocaleString('id-ID') : '-';
-                        var isDefault = data[k].isDefault ? ' (Default)' : '';
-                        html += '<tr><td>' + masked + isDefault + '</td><td>' + date + '</td><td>' +
-                            (data[k].isDefault ? '<span class="badge badge-blue">Default</span>' : '<button class="btn btn-danger btn-xs" onclick="deleteActionKey(\'' + k + '\')"><i class="fas fa-trash"></i></button>') +
-                            '</td></tr>';
-                    }
-                }
-                if (count === 0) {
-                    html = '<tr><td colspan="3" style="text-align:center;">Tidak ada key aksi</td></tr>';
-                }
-                document.getElementById('actionKeysTable').innerHTML = html;
-            });
-        }
-
-        function deleteActionKey(id) {
-            if (!actionKeyVerified) {
-                showAlert('Error', 'Verifikasi key aksi terlebih dahulu!', 'error');
-                return;
-            }
-            showConfirm('Hapus key aksi ini?', function() {
-                apiCall('action_keys/' + id, 'DELETE').then(function() {
-                    showAlert('Berhasil', 'Key aksi dihapus!', 'success');
-                    loadActionKeys();
-                });
-            });
-        }
-
-        // ==================== IP WHITELIST ====================
-        function addWhitelistIP() {
-            if (!actionKeyVerified) {
-                showAlert('Error', 'Verifikasi key aksi terlebih dahulu!', 'error');
-                return;
-            }
-            var ip = document.getElementById('newWhitelistIP').value.trim();
-            if (!ip) { showAlert('Error', 'Masukkan IP!', 'error'); return; }
-
-            apiCall('ip_whitelist', 'POST', { ip: ip, createdAt: Date.now() }).then(function() {
-                showAlert('Berhasil', 'IP ditambahkan ke whitelist!', 'success');
-                document.getElementById('newWhitelistIP').value = '';
-                loadWhitelistIP();
-            }).catch(function(e) { showAlert('Error', e.message, 'error'); });
-        }
-
-        function loadWhitelistIP() {
-            if (!actionKeyVerified) {
-                document.getElementById('ipWhitelistTable').innerHTML = '<tr><td colspan="3" style="text-align:center;">🔒 Verifikasi key aksi terlebih dahulu</td></tr>';
-                return;
-            }
-            apiCall('ip_whitelist', 'GET').then(function(data) {
-                var html = '';
-                for (var k in data) {
-                    if (data[k] && data[k].ip) {
-                        var date = data[k].createdAt ? new Date(data[k].createdAt).toLocaleString('id-ID') : '-';
-                        html += '<tr><td>' + data[k].ip + '</td><td>' + date + '</td><td><button class="btn btn-danger btn-xs" onclick="deleteWhitelistIP(\'' + k + '\')"><i class="fas fa-trash"></i></button></td></tr>';
-                    }
-                }
-                document.getElementById('ipWhitelistTable').innerHTML = html || '<tr><td colspan="3" style="text-align:center;">Tidak ada IP</td></tr>';
-            });
-        }
-
-        function deleteWhitelistIP(id) {
-            if (!actionKeyVerified) {
-                showAlert('Error', 'Verifikasi key aksi terlebih dahulu!', 'error');
-                return;
-            }
-            showConfirm('Hapus IP dari whitelist?', function() {
-                apiCall('ip_whitelist/' + id, 'DELETE').then(function() {
-                    showAlert('Berhasil', 'IP dihapus!', 'success');
-                    loadWhitelistIP();
-                });
-            });
-        }
-
-        // ==================== FP WHITELIST ====================
-        function addWhitelistFP() {
-            if (!actionKeyVerified) {
-                showAlert('Error', 'Verifikasi key aksi terlebih dahulu!', 'error');
-                return;
-            }
-            var fp = document.getElementById('newWhitelistFP').value.trim();
-            if (!fp) { showAlert('Error', 'Masukkan fingerprint!', 'error'); return; }
-
-            apiCall('fp_whitelist', 'POST', { fp: fp, createdAt: Date.now() }).then(function() {
-                showAlert('Berhasil', 'Fingerprint ditambahkan ke whitelist!', 'success');
-                document.getElementById('newWhitelistFP').value = '';
-                loadWhitelistFP();
-            }).catch(function(e) { showAlert('Error', e.message, 'error'); });
-        }
-
-        function loadWhitelistFP() {
-            if (!actionKeyVerified) {
-                document.getElementById('fpWhitelistTable').innerHTML = '<tr><td colspan="3" style="text-align:center;">🔒 Verifikasi key aksi terlebih dahulu</td></tr>';
-                return;
-            }
-            apiCall('fp_whitelist', 'GET').then(function(data) {
-                var html = '';
-                for (var k in data) {
-                    if (data[k] && data[k].fp) {
-                        var masked = data[k].fp.substring(0, 20) + '...';
-                        var date = data[k].createdAt ? new Date(data[k].createdAt).toLocaleString('id-ID') : '-';
-                        html += '<tr><td>' + masked + '</td><td>' + date + '</td><td><button class="btn btn-danger btn-xs" onclick="deleteWhitelistFP(\'' + k + '\')"><i class="fas fa-trash"></i></button></td></tr>';
-                    }
-                }
-                document.getElementById('fpWhitelistTable').innerHTML = html || '<tr><td colspan="3" style="text-align:center;">Tidak ada FP</td></tr>';
-            });
-        }
-
-        function deleteWhitelistFP(id) {
-            if (!actionKeyVerified) {
-                showAlert('Error', 'Verifikasi key aksi terlebih dahulu!', 'error');
-                return;
-            }
-            showConfirm('Hapus fingerprint dari whitelist?', function() {
-                apiCall('fp_whitelist/' + id, 'DELETE').then(function() {
-                    showAlert('Berhasil', 'Fingerprint dihapus!', 'success');
-                    loadWhitelistFP();
-                });
-            });
-        }
-
-        // ==================== INIT ====================
-        document.addEventListener('DOMContentLoaded', async function() {
-            document.querySelectorAll('.modal').forEach(function(m) {
-                m.addEventListener('click', function(e) {
-                    if (e.target === this) this.classList.remove('show');
-                });
-            });
-
-            document.getElementById('loginPassword').addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') login();
-            });
-
-            document.getElementById('accessKey').addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') verifyKey();
-            });
-
-            document.addEventListener('click', function() {
-                if (currentAdmin && sessionTimer) {
-                    clearTimeout(sessionTimer);
-                    sessionTimer = setTimeout(function() {
-                        if (currentAdmin) {
-                            logout();
-                            showAlert('Sesi Berakhir', '30 menit idle.', 'info');
-                        }
-                    }, 1800000);
-                }
-            });
-
-            // CEK SESSION SAVED
-            var savedSession = localStorage.getItem('sessionId');
-            if (savedSession) {
-                sessionId = savedSession;
-                // COBA LOAD DATA
-                try {
-                    await loadUsers();
-                    await loadActivity();
-                    // KALO BERHASIL, TAMPILKAN DASHBOARD
-                    document.getElementById('loginScreen').style.display = 'none';
-                    document.getElementById('loginWrapper').style.display = 'none';
-                    document.getElementById('appContainer').style.display = 'block';
-                    currentAdmin = 'Admin';
-                    document.getElementById('loggedUser').textContent = 'Admin';
-                    document.getElementById('navbarUserName').textContent = 'Admin';
-                    switchPage('dashboard');
-                } catch(e) {
-                    // SESSION EXPIRED
-                    sessionId = null;
-                    localStorage.removeItem('sessionId');
-                }
-            }
-
-            if (!fingerprint) fingerprint = await getFingerprint();
-        });
+        })();
     </script>
 </body>
 </html>
