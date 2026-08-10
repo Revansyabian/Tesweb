@@ -18,8 +18,8 @@ var blockedChecked = false;
 var loginInProgress = false;
 var statusCheckInterval = null;
 
-var STORAGE_KEY = 'bussid_data';
-var STORAGE_SECRET = 'bussid_session_secret_key';
+var STORAGE_KEY = 'app_data';
+var STORAGE_SECRET = 'session_local_secret';
 
 function storageSet(key, value) {
     try {
@@ -54,7 +54,7 @@ function storageGetAll() {
 }
 
 function getBlockKey(username) {
-    return 'bussid_block_' + (username || 'global');
+    return 'blok_' + (username || 'global');
 }
 
 function getBlockData(username) {
@@ -140,17 +140,66 @@ async function checkIfBlocked() {
         }
         if (result && result.blocked) {
             isBlocked = true;
-            storageSet('bussid_blocked', 'true');
+            storageSet('perangkat_diblokir', 'true');
         } else {
             isBlocked = false;
-            storageRemove('bussid_blocked');
+            storageRemove('perangkat_diblokir');
         }
         blockedChecked = true;
     } catch (e) {
-        isBlocked = storageGet('bussid_blocked') === 'true';
+        isBlocked = storageGet('perangkat_diblokir') === 'true';
         blockedChecked = true;
     }
     return isBlocked;
+}
+
+async function periksaMaintenance() {
+    try {
+        var payload = {
+            path: 'maintenance_status',
+            method: 'GET',
+            data: null,
+            timestamp: Date.now()
+        };
+        var encryptedPayload = CryptoJS.AES.encrypt(JSON.stringify(payload), API_SECRET).toString();
+        var res = await fetch(API_REVANSTORE, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Fingerprint': fingerprint || 'check'
+            },
+            body: JSON.stringify({ data: encryptedPayload })
+        });
+        var result = await res.json();
+        if (result.encrypted && result.data) {
+            var dec = CryptoJS.AES.decrypt(result.data, API_SECRET).toString(CryptoJS.enc.Utf8);
+            if (dec) result = JSON.parse(dec);
+        }
+        if (result && result.maintenance === true) {
+            return result;
+        }
+        return null;
+    } catch (e) {
+        return null;
+    }
+}
+
+function tampilkanHalamanMaintenance(dataMaintenance) {
+    var judul = (dataMaintenance && dataMaintenance.judul) ? dataMaintenance.judul : 'SEDANG PERBAIKAN SISTEM';
+    var pesan = (dataMaintenance && dataMaintenance.pesan) ? dataMaintenance.pesan : 'Website sedang dalam perbaikan oleh admin. Silakan kembali beberapa saat lagi.';
+    var sampai = (dataMaintenance && dataMaintenance.sampai) ? dataMaintenance.sampai : null;
+    var teksEstimasi = sampai ? 'Estimasi selesai: ' + new Date(sampai).toLocaleString('id-ID') : 'Mohon maaf atas ketidaknyamanan ini.';
+
+    document.body.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#e0f2fe 0%,#bae6fd 50%,#7dd3fc 100%);padding:20px;font-family:\'Segoe UI\',sans-serif;">' +
+        '<div style="background:#ffffff;border-radius:24px;padding:48px 36px;width:100%;max-width:440px;text-align:center;box-shadow:0 25px 60px rgba(0,0,0,0.1);">' +
+        '<div style="width:90px;height:90px;background:#fef3c7;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;">' +
+        '<i class="fas fa-tools" style="font-size:40px;color:#f59e0b;"></i>' +
+        '</div>' +
+        '<h1 style="color:#0c4a6e;font-size:24px;font-weight:700;margin-bottom:8px;">' + judul + '</h1>' +
+        '<p style="color:#64748b;font-size:14px;margin-bottom:6px;line-height:1.6;">' + pesan + '</p>' +
+        '<div style="background:#fef3c7;color:#92400e;padding:12px 16px;border-radius:12px;font-weight:600;font-size:13px;margin:16px 0 24px;">' + teksEstimasi + '</div>' +
+        '<button onclick="window.open(\'https://wa.me/' + WHATSAPP_NUMBER + '?text=Assalamualaikum%20admin%2C%20info%20perbaikan\',\'_blank\')" style="display:inline-flex;align-items:center;gap:10px;padding:12px 32px;background:#25D366;color:#fff;border:none;border-radius:30px;font-weight:600;font-size:15px;cursor:pointer;transition:0.2s;font-family:\'Segoe UI\',sans-serif;">' +
+        '<i class="fab fa-whatsapp"></i> Hubungi Admin</button></div></div>';
 }
 
 async function callRevanstore(path, method, data) {
@@ -174,7 +223,7 @@ async function callRevanstore(path, method, data) {
         headers: headers,
         body: JSON.stringify({ data: encryptedPayload })
     });
-    if (res.status === 429) throw new Error('Terlalu banyak request');
+    if (res.status === 429) throw new Error('Terlalu banyak permintaan');
     var text = await res.text();
     if (!text || text === 'null') return null;
     var result = JSON.parse(text);
@@ -365,23 +414,23 @@ function getDaysLeftClass(daysLeft) {
 }
 
 function getDaysLeftText(daysLeft) {
-    if (daysLeft === 999999) return '♾️ Permanent';
-    if (daysLeft < 0) return '⏰ Habis ' + Math.abs(daysLeft) + ' hari';
-    if (daysLeft === 0) return '⚠️ Hari ini';
-    if (daysLeft === 1) return '📅 1 hari';
-    return '📅 ' + daysLeft + ' hari';
+    if (daysLeft === 999999) return 'Permanen';
+    if (daysLeft < 0) return 'Habis ' + Math.abs(daysLeft) + ' hari';
+    if (daysLeft === 0) return 'Hari ini';
+    if (daysLeft === 1) return '1 hari';
+    return daysLeft + ' hari';
 }
 
 function checkAccountExpiry(user) {
     if (!user || !user.expiry_date) {
-        return { expired: false, daysLeft: 999999, daysLeftText: '♾️ Permanent', daysLeftClass: 'days-permanent' };
+        return { expired: false, daysLeft: 999999, daysLeftText: 'Permanen', daysLeftClass: 'days-permanent' };
     }
     if (String(user.expiry_date).includes('9999')) {
-        return { expired: false, daysLeft: 999999, daysLeftText: '♾️ Permanent', daysLeftClass: 'days-permanent' };
+        return { expired: false, daysLeft: 999999, daysLeftText: 'Permanen', daysLeftClass: 'days-permanent' };
     }
     var daysLeft = calculateRemainingDays(user.expiry_date);
     if (daysLeft === 999999) {
-        return { expired: false, daysLeft: 999999, daysLeftText: '♾️ Permanent', daysLeftClass: 'days-permanent' };
+        return { expired: false, daysLeft: 999999, daysLeftText: 'Permanen', daysLeftClass: 'days-permanent' };
     }
     var expired = daysLeft < 0;
     return {
@@ -406,17 +455,17 @@ function closeExpiredBanner() {
 }
 
 function openWhatsApp() {
-    var msg = encodeURIComponent("Assalamualaikum admin, saya ingin memperpanjang masa aktif akun BUSSID Top Up saya. Username: " + (currentUser ? currentUser.username : ''));
+    var msg = encodeURIComponent("Assalamualaikum admin, saya ingin memperpanjang masa aktif akun. Username: " + (currentUser ? currentUser.username : ''));
     window.open('https://wa.me/' + WHATSAPP_NUMBER + '?text=' + msg, '_blank');
 }
 
 function openWhatsAppPassword() {
-    var msg = encodeURIComponent("Assalamualaikum admin, saya ingin mengubah password akun saya. Username: " + (currentUser ? currentUser.username : ''));
+    var msg = encodeURIComponent("Assalamualaikum admin, saya ingin mengubah password akun. Username: " + (currentUser ? currentUser.username : ''));
     window.open('https://wa.me/' + WHATSAPP_NUMBER + '?text=' + msg, '_blank');
 }
 
 function showBlockedScreen() {
-    document.body.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#f0f9ff,#bae6fd,#7dd3fc);padding:20px;font-family:\'Segoe UI\',sans-serif;"><div style="background:#fff;border-radius:20px;padding:40px 30px;max-width:420px;width:100%;text-align:center;box-shadow:0 25px 60px rgba(0,0,0,0.1);"><div style="font-size:70px;color:#ef4444;margin-bottom:20px;">🔒</div><h1 style="color:#0c4a6e;font-size:24px;margin-bottom:10px;">AKSES DITOLAK</h1><p style="color:#64748b;font-size:14px;">Maaf, akses Anda telah diblokir.</p></div></div>';
+    document.body.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#f0f9ff,#bae6fd,#7dd3fc);padding:20px;font-family:\'Segoe UI\',sans-serif;"><div style="background:#fff;border-radius:20px;padding:40px 30px;max-width:420px;width:100%;text-align:center;box-shadow:0 25px 60px rgba(0,0,0,0.1);"><div style="font-size:70px;color:#ef4444;margin-bottom:20px;">🔒</div><h1 style="color:#0c4a6e;font-size:24px;margin-bottom:10px;">AKSES DITOLAK</h1><p style="color:#64748b;font-size:14px;">Maaf, akses Anda telah ditolak.</p></div></div>';
 }
 
 function showBannedPopup(until) {
@@ -436,23 +485,23 @@ function showBannedPopup(until) {
     });
 }
 
-function showBanAksesPage(until) {
+function showBanAccessPage(until) {
     var untilText = (until || 0) === 0 ? 'PERMANEN' : ('sampai ' + new Date(until).toLocaleString('id-ID'));
     document.body.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#f0f9ff 0%,#bae6fd 50%,#7dd3fc 100%);padding:20px;font-family:\'Segoe UI\',sans-serif;">' +
         '<div style="background:#ffffff;border-radius:24px;padding:48px 36px;width:100%;max-width:420px;text-align:center;box-shadow:0 20px 60px rgba(0,191,255,0.15);border:1px solid rgba(0,191,255,0.1);">' +
         '<div style="font-size:72px;color:#f59e0b;margin-bottom:12px;">🚫</div>' +
         '<h2 style="font-size:24px;font-weight:700;color:#0c4a6e;margin-bottom:8px;">AKSES DIBLOKIR</h2>' +
         '<p style="font-size:14px;color:#64748b;margin-bottom:6px;">Maaf, akses Anda diblokir oleh admin.</p>' +
-        '<div style="background:#fef3c7;color:#92400e;padding:12px 16px;border-radius:12px;font-weight:600;font-size:14px;margin:16px 0 24px;">⏱️ Durasi: ' + untilText + '</div>' +
+        '<div style="background:#fef3c7;color:#92400e;padding:12px 16px;border-radius:12px;font-weight:600;font-size:14px;margin:16px 0 24px;">Durasi: ' + untilText + '</div>' +
         '<button onclick="window.open(\'https://wa.me/' + WHATSAPP_NUMBER + '?text=Assalamualaikum%20admin%2C%20akses%20saya%20diblokir\',\'_blank\')" style="display:inline-flex;align-items:center;gap:10px;padding:12px 32px;background:#25D366;color:#fff;border:none;border-radius:30px;font-weight:600;font-size:15px;cursor:pointer;transition:0.2s;font-family:\'Segoe UI\',sans-serif;">' +
         '<i class="fab fa-whatsapp"></i> Hubungi Admin</button></div></div>';
 }
 
-function showForceLogoutPopup() {
+function showSuspendedPopup() {
     Swal.fire({
         icon: 'warning',
         title: 'AKUN DITANGGUHKAN',
-        html: '<p>Akun Anda ditangguhkan karena indikasi sharing akun.</p><p style="font-size:12px;color:#92400e;">Silakan hubungi admin.</p>',
+        html: '<p>Akun Anda ditangguhkan karena indikasi aktivitas mencurigakan.</p><p style="font-size:12px;color:#92400e;">Silakan hubungi admin.</p>',
         confirmButtonText: '<i class="fab fa-whatsapp"></i> Hubungi Admin',
         confirmButtonColor: '#25D366',
         showCancelButton: true,
@@ -465,17 +514,17 @@ function showForceLogoutPopup() {
 }
 
 function checkAuth() {
-    var saved = storageGet('bussid_session');
+    var saved = storageGet('sesi_pengguna');
     if (!saved) {
-        window.location.href = 'login.html';
+        window.location.href = '/login';
         return false;
     }
     try {
         var session = JSON.parse(saved);
         var age = Date.now() - (session.timestamp || 0);
         if (age > 7 * 24 * 60 * 60 * 1000) {
-            storageRemove('bussid_session');
-            window.location.href = 'login.html';
+            storageRemove('sesi_pengguna');
+            window.location.href = '/login';
             return false;
         }
         currentUser = {
@@ -488,8 +537,8 @@ function checkAuth() {
         };
         return true;
     } catch (e) {
-        storageRemove('bussid_session');
-        window.location.href = 'login.html';
+        storageRemove('sesi_pengguna');
+        window.location.href = '/login';
         return false;
     }
 }
@@ -528,7 +577,7 @@ async function checkAccountStatus() {
             Swal.fire({
                 icon: 'error',
                 title: 'AKUN DIBANNED',
-                html: 'Maaf, akun Anda telah dibanned oleh admin.<br><br>⏱️ Durasi: ' + untilText,
+                html: 'Maaf, akun Anda telah dibanned oleh admin.<br><br>Durasi: ' + untilText,
                 confirmButtonText: 'OK',
                 confirmButtonColor: '#ef4444',
                 allowOutsideClick: false
@@ -542,7 +591,7 @@ async function checkAccountStatus() {
             Swal.fire({
                 icon: 'error',
                 title: 'AKSES DIBLOKIR',
-                html: 'Maaf, akses Anda diblokir oleh admin.<br><br>⏱️ Durasi: ' + untilTextA,
+                html: 'Maaf, akses Anda diblokir oleh admin.<br><br>Durasi: ' + untilTextA,
                 confirmButtonText: 'OK',
                 confirmButtonColor: '#ef4444',
                 allowOutsideClick: false
@@ -555,7 +604,7 @@ async function checkAccountStatus() {
             Swal.fire({
                 icon: 'warning',
                 title: 'AKUN DITANGGUHKAN',
-                html: 'Akun Anda ditangguhkan karena indikasi sharing akun.<br><br>Silakan hubungi admin.',
+                html: 'Akun Anda ditangguhkan karena indikasi aktivitas mencurigakan.<br><br>Silakan hubungi admin.',
                 confirmButtonText: 'OK',
                 confirmButtonColor: '#ef4444',
                 allowOutsideClick: false
@@ -573,9 +622,9 @@ async function checkAccountStatus() {
 }
 
 function autoLogout() {
-    storageRemove('bussid_session');
+    storageRemove('sesi_pengguna');
     if (statusCheckInterval) clearInterval(statusCheckInterval);
-    window.location.href = 'login.html';
+    window.location.href = '/login';
 }
 
 function logout() {
@@ -583,9 +632,9 @@ function logout() {
     currentAccount = null;
     currentAuthToken = null;
     lastDeviceId = null;
-    storageRemove('bussid_session');
+    storageRemove('sesi_pengguna');
     if (statusCheckInterval) clearInterval(statusCheckInterval);
-    window.location.href = 'login.html';
+    window.location.href = '/login';
 }
 
 function updateProfileInfo() {
@@ -776,7 +825,7 @@ function refreshAccountInfo() {
         showAlert('Cari akun dulu!', 'error');
         return;
     }
-    showLoading('Refresh...');
+    showLoading('Menyegarkan...');
     setTimeout(async function() {
         var info = await getUserInfoFromPlayFab();
         if (info) {
@@ -787,7 +836,7 @@ function refreshAccountInfo() {
             currentAccount.playFabId = info.playFabId;
             showAccountInfo(currentAccount);
             hideLoading();
-            showAlert('Updated!', 'success');
+            showAlert('Diperbarui!', 'success');
         } else {
             hideLoading();
         }
@@ -942,7 +991,7 @@ function showReceipt(trx) {
     hideAllSections();
     var typeText = trx.type === 'topup' ? 'TOP UP' : 'KURAS';
     var sign = trx.type === 'topup' ? '+' : '-';
-    document.getElementById('receiptContent').innerHTML = '<div class="receipt-content"><div class="receipt-header"><h3>BUSSID</h3><p>Detail Transaksi</p></div><div class="receipt-details"><div class="receipt-row"><span>Akun:</span><span>' + sanitize(trx.accountName) + '</span></div><div class="receipt-row"><span>Jenis:</span><span>' + typeText + '</span></div><div class="receipt-row"><span>Jumlah:</span><span style="color:' + (trx.type === 'topup' ? '#10b981' : '#f59e0b') + '">' + sign + formatCurrency(trx.amount) + '</span></div><div class="receipt-row"><span>Saldo Awal:</span><span>' + formatCurrency(trx.oldBalance) + '</span></div><div class="receipt-row"><span>Saldo Akhir:</span><span>' + formatCurrency(trx.newBalance) + '</span></div><div class="receipt-row"><span>Tanggal:</span><span>' + new Date(trx.timestamp).toLocaleString('id-ID') + '</span></div><div class="receipt-row"><span>Status:</span><span style="color:#10b981;">BERHASIL</span></div></div></div><div style="display:flex;gap:8px;margin-top:20px;"><button class="btn btn-primary" onclick="window._showTrxModal()" style="flex:1;">TRX LAGI</button><button class="btn btn-secondary" onclick="window._goHome()" style="flex:1;">HOME</button></div>';
+    document.getElementById('receiptContent').innerHTML = '<div class="receipt-content"><div class="receipt-header"><h3>TOP UP</h3><p>Detail Transaksi</p></div><div class="receipt-details"><div class="receipt-row"><span>Akun:</span><span>' + sanitize(trx.accountName) + '</span></div><div class="receipt-row"><span>Jenis:</span><span>' + typeText + '</span></div><div class="receipt-row"><span>Jumlah:</span><span style="color:' + (trx.type === 'topup' ? '#10b981' : '#f59e0b') + '">' + sign + formatCurrency(trx.amount) + '</span></div><div class="receipt-row"><span>Saldo Awal:</span><span>' + formatCurrency(trx.oldBalance) + '</span></div><div class="receipt-row"><span>Saldo Akhir:</span><span>' + formatCurrency(trx.newBalance) + '</span></div><div class="receipt-row"><span>Tanggal:</span><span>' + new Date(trx.timestamp).toLocaleString('id-ID') + '</span></div><div class="receipt-row"><span>Status:</span><span style="color:#10b981;">BERHASIL</span></div></div></div><div style="display:flex;gap:8px;margin-top:20px;"><button class="btn btn-primary" onclick="window._showTrxModal()" style="flex:1;">LANJUTKAN</button><button class="btn btn-secondary" onclick="window._goHome()" style="flex:1;">HOME</button></div>';
     document.getElementById('receiptSection').style.display = 'block';
 }
 
@@ -1177,6 +1226,10 @@ function setupEventListeners() {
 
 document.addEventListener('DOMContentLoaded', async function() {
     if (!checkAuth()) return;
+
+    var maintenance = await periksaMaintenance();
+    if (maintenance) { tampilkanHalamanMaintenance(maintenance); return; }
+
     setupEventListeners();
     setupQuickAmounts();
     document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
