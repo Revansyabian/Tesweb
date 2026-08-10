@@ -1,4 +1,4 @@
-var API_REVANSTORE = '/api/revanstoreV2';
+var API_REVANSTORE = '/api/revanstore';
 var API_RVNSTORE = '/api/rvnstore';
 var ADMIN_KEY = 'dhagwxwhu:f4afc5aa03e73130f5e055dfe6a708c4dc40759b';
 var WHATSAPP_NUMBER = "6285199120995";
@@ -133,9 +133,10 @@ function parseAmount(input) {
 
 function validateTopupAmount() {
     var input = document.getElementById('topupAmount'), preview = document.getElementById('amountPreview'), previewValue = document.getElementById('amountPreviewValue');
+    if (!input) return;
     var amount = parseAmount(input.value);
-    if (amount > 0 && input.value.trim() !== '') { preview.style.display = 'block'; previewValue.textContent = formatCurrency(amount); }
-    else { preview.style.display = 'none'; }
+    if (amount > 0 && input.value.trim() !== '') { if (preview) preview.style.display = 'block'; if (previewValue) previewValue.textContent = formatCurrency(amount); }
+    else { if (preview) preview.style.display = 'none'; }
 }
 
 function hideAllSections() {
@@ -144,13 +145,31 @@ function hideAllSections() {
     var searchCard = document.querySelector('.search-card'); if (searchCard) searchCard.style.display = 'none';
 }
 
-function showHome() { hideAllSections(); document.querySelector('.search-card').style.display = 'block'; }
-function backToAccount() { if (currentAccount) { hideAllSections(); document.getElementById('accountInfo').style.display = 'block'; renderAccountInfo(); } else { showHome(); } }
+function showHome() { hideAllSections(); var sc = document.querySelector('.search-card'); if (sc) sc.style.display = 'block'; }
+function backToAccount() { if (currentAccount) { hideAllSections(); var ai = document.getElementById('accountInfo'); if (ai) { ai.style.display = 'block'; renderAccountInfo(); } } else { showHome(); } }
 
 function parseDate(dateStr) {
     if (!dateStr) return null;
-    var parts = dateStr.split('/'); if (parts.length !== 3) return null;
-    var month = parseInt(parts[0], 10) - 1, day = parseInt(parts[1], 10), year = parseInt(parts[2], 10);
+    if (dateStr.includes('9999')) return null;
+    var parts = String(dateStr).split('/');
+    if (parts.length !== 3) {
+        if (String(dateStr).includes('-')) {
+            parts = String(dateStr).split('-');
+            if (parts.length !== 3) return null;
+        } else {
+            return null;
+        }
+    }
+    var day, month, year;
+    if (parts[0].length === 4) {
+        year = parseInt(parts[0], 10);
+        month = parseInt(parts[1], 10) - 1;
+        day = parseInt(parts[2], 10);
+    } else {
+        month = parseInt(parts[0], 10) - 1;
+        day = parseInt(parts[1], 10);
+        year = parseInt(parts[2], 10);
+    }
     if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
     if (month < 0 || month > 11 || day < 1 || day > 31 || year < 2000) return null;
     var date = new Date(year, month, day);
@@ -159,18 +178,33 @@ function parseDate(dateStr) {
 }
 
 function calculateRemainingDays(expiryDate) {
-    if (!expiryDate) return -999;
-    if (expiryDate.includes('9999')) return 999999;
-    var expiry = parseDate(expiryDate); if (!expiry) return -999;
-    var now = new Date(); now.setHours(0, 0, 0, 0);
-    return Math.ceil((expiry - now) / (1000 * 60 * 60 * 24));
+    if (!expiryDate) return 999999;
+    if (String(expiryDate).includes('9999')) return 999999;
+    var expiry = parseDate(expiryDate);
+    if (!expiry) return 999999;
+    var now = new Date();
+    now.setHours(0, 0, 0, 0);
+    var diff = expiry.getTime() - now.getTime();
+    if (diff < 0) {
+        if (diff > -86400000) return 0;
+        return Math.ceil(diff / (1000 * 60 * 60 * 24));
+    }
+    return Math.ceil(diff / (1000 * 60 * 60 * 24));
 }
 
-function getDaysLeftClass(daysLeft) { if (daysLeft === 999999) return 'days-permanent'; if (daysLeft <= 0) return 'days-red'; if (daysLeft <= 3) return 'days-yellow'; return 'days-green'; }
-function getDaysLeftText(daysLeft) { if (daysLeft === 999999) return '♾️ Permanent'; if (daysLeft === -999) return '⏰ Tidak ada'; if (daysLeft < 0) return '⏰ Habis ' + Math.abs(daysLeft) + ' hari'; if (daysLeft === 0) return '⚠️ Hari ini'; if (daysLeft === 1) return '📅 1 hari'; return '📅 ' + daysLeft + ' hari'; }
-function checkAccountExpiry(user) { if (!user || !user.expiry_date) return { expired: true, daysLeft: -999, daysLeftText: '⏰ Tidak ada', daysLeftClass: 'days-red' }; var daysLeft = calculateRemainingDays(user.expiry_date); var expired = daysLeft <= 0 && daysLeft !== 999999; return { expired: expired, daysLeft: daysLeft, daysLeftText: getDaysLeftText(daysLeft), daysLeftClass: getDaysLeftClass(daysLeft) }; }
-function showExpiredBanner() { document.getElementById('expiredBanner').style.display = 'flex'; document.getElementById('mainApp').style.display = 'none'; }
-function closeExpiredBanner() { document.getElementById('expiredBanner').style.display = 'none'; logout(); }
+function getDaysLeftClass(daysLeft) { if (daysLeft === 999999) return 'days-permanent'; if (daysLeft < 0) return 'days-red'; if (daysLeft === 0) return 'days-yellow'; if (daysLeft <= 3) return 'days-yellow'; return 'days-green'; }
+function getDaysLeftText(daysLeft) { if (daysLeft === 999999) return '♾️ Permanent'; if (daysLeft < 0) return '⏰ Habis ' + Math.abs(daysLeft) + ' hari'; if (daysLeft === 0) return '⚠️ Hari ini'; if (daysLeft === 1) return '📅 1 hari'; return '📅 ' + daysLeft + ' hari'; }
+function checkAccountExpiry(user) {
+    if (!user || !user.expiry_date) return { expired: false, daysLeft: 999999, daysLeftText: '♾️ Permanent', daysLeftClass: 'days-permanent' };
+    if (String(user.expiry_date).includes('9999')) return { expired: false, daysLeft: 999999, daysLeftText: '♾️ Permanent', daysLeftClass: 'days-permanent' };
+    var daysLeft = calculateRemainingDays(user.expiry_date);
+    if (daysLeft === 999999) return { expired: false, daysLeft: 999999, daysLeftText: '♾️ Permanent', daysLeftClass: 'days-permanent' };
+    var expired = daysLeft < 0;
+    return { expired: expired, daysLeft: daysLeft, daysLeftText: getDaysLeftText(daysLeft), daysLeftClass: getDaysLeftClass(daysLeft) };
+}
+
+function showExpiredBanner() { var eb = document.getElementById('expiredBanner'); if (eb) eb.style.display = 'flex'; var ma = document.getElementById('mainApp'); if (ma) ma.style.display = 'none'; }
+function closeExpiredBanner() { var eb = document.getElementById('expiredBanner'); if (eb) eb.style.display = 'none'; logout(); }
 
 function openWhatsApp() {
     var msg = encodeURIComponent("Assalamualaikum admin, saya ingin memperpanjang masa aktif akun BUSSID Top Up saya. Username: " + (currentUser ? currentUser.username : ''));
@@ -203,7 +237,7 @@ function checkAuth() {
     try {
         var session = JSON.parse(saved), age = Date.now() - (session.timestamp || 0);
         if (age > 7 * 24 * 60 * 60 * 1000) { storageRemove('bussid_session'); window.location.href = 'login.html'; return false; }
-        currentUser = { id: session.user_id, username: session.username, password: session.password };
+        currentUser = { id: session.user_id, username: session.username, password: session.password, role: session.role || 'Operator', full_name: session.full_name || session.username, expiry_date: session.expiry_date || '' };
         return true;
     } catch (e) { storageRemove('bussid_session'); window.location.href = 'login.html'; return false; }
 }
@@ -227,6 +261,11 @@ async function checkAccountStatus() {
         if (result && result.forceLogout) {
             Swal.fire({ icon: 'warning', title: 'AKUN DITANGGUHKAN', html: 'Akun Anda ditangguhkan karena indikasi sharing akun.<br><br>Silakan hubungi admin.', confirmButtonText: 'OK', confirmButtonColor: '#ef4444', allowOutsideClick: false }).then(function() { autoLogout(); });
             return;
+        }
+        if (result && result.valid && result.user) {
+            currentUser.role = result.user.role || currentUser.role;
+            currentUser.full_name = result.user.full_name || currentUser.full_name;
+            currentUser.expiry_date = result.user.expiry_date || currentUser.expiry_date;
         }
     } catch (e) {}
 }
@@ -254,7 +293,7 @@ function updateProfileInfo() {
     if (elName) elName.textContent = currentUser.full_name || currentUser.username;
     if (elRole) elRole.textContent = currentUser.role || 'Operator';
     var expiryFormatted = currentUser.expiry_date || 'Tidak ada';
-    if (elExpiry) elExpiry.innerHTML = '<span>' + expiryFormatted + '</span> <span class="expiry-days-left ' + expiryCheck.daysLeftClass + '">' + expiryCheck.daysLeftText + '</span>';
+    if (elExpiry) elExpiry.innerHTML = '<span>' + expiryFormatted + '</span>';
 }
 
 // ==================== BOTTOM NAVIGATION ====================
@@ -307,7 +346,7 @@ async function searchAccount() {
     var id = document.getElementById('deviceId').value.trim();
     if (!id) { showAlert('Masukkan Device ID!', 'error'); return; }
     var ok = await loginWithDeviceId(id);
-    if (ok) { lastDeviceId = id; renderAccountInfo(); hideAllSections(); document.getElementById('accountInfo').style.display = 'block'; showAlert('Akun ditemukan!', 'success'); }
+    if (ok) { lastDeviceId = id; renderAccountInfo(); hideAllSections(); var ai = document.getElementById('accountInfo'); if (ai) ai.style.display = 'block'; showAlert('Akun ditemukan!', 'success'); }
 }
 
 function renderAccountInfo() {
@@ -319,7 +358,7 @@ function renderAccountInfo() {
 
     var html = '<div class="card-header"><h2><i class="fas fa-user-circle"></i> INFORMASI AKUN BUSSID</h2><button class="btn-icon" onclick="refreshAccountInfo()"><i class="fas fa-sync-alt"></i> Refresh</button></div>';
     html += '<div class="card-body">';
-    html += '<div class="account-profile"><div class="profile-photo-container"><div class="profile-photo" id="profilePhoto">' + (acc.facebookAvatarUrl ? '<img src="' + acc.facebookAvatarUrl + '" style="width:100%;height:100%;object-fit:cover;border-radius:50%">' : '<i class="fas fa-user"></i>') + '</div></div><div class="profile-info"><h3 id="accountName">' + sanitize(acc.name || '-') + '</h3><p class="account-balance" id="accountBalance">' + formatCurrency(acc.balance) + '</p></div></div>';
+    html += '<div class="account-profile"><div class="profile-photo-container"><div class="profile-photo" id="profilePhoto">' + (acc.facebookAvatarUrl ? '<img src="' + acc.facebookAvatarUrl + '" style="width:100%;height:100%;object-fit:cover;border-radius:50%" onerror="this.parentElement.innerHTML=\'<i class=\\\'fas fa-user\\\'></i>\'">' : '<i class="fas fa-user"></i>') + '</div></div><div class="profile-info"><h3 id="accountName">' + sanitize(acc.name || '-') + '</h3><p class="account-balance" id="accountBalance">' + formatCurrency(acc.balance) + '</p></div></div>';
     html += '<div class="facebook-info-section"><h4><i class="fab fa-facebook" style="color:#1877F2"></i> INFORMASI AKUN FACEBOOK</h4><div class="facebook-info-details" id="facebookDetails">';
     if (fb.isConnected && fb.id) {
         html += '<div class="fb-info-row"><span class="fb-info-label"><i class="fab fa-facebook"></i> Status:</span><span class="fb-info-value" style="color:#1877F2;">✅ TERHUBUNG</span></div>';
@@ -383,14 +422,17 @@ function generateQuickAmounts() {
 
 async function processTopup() {
     if (!currentAccount) return;
-    var amt = parseAmount(document.getElementById('topupAmount').value.trim());
+    var el = document.getElementById('topupAmount');
+    if (!el) return;
+    var amt = parseAmount(el.value.trim());
     if (amt <= 0) { showAlert('Jumlah tidak valid!', 'error'); return; }
     showConfirm('TOP UP', 'Top up ' + formatCurrency(amt) + '?', 'topup', { amount: amt });
 }
 
 async function processKuras() {
     if (!currentAccount) return;
-    var amt = parseAmount(document.getElementById('kurasAmount').value.trim()) || currentAccount.balance;
+    var el = document.getElementById('kurasAmount');
+    var amt = el ? parseAmount(el.value.trim()) || currentAccount.balance : currentAccount.balance;
     if (amt <= 0 || amt > currentAccount.balance) { showAlert('Saldo tidak cukup!', 'error'); return; }
     showConfirm('KURAS', 'Kuras ' + formatCurrency(amt) + '?', 'kuras', { amount: amt });
 }
@@ -478,8 +520,8 @@ function showSettings() {
     hideAllSections();
     var section = document.getElementById('settingsSection');
     if (section) {
-        var expiryCheck = checkAccountExpiry(currentUser);
-        section.innerHTML = '<div class="card-header"><h2><i class="fas fa-cog"></i> PENGATURAN AKUN</h2></div><div class="card-body"><div class="user-profile-info"><div class="profile-item"><span class="profile-label"><i class="fas fa-user"></i> Username:</span><span class="profile-value highlight-black" id="profileUsername">' + sanitize(currentUser.username) + '</span></div><div class="profile-item"><span class="profile-label"><i class="fas fa-user"></i> Nama:</span><span class="profile-value highlight-black" id="profileName">' + sanitize(currentUser.full_name || currentUser.username) + '</span></div><div class="profile-item"><span class="profile-label"><i class="fas fa-user-tag"></i> Role:</span><span class="profile-value role-biru" id="profileRole">' + sanitize(currentUser.role || 'Operator') + '</span></div><div class="profile-item"><span class="profile-label"><i class="fas fa-calendar-alt"></i> Masa Aktif:</span><span class="profile-value" id="profileExpiry"><span>' + (currentUser.expiry_date || 'Tidak ada') + '</span> <span class="expiry-days-left ' + expiryCheck.daysLeftClass + '">' + expiryCheck.daysLeftText + '</span></span></div></div><div class="settings-divider"><h3><i class="fas fa-key"></i> Ubah Password</h3></div><p style="text-align:center;color:#64748b;padding:15px;font-size:14px"><i class="fas fa-info-circle"></i> Hubungi admin via WhatsApp untuk ubah password</p><button class="btn btn-whatsapp btn-block" onclick="openWhatsAppPassword()"><i class="fab fa-whatsapp"></i> Ubah Password</button><button class="btn btn-danger btn-block" onclick="logout()" style="margin-top:20px"><i class="fas fa-sign-out-alt"></i> LOGOUT</button></div>';
+        var expiryFormatted = currentUser.expiry_date || 'Tidak ada';
+        section.innerHTML = '<div class="card-header"><h2><i class="fas fa-cog"></i> PENGATURAN AKUN</h2></div><div class="card-body"><div class="user-profile-info"><div class="profile-item"><span class="profile-label"><i class="fas fa-user"></i> Username:</span><span class="profile-value highlight-black" id="profileUsername">' + sanitize(currentUser.username) + '</span></div><div class="profile-item"><span class="profile-label"><i class="fas fa-user"></i> Nama:</span><span class="profile-value highlight-black" id="profileName">' + sanitize(currentUser.full_name || currentUser.username) + '</span></div><div class="profile-item"><span class="profile-label"><i class="fas fa-user-tag"></i> Role:</span><span class="profile-value role-biru" id="profileRole">' + sanitize(currentUser.role || 'Operator') + '</span></div><div class="profile-item"><span class="profile-label"><i class="fas fa-calendar-alt"></i> Masa Aktif:</span><span class="profile-value" id="profileExpiry">' + expiryFormatted + '</span></div></div><div class="settings-divider"><h3><i class="fas fa-key"></i> Ubah Password</h3></div><p style="text-align:center;color:#64748b;padding:15px;font-size:14px"><i class="fas fa-info-circle"></i> Hubungi admin via WhatsApp untuk ubah password</p><button class="btn btn-whatsapp btn-block" onclick="openWhatsAppPassword()"><i class="fab fa-whatsapp"></i> Ubah Password</button><button class="btn btn-danger btn-block" onclick="logout()" style="margin-top:20px"><i class="fas fa-sign-out-alt"></i> LOGOUT</button></div>';
         section.style.display = 'block';
     }
 }
@@ -508,7 +550,9 @@ async function confirmAction() {
 async function checkNameAvailability() { var d = document.getElementById('nameAvailability'); if (d) { d.innerHTML = 'Mengecek...'; d.style.display = 'block'; setTimeout(function() { d.innerHTML = '✅ Tersedia!'; }, 1000); } }
 
 async function changeAccountNameSimple() {
-    var name = sanitize(document.getElementById('newAccountName').value.trim());
+    var nameEl = document.getElementById('newAccountName');
+    if (!nameEl) return;
+    var name = sanitize(nameEl.value.trim());
     if (!name) { showAlert('Masukkan nama!', 'error'); return; }
     if (!currentAccount || !currentAuthToken) { showAlert('Cari akun dulu!', 'error'); return; }
     showConfirm('GANTI NAMA', 'Ganti ke "' + name + '"?', 'changename', name);
@@ -547,10 +591,18 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     showHome();
 
-    grecaptcha.ready(async function() {
+    if (typeof grecaptcha !== 'undefined') {
+        grecaptcha.ready(async function() {
+            await checkAccountStatus();
+            statusCheckInterval = setInterval(checkAccountStatus, 30000);
+        });
+    } else {
         await checkAccountStatus();
         statusCheckInterval = setInterval(checkAccountStatus, 30000);
-    });
+    }
 
-    document.getElementById('deviceId').addEventListener('keypress', function(e) { if (e.key === 'Enter') searchAccount(); });
+    var deviceInput = document.getElementById('deviceId');
+    if (deviceInput) deviceInput.addEventListener('keypress', function(e) { if (e.key === 'Enter') searchAccount(); });
+
+    console.log('Dashboard siap. User:', currentUser.username);
 });
