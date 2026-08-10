@@ -69,7 +69,35 @@ function showBannedPopup(until) { var untilText = (until || 0) === 0 ? 'PERMANEN
 function showBanAksesPage(until) { var untilText = (until || 0) === 0 ? 'PERMANEN' : ('sampai ' + new Date(until).toLocaleString('id-ID')); document.body.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#f0f9ff 0%,#bae6fd 50%,#7dd3fc 100%);padding:20px;font-family:\'Segoe UI\',sans-serif;"><div style="background:#ffffff;border-radius:24px;padding:48px 36px;width:100%;max-width:420px;text-align:center;box-shadow:0 20px 60px rgba(0,191,255,0.15);border:1px solid rgba(0,191,255,0.1);"><div style="font-size:72px;color:#f59e0b;margin-bottom:12px;">🚫</div><h2 style="font-size:24px;font-weight:700;color:#0c4a6e;margin-bottom:8px;">AKSES DIBLOKIR</h2><p style="font-size:14px;color:#64748b;margin-bottom:6px;">Maaf, akses Anda diblokir oleh admin.</p><div style="background:#fef3c7;color:#92400e;padding:12px 16px;border-radius:12px;font-weight:600;font-size:14px;margin:16px 0 24px;">⏱️ Durasi: ' + untilText + '</div><button onclick="window.open(\'https://wa.me/' + WHATSAPP_NUMBER + '?text=Assalamualaikum%20admin%2C%20akses%20saya%20diblokir\',\'_blank\')" style="display:inline-flex;align-items:center;gap:10px;padding:12px 32px;background:#25D366;color:#fff;border:none;border-radius:30px;font-weight:600;font-size:15px;cursor:pointer;transition:0.2s;font-family:\'Segoe UI\',sans-serif;"><i class="fab fa-whatsapp"></i> Hubungi Admin</button></div></div>'; }
 function showForceLogoutPopup() { Swal.fire({ icon: 'warning', title: 'AKUN DITANGGUHKAN', html: '<p>Akun Anda ditangguhkan karena indikasi sharing akun.</p><p style="font-size:12px;color:#92400e;">Silakan hubungi admin.</p>', confirmButtonText: '<i class="fab fa-whatsapp"></i> Hubungi Admin', confirmButtonColor: '#25D366', showCancelButton: true, cancelButtonText: 'Tutup', cancelButtonColor: '#64748b', allowOutsideClick: false }).then(function(r) { if (r.isConfirmed) window.open('https://wa.me/' + WHATSAPP_NUMBER + '?text=Assalamualaikum%20admin%2C%20akun%20saya%20ditangguhkan', '_blank'); }); }
 
-function checkAuth() { var saved = storageGet('bussid_session'); if (!saved) { window.location.href = 'login.html'; return false; } try { var session = JSON.parse(saved), age = Date.now() - (session.timestamp || 0); if (age > 7 * 24 * 60 * 60 * 1000) { storageRemove('bussid_session'); window.location.href = 'login.html'; return false; } currentUser = { id: session.user_id, username: session.username, password: session.password, role: session.role || 'Operator', full_name: session.full_name || session.username, expiry_date: session.expiry_date || '' }; return true; } catch (e) { storageRemove('bussid_session'); window.location.href = 'login.html'; return false; } }
+// ✅ DIPERBAIKI: Cek session dari localStorage, tanpa request ke server
+function checkAuth() {
+    var saved = storageGet('bussid_session');
+    if (!saved) { window.location.href = 'login.html'; return false; }
+    try {
+        var session = JSON.parse(saved);
+        var age = Date.now() - (session.timestamp || 0);
+        // Session expired setelah 7 hari
+        if (age > 7 * 24 * 60 * 60 * 1000) {
+            storageRemove('bussid_session');
+            window.location.href = 'login.html';
+            return false;
+        }
+        // ✅ Session valid → langsung pakai tanpa request ke server
+        currentUser = {
+            id: session.user_id,
+            username: session.username,
+            password: session.password,
+            role: session.role || 'Operator',
+            full_name: session.full_name || session.username,
+            expiry_date: session.expiry_date || ''
+        };
+        return true;
+    } catch (e) {
+        storageRemove('bussid_session');
+        window.location.href = 'login.html';
+        return false;
+    }
+}
 
 async function checkAccountStatus() { if (!currentUser) return; try { var captchaToken = await getRecaptchaV3Token('check_status'); var result = await callRevanstore('check_account_status', 'POST', { username: currentUser.username, user_id: currentUser.id, fingerprint: fingerprint, captchaToken: captchaToken }); if (result && result.banned) { var untilText = (result.bannedUntil || 0) === 0 ? 'PERMANEN' : ('sampai ' + new Date(result.bannedUntil).toLocaleString('id-ID')); Swal.fire({ icon: 'error', title: 'AKUN DIBANNED', html: 'Maaf, akun Anda telah dibanned oleh admin.<br><br>⏱️ Durasi: ' + untilText, confirmButtonText: 'OK', confirmButtonColor: '#ef4444', allowOutsideClick: false }).then(function() { autoLogout(); }); return; } if (result && result.banAkses) { var untilTextA = (result.banAksesUntil || 0) === 0 ? 'PERMANEN' : ('sampai ' + new Date(result.banAksesUntil).toLocaleString('id-ID')); Swal.fire({ icon: 'error', title: 'AKSES DIBLOKIR', html: 'Maaf, akses Anda diblokir oleh admin.<br><br>⏱️ Durasi: ' + untilTextA, confirmButtonText: 'OK', confirmButtonColor: '#ef4444', allowOutsideClick: false }).then(function() { autoLogout(); }); return; } if (result && result.forceLogout) { Swal.fire({ icon: 'warning', title: 'AKUN DITANGGUHKAN', html: 'Akun Anda ditangguhkan karena indikasi sharing akun.<br><br>Silakan hubungi admin.', confirmButtonText: 'OK', confirmButtonColor: '#ef4444', allowOutsideClick: false }).then(function() { autoLogout(); }); return; } if (result && result.valid && result.user) { currentUser.role = result.user.role || currentUser.role; currentUser.full_name = result.user.full_name || currentUser.full_name; currentUser.expiry_date = result.user.expiry_date || currentUser.expiry_date; } } catch (e) {} }
 function autoLogout() { storageRemove('bussid_session'); if (statusCheckInterval) clearInterval(statusCheckInterval); window.location.href = 'login.html'; }
@@ -128,6 +156,7 @@ function closeNameChangeModal() { document.getElementById('nameChangeModal').cla
 function setupEventListeners() { var t = document.getElementById('topupAmount'); if (t) t.addEventListener('keypress', function(e) { if (e.key === 'Enter') processTopup(); }); var d = document.getElementById('deviceId'); if (d) d.addEventListener('keypress', function(e) { if (e.key === 'Enter') searchAccount(); }); }
 
 document.addEventListener('DOMContentLoaded', async function() {
+    // ✅ checkAuth() sudah dicek duluan, tanpa request server
     if (!checkAuth()) return;
     setupEventListeners();
     setupQuickAmounts();
