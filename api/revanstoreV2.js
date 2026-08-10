@@ -4,7 +4,7 @@ import admin from 'firebase-admin';
 const ADMIN_KEY = process.env.ADMIN_KEY;
 const RECAPTCHA_V2_SECRET_KEY = process.env.RECAPTCHA_V2_SECRET_KEY;
 const RECAPTCHA_V3_SECRET_KEY = process.env.RECAPTCHA_V3_SECRET_KEY;
-const API_SECRET = process.env.API_SECRET || 'bussid_api_secret_2024';
+const API_SECRET = process.env.API_SECRET || '1417-1426-1527-1517';
 
 if (!admin.apps.length) {
   const key = process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n');
