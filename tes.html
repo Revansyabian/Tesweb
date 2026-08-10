@@ -146,7 +146,7 @@
         var WHATSAPP_NUMBER = '6285199120995';
         var STORAGE_KEY = 'bussid_session';
         var STORAGE_SECRET = 'bussid_session_secret_key';
-        var RECAPTCHA_SITE_KEY_V3 = '6LcVBn4tAAAAAINTTIleUbUZr1ZykvyB6WA-oOfT';
+        var RECAPTCHA_V3_SITE_KEY = '6LcVBn4tAAAAAINTTIleUbUZr1ZykvyB6WA-oOfT';
 
         function showBlockedScreen(title, message, info) {
             document.getElementById('loadingScreen').style.display = 'none';
@@ -177,9 +177,9 @@
             return CryptoJS.MD5(fp).toString();
         }
 
-        async function getRecaptchaToken(action) {
+        async function getRecaptchaV3Token(action) {
             try {
-                return await grecaptcha.execute(RECAPTCHA_SITE_KEY_V3, { action: action });
+                return await grecaptcha.execute(RECAPTCHA_V3_SITE_KEY, { action: action });
             } catch (e) {
                 return null;
             }
@@ -197,7 +197,7 @@
         async function checkBlocked() {
             updateLoadingText('Memeriksa fingerprint...');
             var fingerprint = await getFingerprint();
-            var captchaToken = await getRecaptchaToken('check_blocked');
+            var captchaToken = await getRecaptchaV3Token('check_blocked');
 
             updateLoadingText('Memeriksa keamanan IP & perangkat...');
             try {
@@ -262,7 +262,7 @@
             updateLoadingText('Memverifikasi akun...');
 
             try {
-                var captchaToken = await getRecaptchaToken('check_session');
+                var captchaToken = await getRecaptchaV3Token('check_session');
                 var res = await fetch(API_REVANSTORE, {
                     method: 'POST',
                     headers: {
