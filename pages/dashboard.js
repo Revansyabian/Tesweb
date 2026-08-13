@@ -1225,8 +1225,10 @@ function setupEventListeners() {
 }
 
 document.addEventListener('DOMContentLoaded', async function() {
+    // ✅ Cek login dulu — kalau belum, arahkan ke login page
     if (!checkAuth()) return;
 
+    // ✅ Kalau sudah login, cek maintenance
     var maintenance = await periksaMaintenance();
     if (maintenance) { tampilkanHalamanMaintenance(maintenance); return; }
 
@@ -1245,8 +1247,13 @@ document.addEventListener('DOMContentLoaded', async function() {
         showBlockedScreen();
         return;
     }
-    document.getElementById('mainApp').style.display = 'block';
-    document.getElementById('bottomNav').style.display = 'flex';
+
+    // ✅ Tampilkan dashboard
+    var mainApp = document.getElementById('mainApp');
+    var bottomNav = document.getElementById('bottomNav');
+    if (mainApp) mainApp.style.display = 'block';
+    if (bottomNav) bottomNav.style.display = 'flex';
+
     var expiryCheck = checkAccountExpiry(currentUser);
     if (expiryCheck.expired) {
         showExpiredBanner();
