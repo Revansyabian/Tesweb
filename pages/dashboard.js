@@ -532,7 +532,7 @@ function checkAuth() {
         var age = Date.now() - (session.timestamp || 0);
         if (age > 7 * 24 * 60 * 60 * 1000) {
             storageRemove('sesi_pengguna');
-            window.location.href = '/login';
+            window.location.href = '/pages/login';
             return false;
         }
         currentUser = {
