@@ -1,8 +1,8 @@
 {
   "rewrites": [
     { "source": "/", "destination": "/index.html" },
-    { "source": "/login", "destination": "/pages/login.html" },
-    { "source": "/dashboard", "destination": "/pages/dashboard.html" },
+    { "source": "/pages/login", "destination": "/pages/login.html" },
+    { "source": "/pages/dashboard", "destination": "/pages/dashboard.html" },
     { "source": "/api/revanstoreV2", "destination": "/api/revanstoreV2.js" },
     { "source": "/api/rvnstore", "destination": "/api/rvnstore.js" }
   ]
