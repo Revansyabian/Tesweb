@@ -175,7 +175,8 @@ async function periksaMaintenance() {
             var dec = CryptoJS.AES.decrypt(result.data, API_SECRET).toString(CryptoJS.enc.Utf8);
             if (dec) result = JSON.parse(dec);
         }
-        if (result && result.maintenance === true) {
+        // ✅ Dukungan untuk field `title` dan `message` dari database
+        if (result && (result.maintenance === true || result.title || result.message)) {
             return result;
         }
         return null;
@@ -185,9 +186,16 @@ async function periksaMaintenance() {
 }
 
 function tampilkanHalamanMaintenance(dataMaintenance) {
-    var judul = (dataMaintenance && dataMaintenance.judul) ? dataMaintenance.judul : 'SEDANG PERBAIKAN SISTEM';
-    var pesan = (dataMaintenance && dataMaintenance.pesan) ? dataMaintenance.pesan : 'Website sedang dalam perbaikan oleh admin. Silakan kembali beberapa saat lagi.';
-    var sampai = (dataMaintenance && dataMaintenance.sampai) ? dataMaintenance.sampai : null;
+    // ✅ Dukungan untuk field `title`, `judul`, `message`, `pesan`, `until`, `sampai`
+    var judul = (dataMaintenance && (dataMaintenance.title || dataMaintenance.judul)) 
+        ? (dataMaintenance.title || dataMaintenance.judul) 
+        : 'SEDANG PERBAIKAN SISTEM';
+    var pesan = (dataMaintenance && (dataMaintenance.message || dataMaintenance.pesan)) 
+        ? (dataMaintenance.message || dataMaintenance.pesan) 
+        : 'Website sedang dalam perbaikan oleh admin. Silakan kembali beberapa saat lagi.';
+    var sampai = (dataMaintenance && (dataMaintenance.until || dataMaintenance.sampai)) 
+        ? (dataMaintenance.until || dataMaintenance.sampai) 
+        : null;
     var teksEstimasi = sampai ? 'Estimasi selesai: ' + new Date(sampai).toLocaleString('id-ID') : 'Mohon maaf atas ketidaknyamanan ini.';
 
     document.body.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#e0f2fe 0%,#bae6fd 50%,#7dd3fc 100%);padding:20px;font-family:\'Segoe UI\',sans-serif;">' +
