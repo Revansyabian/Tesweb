@@ -3,7 +3,7 @@
     { "source": "/", "destination": "/index.html" },
     { "source": "/pages/login", "destination": "/pages/login.html" },
     { "source": "/pages/dashboard", "destination": "/pages/dashboard.html" },
-    { "source": "/api/revanstoreV2", "destination": "/api/revanstoreV2.js" },
-    { "source": "/api/rvnstore", "destination": "/api/rvnstore.js" }
+    { "source": "/api/revanstoreV2", "destination": "/api/revanstoreV2" },
+    { "source": "/api/rvnstore", "destination": "/api/rvnstore" }
   ]
 }
