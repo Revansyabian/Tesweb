@@ -172,10 +172,10 @@ async function periksaMaintenance() {
 }
 
 function tampilkanHalamanMaintenance(dataMaintenance) {
-    var judul = (dataMaintenance && dataMaintenance.judul) ? dataMaintenance.judul : 'SEDANG PERBAIKAN SISTEM';
-    var pesan = (dataMaintenance && dataMaintenance.pesan) ? dataMaintenance.pesan : 'Website sedang dalam perbaikan oleh admin. Silakan kembali beberapa saat lagi.';
+    var judul = sanitize((dataMaintenance && dataMaintenance.judul) ? dataMaintenance.judul : 'SEDANG PERBAIKAN SISTEM');
+    var pesan = sanitize((dataMaintenance && dataMaintenance.pesan) ? dataMaintenance.pesan : 'Website sedang dalam perbaikan oleh admin. Silakan kembali beberapa saat lagi.');
     var sampai = (dataMaintenance && dataMaintenance.sampai) ? dataMaintenance.sampai : null;
-    var teksEstimasi = sampai ? 'Estimasi selesai: ' + new Date(sampai).toLocaleString('id-ID') : 'Mohon maaf atas ketidaknyamanan ini.';
+    var teksEstimasi = sanitize(sampai ? 'Estimasi selesai: ' + new Date(sampai).toLocaleString('id-ID') : 'Mohon maaf atas ketidaknyamanan ini.');
 
     document.body.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#e0f2fe 0%,#bae6fd 50%,#7dd3fc 100%);padding:20px;font-family:\'Segoe UI\',sans-serif;">' +
         '<div style="background:#ffffff;border-radius:24px;padding:48px 36px;width:100%;max-width:440px;text-align:center;box-shadow:0 25px 60px rgba(0,0,0,0.1);">' +
@@ -194,7 +194,7 @@ function tampilkanHalamanBlokir() {
 }
 
 function tampilkanPopupBanned(until) {
-    var untilText = (until || 0) === 0 ? 'PERMANEN' : ('sampai ' + new Date(until).toLocaleString('id-ID'));
+    var untilText = sanitize((until || 0) === 0 ? 'PERMANEN' : ('sampai ' + new Date(until).toLocaleString('id-ID')));
     Swal.fire({
         icon: 'error',
         title: 'AKUN DIBANNED',
@@ -211,7 +211,7 @@ function tampilkanPopupBanned(until) {
 }
 
 function tampilkanHalamanBanAkses(until) {
-    var untilText = (until || 0) === 0 ? 'PERMANEN' : ('sampai ' + new Date(until).toLocaleString('id-ID'));
+    var untilText = sanitize((until || 0) === 0 ? 'PERMANEN' : ('sampai ' + new Date(until).toLocaleString('id-ID')));
     document.body.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#f0f9ff 0%,#bae6fd 50%,#7dd3fc 100%);padding:20px;font-family:\'Segoe UI\',sans-serif;">' +
         '<div style="background:#ffffff;border-radius:24px;padding:48px 36px;width:100%;max-width:420px;text-align:center;box-shadow:0 20px 60px rgba(0,191,255,0.15);border:1px solid rgba(0,191,255,0.1);">' +
         '<div style="font-size:72px;color:#f59e0b;margin-bottom:12px;">🚫</div>' +
@@ -482,7 +482,6 @@ async function login() {
                 hideLoading();
                 storageSet('sesi_pengguna', JSON.stringify({
                     username: username,
-                    password: password,
                     user_id: user.id,
                     role: user.role || 'Operator',
                     full_name: user.full_name || username,
@@ -496,7 +495,6 @@ async function login() {
             await callRevanstore('login_success', 'POST', {});
             storageSet('sesi_pengguna', JSON.stringify({
                 username: username,
-                password: password,
                 user_id: user.id,
                 role: user.role || 'Operator',
                 full_name: user.full_name || username,
