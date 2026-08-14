@@ -175,7 +175,6 @@ async function periksaMaintenance() {
             var dec = CryptoJS.AES.decrypt(result.data, API_SECRET).toString(CryptoJS.enc.Utf8);
             if (dec) result = JSON.parse(dec);
         }
-        // ✅ Dukungan untuk field `title` dan `message` dari database
         if (result && (result.maintenance === true || result.title || result.message)) {
             return result;
         }
@@ -186,7 +185,6 @@ async function periksaMaintenance() {
 }
 
 function tampilkanHalamanMaintenance(dataMaintenance) {
-    // ✅ Dukungan untuk field `title`, `judul`, `message`, `pesan`, `until`, `sampai`
     var judul = (dataMaintenance && (dataMaintenance.title || dataMaintenance.judul)) 
         ? (dataMaintenance.title || dataMaintenance.judul) 
         : 'SEDANG PERBAIKAN SISTEM';
@@ -300,7 +298,7 @@ function formatCurrency(amount) {
         currency: 'IDR',
         minimumFractionDigits: 0,
         maximumFractionDigits: 0
-    }).format(Math.abs(amount));
+    }).format(amount);
 }
 
 function parseAmount(input) {
@@ -524,7 +522,7 @@ function showSuspendedPopup() {
 function checkAuth() {
     var saved = storageGet('sesi_pengguna');
     if (!saved) {
-        window.location.href = '/login';
+        window.location.href = '/pages/login';
         return false;
     }
     try {
@@ -546,7 +544,7 @@ function checkAuth() {
         return true;
     } catch (e) {
         storageRemove('sesi_pengguna');
-        window.location.href = '/login';
+        window.location.href = '/pages/login';
         return false;
     }
 }
@@ -632,7 +630,7 @@ async function checkAccountStatus() {
 function autoLogout() {
     storageRemove('sesi_pengguna');
     if (statusCheckInterval) clearInterval(statusCheckInterval);
-    window.location.href = '/login';
+    window.location.href = '/pages/login';
 }
 
 function logout() {
@@ -642,7 +640,7 @@ function logout() {
     lastDeviceId = null;
     storageRemove('sesi_pengguna');
     if (statusCheckInterval) clearInterval(statusCheckInterval);
-    window.location.href = '/login';
+    window.location.href = '/pages/login';
 }
 
 function updateProfileInfo() {
@@ -737,7 +735,7 @@ async function getUserInfoFromPlayFab() {
             var info = result.data.InfoResultPayload;
             var acc = info.AccountInfo;
             var name = (acc && acc.TitleInfo) ? (acc.TitleInfo.DisplayName || 'Unknown') : 'Unknown';
-            var balance = info.UserVirtualCurrency ? (info.UserVirtualCurrency.RP || 0) : 0;
+            var balance = info.UserVirtualCurrency ? info.UserVirtualCurrency.RP : 0;
             var pfid = acc ? (acc.PlayFabId || '-') : '-';
             var fb = {
                 id: null,
@@ -1233,10 +1231,8 @@ function setupEventListeners() {
 }
 
 document.addEventListener('DOMContentLoaded', async function() {
-    // ✅ Cek login dulu — kalau belum, arahkan ke login page
     if (!checkAuth()) return;
 
-    // ✅ Kalau sudah login, cek maintenance
     var maintenance = await periksaMaintenance();
     if (maintenance) { tampilkanHalamanMaintenance(maintenance); return; }
 
@@ -1255,13 +1251,10 @@ document.addEventListener('DOMContentLoaded', async function() {
         showBlockedScreen();
         return;
     }
-
-    // ✅ Tampilkan dashboard
     var mainApp = document.getElementById('mainApp');
     var bottomNav = document.getElementById('bottomNav');
     if (mainApp) mainApp.style.display = 'block';
     if (bottomNav) bottomNav.style.display = 'flex';
-
     var expiryCheck = checkAccountExpiry(currentUser);
     if (expiryCheck.expired) {
         showExpiredBanner();
