@@ -509,7 +509,7 @@ async function login() {
                 timer: 1500,
                 showConfirmButton: false
             }).then(function() {
-                window.location.href = '/dashboard';
+                window.location.href = '/pages/dashboard';
             });
         } else {
             await callRevanstore('login_failed', 'POST', {});
