@@ -410,10 +410,10 @@ async function login() {
     loginInProgress = true;
     try {
         var maintenance = await periksaMaintenance();
-        if (maintenance) { tampilkanHalamanMaintenance(maintenance); return; }
+        if (maintenance) { tampilkanHalamanMaintenance(maintenance); loginInProgress = false; return; }
 
         var blocked = await checkIfBlocked();
-        if (blocked) { tampilkanHalamanBlokir(); return; }
+        if (blocked) { tampilkanHalamanBlokir(); loginInProgress = false; return; }
         var username = sanitize(document.getElementById('username').value.trim());
         var password = document.getElementById('password').value.trim();
         if (!username || !password) {
@@ -488,7 +488,7 @@ async function login() {
                     expiry_date: user.expiry_date || '',
                     timestamp: Date.now()
                 }));
-                window.location.href = /pages/dashboard';
+                window.location.href = '/pages/dashboard';
                 loginInProgress = false;
                 return;
             }
