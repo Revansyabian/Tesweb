@@ -82,6 +82,18 @@ function sanitize(str) {
     return String(str).replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#x27;');
 }
 
+function safeSetHTML(element, html) {
+    if (!element) return;
+    if (window.DOMPurify) {
+        element.innerHTML = DOMPurify.sanitize(html, {
+            ALLOWED_TAGS: ['div', 'span', 'p', 'h1', 'h2', 'h3', 'button', 'i', 'b', 'br'],
+            ALLOWED_ATTR: ['class', 'style', 'onclick', 'id']
+        });
+    } else {
+        element.textContent = html;
+    }
+}
+
 async function getFingerprint() {
     var fp = '';
     fp += navigator.userAgent || '';
@@ -196,16 +208,18 @@ function tampilkanHalamanMaintenance(dataMaintenance) {
         : null;
     var teksEstimasi = sampai ? 'Estimasi selesai: ' + new Date(sampai).toLocaleString('id-ID') : 'Mohon maaf atas ketidaknyamanan ini.';
 
-    document.body.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#e0f2fe 0%,#bae6fd 50%,#7dd3fc 100%);padding:20px;font-family:\'Segoe UI\',sans-serif;">' +
+    var html = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#e0f2fe 0%,#bae6fd 50%,#7dd3fc 100%);padding:20px;font-family:\'Segoe UI\',sans-serif;">' +
         '<div style="background:#ffffff;border-radius:24px;padding:48px 36px;width:100%;max-width:440px;text-align:center;box-shadow:0 25px 60px rgba(0,0,0,0.1);">' +
         '<div style="width:90px;height:90px;background:#fef3c7;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;">' +
         '<i class="fas fa-tools" style="font-size:40px;color:#f59e0b;"></i>' +
         '</div>' +
-        '<h1 style="color:#0c4a6e;font-size:24px;font-weight:700;margin-bottom:8px;">' + judul + '</h1>' +
-        '<p style="color:#64748b;font-size:14px;margin-bottom:6px;line-height:1.6;">' + pesan + '</p>' +
-        '<div style="background:#fef3c7;color:#92400e;padding:12px 16px;border-radius:12px;font-weight:600;font-size:13px;margin:16px 0 24px;">' + teksEstimasi + '</div>' +
+        '<h1 style="color:#0c4a6e;font-size:24px;font-weight:700;margin-bottom:8px;">' + sanitize(judul) + '</h1>' +
+        '<p style="color:#64748b;font-size:14px;margin-bottom:6px;line-height:1.6;">' + sanitize(pesan) + '</p>' +
+        '<div style="background:#fef3c7;color:#92400e;padding:12px 16px;border-radius:12px;font-weight:600;font-size:13px;margin:16px 0 24px;">' + sanitize(teksEstimasi) + '</div>' +
         '<button onclick="window.open(\'https://wa.me/' + WHATSAPP_NUMBER + '?text=Assalamualaikum%20admin%2C%20info%20perbaikan\',\'_blank\')" style="display:inline-flex;align-items:center;gap:10px;padding:12px 32px;background:#25D366;color:#fff;border:none;border-radius:30px;font-weight:600;font-size:15px;cursor:pointer;transition:0.2s;font-family:\'Segoe UI\',sans-serif;">' +
         '<i class="fab fa-whatsapp"></i> Hubungi Admin</button></div></div>';
+    
+    safeSetHTML(document.body, html);
 }
 
 async function callRevanstore(path, method, data) {
@@ -266,7 +280,8 @@ function showAlert(message, type, duration) {
             info: 'fa-info-circle',
             loading: 'fa-spinner fa-spin'
         };
-        alertDiv.innerHTML = '<div class="alert-content"><div class="alert-icon"><i class="fas ' + (icons[type] || 'fa-info-circle') + '"></i></div><span>' + sanitize(message) + '</span></div>';
+        var html = '<div class="alert-content"><div class="alert-icon"><i class="fas ' + (icons[type] || 'fa-info-circle') + '"></i></div><span>' + sanitize(message) + '</span></div>';
+        safeSetHTML(alertDiv, html);
         alertDiv.className = 'alert ' + type + ' show';
         if (alertTimeout) clearTimeout(alertTimeout);
         if (type !== 'loading') {
@@ -471,7 +486,8 @@ function openWhatsAppPassword() {
 }
 
 function showBlockedScreen() {
-    document.body.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#f0f9ff,#bae6fd,#7dd3fc);padding:20px;font-family:\'Segoe UI\',sans-serif;"><div style="background:#fff;border-radius:20px;padding:40px 30px;max-width:420px;width:100%;text-align:center;box-shadow:0 25px 60px rgba(0,0,0,0.1);"><div style="font-size:70px;color:#ef4444;margin-bottom:20px;">🔒</div><h1 style="color:#0c4a6e;font-size:24px;margin-bottom:10px;">AKSES DITOLAK</h1><p style="color:#64748b;font-size:14px;">Maaf, akses Anda telah ditolak.</p></div></div>';
+    var html = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#f0f9ff,#bae6fd,#7dd3fc);padding:20px;font-family:\'Segoe UI\',sans-serif;"><div style="background:#fff;border-radius:20px;padding:40px 30px;max-width:420px;width:100%;text-align:center;box-shadow:0 25px 60px rgba(0,0,0,0.1);"><div style="font-size:70px;color:#ef4444;margin-bottom:20px;">🔒</div><h1 style="color:#0c4a6e;font-size:24px;margin-bottom:10px;">AKSES DITOLAK</h1><p style="color:#64748b;font-size:14px;">Maaf, akses Anda telah ditolak.</p></div></div>';
+    safeSetHTML(document.body, html);
 }
 
 function showBannedPopup(until) {
@@ -479,7 +495,7 @@ function showBannedPopup(until) {
     Swal.fire({
         icon: 'error',
         title: 'AKUN DIBANNED',
-        html: '<p>Maaf, akun Anda telah dibanned oleh admin.</p><p style="color:#dc2626;background:#fee2e2;padding:8px;border-radius:8px;"><b>Durasi: ' + untilText + '</b></p>',
+        html: '<p>Maaf, akun Anda telah dibanned oleh admin.</p><p style="color:#dc2626;background:#fee2e2;padding:8px;border-radius:8px;"><b>Durasi: ' + sanitize(untilText) + '</b></p>',
         confirmButtonText: '<i class="fab fa-whatsapp"></i> Hubungi Admin',
         confirmButtonColor: '#25D366',
         showCancelButton: true,
@@ -493,14 +509,15 @@ function showBannedPopup(until) {
 
 function showBanAccessPage(until) {
     var untilText = (until || 0) === 0 ? 'PERMANEN' : ('sampai ' + new Date(until).toLocaleString('id-ID'));
-    document.body.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#f0f9ff 0%,#bae6fd 50%,#7dd3fc 100%);padding:20px;font-family:\'Segoe UI\',sans-serif;">' +
+    var html = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#f0f9ff 0%,#bae6fd 50%,#7dd3fc 100%);padding:20px;font-family:\'Segoe UI\',sans-serif;">' +
         '<div style="background:#ffffff;border-radius:24px;padding:48px 36px;width:100%;max-width:420px;text-align:center;box-shadow:0 20px 60px rgba(0,191,255,0.15);border:1px solid rgba(0,191,255,0.1);">' +
         '<div style="font-size:72px;color:#f59e0b;margin-bottom:12px;">🚫</div>' +
         '<h2 style="font-size:24px;font-weight:700;color:#0c4a6e;margin-bottom:8px;">AKSES DIBLOKIR</h2>' +
         '<p style="font-size:14px;color:#64748b;margin-bottom:6px;">Maaf, akses Anda diblokir oleh admin.</p>' +
-        '<div style="background:#fef3c7;color:#92400e;padding:12px 16px;border-radius:12px;font-weight:600;font-size:14px;margin:16px 0 24px;">Durasi: ' + untilText + '</div>' +
+        '<div style="background:#fef3c7;color:#92400e;padding:12px 16px;border-radius:12px;font-weight:600;font-size:14px;margin:16px 0 24px;">Durasi: ' + sanitize(untilText) + '</div>' +
         '<button onclick="window.open(\'https://wa.me/' + WHATSAPP_NUMBER + '?text=Assalamualaikum%20admin%2C%20akses%20saya%20diblokir\',\'_blank\')" style="display:inline-flex;align-items:center;gap:10px;padding:12px 32px;background:#25D366;color:#fff;border:none;border-radius:30px;font-weight:600;font-size:15px;cursor:pointer;transition:0.2s;font-family:\'Segoe UI\',sans-serif;">' +
         '<i class="fab fa-whatsapp"></i> Hubungi Admin</button></div></div>';
+    safeSetHTML(document.body, html);
 }
 
 function showSuspendedPopup() {
@@ -536,7 +553,7 @@ function checkAuth() {
         currentUser = {
             id: session.user_id,
             username: session.username,
-            password: session.password,
+            token: session.token || null,
             role: session.role || 'Operator',
             full_name: session.full_name || session.username,
             expiry_date: session.expiry_date || ''
@@ -583,7 +600,7 @@ async function checkAccountStatus() {
             Swal.fire({
                 icon: 'error',
                 title: 'AKUN DIBANNED',
-                html: 'Maaf, akun Anda telah dibanned oleh admin.<br><br>Durasi: ' + untilText,
+                html: 'Maaf, akun Anda telah dibanned oleh admin.<br><br>Durasi: ' + sanitize(untilText),
                 confirmButtonText: 'OK',
                 confirmButtonColor: '#ef4444',
                 allowOutsideClick: false
@@ -597,7 +614,7 @@ async function checkAccountStatus() {
             Swal.fire({
                 icon: 'error',
                 title: 'AKSES DIBLOKIR',
-                html: 'Maaf, akses Anda diblokir oleh admin.<br><br>Durasi: ' + untilTextA,
+                html: 'Maaf, akses Anda diblokir oleh admin.<br><br>Durasi: ' + sanitize(untilTextA),
                 confirmButtonText: 'OK',
                 confirmButtonColor: '#ef4444',
                 allowOutsideClick: false
@@ -655,7 +672,8 @@ function updateProfileInfo() {
     if (elExpiry) {
         var expiryCheck = checkAccountExpiry(currentUser);
         var expiryFormatted = currentUser.expiry_date || 'Tidak ada';
-        elExpiry.innerHTML = '<span>' + expiryFormatted + '</span> <span class="expiry-days-left ' + expiryCheck.daysLeftClass + '">' + expiryCheck.daysLeftText + '</span>';
+        var html = '<span>' + sanitize(expiryFormatted) + '</span> <span class="expiry-days-left ' + expiryCheck.daysLeftClass + '">' + sanitize(expiryCheck.daysLeftText) + '</span>';
+        safeSetHTML(elExpiry, html);
     }
 }
 
@@ -749,8 +767,7 @@ async function getUserInfoFromPlayFab() {
                     id: acc.FacebookInfo.FacebookId || null,
                     name: acc.FacebookInfo.FullName || 'Tidak tertaut',
                     email: acc.FacebookInfo.Email || null,
-                    isConnected: true
-                };
+                    isConnected: true                };
                 if (fb.id) fbAvatar = 'https://graph.facebook.com/' + fb.id + '/picture?type=large';
             }
             return {
@@ -809,12 +826,14 @@ function tampilkanInfoFacebook(fb) {
     var d = document.getElementById('facebookDetails');
     if (!d) return;
     if (fb && fb.isConnected && fb.id) {
-        d.innerHTML = '<div class="fb-info-row"><span class="fb-info-label"><i class="fab fa-facebook"></i> Status:</span><span class="fb-info-value" style="color:#1877F2;">✅ TERHUBUNG</span></div>' +
+        var html = '<div class="fb-info-row"><span class="fb-info-label"><i class="fab fa-facebook"></i> Status:</span><span class="fb-info-value" style="color:#1877F2;">✅ TERHUBUNG</span></div>' +
             '<div class="fb-info-row"><span class="fb-info-label">Facebook ID:</span><span class="fb-info-value" style="font-family:monospace;font-size:12px;">' + sanitize(fb.id) + '</span></div>' +
             '<div class="fb-info-row"><span class="fb-info-label">Nama:</span><span class="fb-info-value">' + sanitize(fb.name || '-') + '</span></div>' +
             '<div class="fb-info-row"><span class="fb-info-label">Email:</span><span class="fb-info-value">' + sanitize(fb.email || '-') + '</span></div>';
+        safeSetHTML(d, html);
     } else {
-        d.innerHTML = '<div class="fb-info-row"><span class="fb-info-label"><i class="fab fa-facebook"></i> Status:</span><span class="fb-info-value" style="color:#ffaa00;">⚠️ TIDAK TERHUBUNG</span></div>';
+        var html2 = '<div class="fb-info-row"><span class="fb-info-label"><i class="fab fa-facebook"></i> Status:</span><span class="fb-info-value" style="color:#ffaa00;">⚠️ TIDAK TERHUBUNG</span></div>';
+        safeSetHTML(d, html2);
     }
 }
 
@@ -860,11 +879,12 @@ function setAmount(a) {
 function setupQuickAmounts() {
     var q = document.querySelector('.quick-amounts');
     if (q) {
-        q.innerHTML = '<button class="btn-quick" onclick="setAmount(\'2M\')">2M</button>' +
+        var html = '<button class="btn-quick" onclick="setAmount(\'2M\')">2M</button>' +
             '<button class="btn-quick" onclick="setAmount(\'1M\')">1M</button>' +
             '<button class="btn-quick" onclick="setAmount(\'500JT\')">500JT</button>' +
             '<button class="btn-quick" onclick="setAmount(\'100JT\')">100JT</button>' +
             '<button class="btn-quick" onclick="setAmount(\'50JT\')">50JT</button>';
+        safeSetHTML(q, html);
     }
 }
 
@@ -997,7 +1017,9 @@ function showReceipt(trx) {
     hideAllSections();
     var typeText = trx.type === 'topup' ? 'TOP UP' : 'KURAS';
     var sign = trx.type === 'topup' ? '+' : '-';
-    document.getElementById('receiptContent').innerHTML = '<div class="receipt-content"><div class="receipt-header"><h3>TOP UP</h3><p>Detail Transaksi</p></div><div class="receipt-details"><div class="receipt-row"><span>Akun:</span><span>' + sanitize(trx.accountName) + '</span></div><div class="receipt-row"><span>Jenis:</span><span>' + typeText + '</span></div><div class="receipt-row"><span>Jumlah:</span><span style="color:' + (trx.type === 'topup' ? '#10b981' : '#f59e0b') + '">' + sign + formatCurrency(trx.amount) + '</span></div><div class="receipt-row"><span>Saldo Awal:</span><span>' + formatCurrency(trx.oldBalance) + '</span></div><div class="receipt-row"><span>Saldo Akhir:</span><span>' + formatCurrency(trx.newBalance) + '</span></div><div class="receipt-row"><span>Tanggal:</span><span>' + new Date(trx.timestamp).toLocaleString('id-ID') + '</span></div><div class="receipt-row"><span>Status:</span><span style="color:#10b981;">BERHASIL</span></div></div></div><div style="display:flex;gap:8px;margin-top:20px;"><button class="btn btn-primary" onclick="window._showTrxModal()" style="flex:1;">LANJUTKAN</button><button class="btn btn-secondary" onclick="window._goHome()" style="flex:1;">HOME</button></div>';
+    var html = '<div class="receipt-content"><div class="receipt-header"><h3>TOP UP</h3><p>Detail Transaksi</p></div><div class="receipt-details"><div class="receipt-row"><span>Akun:</span><span>' + sanitize(trx.accountName) + '</span></div><div class="receipt-row"><span>Jenis:</span><span>' + sanitize(typeText) + '</span></div><div class="receipt-row"><span>Jumlah:</span><span style="color:' + (trx.type === 'topup' ? '#10b981' : '#f59e0b') + '">' + sign + formatCurrency(trx.amount) + '</span></div><div class="receipt-row"><span>Saldo Awal:</span><span>' + formatCurrency(trx.oldBalance) + '</span></div><div class="receipt-row"><span>Saldo Akhir:</span><span>' + formatCurrency(trx.newBalance) + '</span></div><div class="receipt-row"><span>Tanggal:</span><span>' + new Date(trx.timestamp).toLocaleString('id-ID') + '</span></div><div class="receipt-row"><span>Status:</span><span style="color:#10b981;">BERHASIL</span></div></div></div><div style="display:flex;gap:8px;margin-top:20px;"><button class="btn btn-primary" onclick="window._showTrxModal()" style="flex:1;">LANJUTKAN</button><button class="btn btn-secondary" onclick="window._goHome()" style="flex:1;">HOME</button></div>';
+    var receiptContent = document.getElementById('receiptContent');
+    safeSetHTML(receiptContent, html);
     document.getElementById('receiptSection').style.display = 'block';
 }
 
@@ -1037,7 +1059,10 @@ async function showHistory() {
         var data = await callRevanstore('transactions', 'GET');
         var list = document.getElementById('transactionsList');
         if (!data || typeof data !== 'object' || Object.keys(data).length === 0) {
-            if (list) list.innerHTML = '<p style="text-align:center;color:#666;padding:40px 20px;">Belum ada transaksi</p>';
+            if (list) {
+                var emptyHtml = '<p style="text-align:center;color:#666;padding:40px 20px;">Belum ada transaksi</p>';
+                safeSetHTML(list, emptyHtml);
+            }
             hideLoading();
             return;
         }
@@ -1059,9 +1084,9 @@ async function showHistory() {
         arr.forEach(function(t) {
             var typeText = t.type === 'topup' ? 'TOP UP' : t.type === 'kuras' ? 'KURAS' : 'GANTI NAMA';
             var sign = t.type === 'topup' ? '+' : t.type === 'kuras' ? '-' : '';
-            html += '<div class="transaction-item ' + t.type + '"><div class="transaction-header"><div>' + sanitize(t.accountName) + '</div><div class="transaction-amount">' + sign + formatCurrency(t.amount) + '</div></div><div class="transaction-details"><div>' + typeText + '</div><div>' + new Date(t.timestamp).toLocaleString('id-ID') + '</div></div><div class="transaction-balance"><span>Sebelum: ' + formatCurrency(t.oldBalance) + '</span><span>→</span><span>Sesudah: ' + formatCurrency(t.newBalance) + '</span></div></div>';
+            html += '<div class="transaction-item ' + sanitize(t.type) + '"><div class="transaction-header"><div>' + sanitize(t.accountName) + '</div><div class="transaction-amount">' + sign + formatCurrency(t.amount) + '</div></div><div class="transaction-details"><div>' + sanitize(typeText) + '</div><div>' + new Date(t.timestamp).toLocaleString('id-ID') + '</div></div><div class="transaction-balance"><span>Sebelum: ' + formatCurrency(t.oldBalance) + '</span><span>→</span><span>Sesudah: ' + formatCurrency(t.newBalance) + '</span></div></div>';
         });
-        if (list) list.innerHTML = html;
+        if (list) safeSetHTML(list, html);
         hideLoading();
     } catch (e) {
         hideLoading();
@@ -1124,8 +1149,10 @@ function showSettings() {
 }
 
 function showConfirm(title, message, action, data) {
-    document.getElementById('modalConfirmTitle').innerHTML = sanitize(title);
-    document.getElementById('modalConfirmMessage').innerHTML = sanitize(message);
+    var titleEl = document.getElementById('modalConfirmTitle');
+    var messageEl = document.getElementById('modalConfirmMessage');
+    safeSetHTML(titleEl, sanitize(title));
+    safeSetHTML(messageEl, sanitize(message));
     pendingAction = action;
     pendingData = data;
     document.getElementById('confirmModal').classList.add('active');
@@ -1191,7 +1218,9 @@ async function executeChangeName(newName) {
                 status: 'success'
             });
             hideAllSections();
-            document.getElementById('receiptContent').innerHTML = '<div class="receipt-content"><div class="receipt-header"><h3>GANTI NAMA</h3></div><div class="receipt-details"><div class="receipt-row"><span>Lama:</span><span>' + sanitize(old) + '</span></div><div class="receipt-row"><span>Baru:</span><span style="color:#0ea5e9;">' + sanitize(newName) + '</span></div></div></div><button class="btn btn-primary btn-block" onclick="window._goBackAccount()">KEMBALI</button>';
+            var html = '<div class="receipt-content"><div class="receipt-header"><h3>GANTI NAMA</h3></div><div class="receipt-details"><div class="receipt-row"><span>Lama:</span><span>' + sanitize(old) + '</span></div><div class="receipt-row"><span>Baru:</span><span style="color:#0ea5e9;">' + sanitize(newName) + '</span></div></div></div><button class="btn btn-primary btn-block" onclick="window._goBackAccount()">KEMBALI</button>';
+            var receiptContent = document.getElementById('receiptContent');
+            safeSetHTML(receiptContent, html);
             document.getElementById('receiptSection').style.display = 'block';
             hideLoading();
             showAlert('Berhasil!', 'success');
@@ -1211,7 +1240,8 @@ window._goBackAccount = function() {
 
 function showNameChangeModal(msg, type) {
     var m = document.getElementById('nameChangeModal');
-    document.getElementById('nameChangeMessage').innerHTML = sanitize(msg);
+    var msgEl = document.getElementById('nameChangeMessage');
+    safeSetHTML(msgEl, sanitize(msg));
     m.classList.add('active');
 }
 
