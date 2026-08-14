@@ -488,7 +488,7 @@ async function login() {
                     expiry_date: user.expiry_date || '',
                     timestamp: Date.now()
                 }));
-                window.location.href = '/dashboard';
+                window.location.href = /pages/dashboard';
                 loginInProgress = false;
                 return;
             }
