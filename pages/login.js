@@ -544,7 +544,7 @@ function autoCheckSession() {
             storageRemove('sesi_pengguna');
             return;
         }
-        window.location.href = '/pages/dashboard.html';
+        window.location.href = '/pages/dashboard';
     } catch (e) {
         storageRemove('sesi_pengguna');
     }
