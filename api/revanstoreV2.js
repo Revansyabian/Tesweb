@@ -1,10 +1,12 @@
 import CryptoJS from 'crypto-js';
 import admin from 'firebase-admin';
+import bcrypt from 'bcryptjs';
 
 const ADMIN_KEY = process.env.ADMIN_KEY;
 const RECAPTCHA_V2_SECRET_KEY = process.env.RECAPTCHA_V2_SECRET_KEY;
 const RECAPTCHA_V3_SECRET_KEY = process.env.RECAPTCHA_V3_SECRET_KEY;
 const API_SECRET = process.env.API_SECRET || '1417-1426-1527-1517';
+const SALT_ROUNDS = 12;
 
 if (!admin.apps.length) {
   const key = process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n');
@@ -50,6 +52,26 @@ async function decryptData(raw) {
     } catch(e) { return raw; }
   }
   return raw;
+}
+
+async function hashPassword(password) {
+  try {
+    const salt = await bcrypt.genSalt(SALT_ROUNDS);
+    const hash = await bcrypt.hash(password, salt);
+    return hash;
+  } catch (e) {
+    console.error('Error hashing password:', e);
+    return null;
+  }
+}
+
+async function verifyPassword(password, hash) {
+  try {
+    return await bcrypt.compare(password, hash);
+  } catch (e) {
+    console.error('Error verifying password:', e);
+    return false;
+  }
 }
 
 async function verifyRecaptchaV2(token) {
@@ -339,7 +361,13 @@ export default async function handler(req, res) {
       for (const key in users) {
         const decryptedUser = await decryptData(users[key]);
         
-        if (decryptedUser && decryptedUser.username === username && decryptedUser.password === password) {
+        if (decryptedUser && decryptedUser.username === username) {
+          // Verifikasi password dengan bcrypt
+          const isPasswordValid = await verifyPassword(password, decryptedUser.password_hash);
+          
+          if (!isPasswordValid) {
+            continue; // Password salah, lanjutkan loop (atau langsung break untuk hindari timing attack)
+          }
 
           if (decryptedUser.banned === true) {
             await logActivity(username, 'login_blocked_banned', 'Login ditolak - akun dibanned', currentIP, currentFP);
