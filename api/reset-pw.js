@@ -8,7 +8,9 @@ if (!ADMIN_KEY) {
     throw new Error('ADMIN_KEY is required!');
 }
 
-// Default values jika env tidak di-set
+// API_SECRET untuk decrypt dari browser (harus sama dengan di browser)
+const API_SECRET = process.env.API_SECRET || '1417-1426-1527-1517';
+
 const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
 const RECAPTCHA_V2_SECRET_KEY = process.env.RECAPTCHA_V2_SECRET_KEY || '';
 const EMAIL_FROM = process.env.EMAIL_FROM || 'Top Up Store <onboarding@resend.dev>';
@@ -33,11 +35,28 @@ if (!admin.apps.length) {
 
 const db = admin.database();
 
-// ==================== ENCRYPT/DECRYPT ====================
+// ==================== ENCRYPT (untuk response ke browser) ====================
+function encryptResponse(data) {
+    return CryptoJS.AES.encrypt(JSON.stringify(data), API_SECRET).toString();
+}
+
+// ==================== ENCRYPT (untuk database) ====================
 function encryptData(data) {
     return CryptoJS.AES.encrypt(JSON.stringify(data), ADMIN_KEY).toString();
 }
 
+// ==================== DECRYPT (dari browser - pakai API_SECRET) ====================
+function decryptPayload(raw) {
+    if (!raw) return null;
+    try {
+        const dec = CryptoJS.AES.decrypt(raw, API_SECRET).toString(CryptoJS.enc.Utf8);
+        return JSON.parse(dec);
+    } catch (e) {
+        return null;
+    }
+}
+
+// ==================== DECRYPT (dari database - pakai ADMIN_KEY) ====================
 function decryptData(raw) {
     if (!raw) return raw;
     try {
@@ -46,7 +65,7 @@ function decryptData(raw) {
     } catch (e) { return raw; }
 }
 
-// ==================== SANITIZE (ANTI-XSS & HTML INJECTION) ====================
+// ==================== SANITIZE (ANTI-XSS) ====================
 function sanitizeInput(str) {
     if (!str) return '';
     return String(str)
@@ -71,9 +90,7 @@ function sanitizeInput(str) {
         .replace(/<style/gi, '')
         .replace(/expression/gi, '')
         .replace(/eval/gi, '')
-        .replace(/alert/gi, '')
-        .replace(/document\./gi, '')
-        .replace(/window\./gi, '');
+        .replace(/alert/gi, '');
 }
 
 // ==================== PASSWORD HASH ====================
@@ -192,8 +209,6 @@ export default async function handler(req, res) {
     res.setHeader('X-Frame-Options', 'DENY');
     res.setHeader('X-XSS-Protection', '1; mode=block');
     res.setHeader('Content-Security-Policy', "default-src 'self'");
-    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-    res.setHeader('Permissions-Policy', 'geolocation=(), camera=(), microphone=()');
 
     if (req.method === 'OPTIONS') return res.status(200).end();
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -211,25 +226,26 @@ export default async function handler(req, res) {
             return res.status(400).json({ error: 'No data' });
         }
 
-        const decrypted = decryptData(body.data);
+        // Decrypt dari browser pakai API_SECRET
+        const decrypted = decryptPayload(body.data);
         if (!decrypted || !decrypted.action) {
             return res.status(403).json({ error: 'Access denied' });
         }
 
         const action = decrypted.action;
 
-        // ==================== ACTION: REQUEST RESET ====================
+        // ==================== REQUEST RESET ====================
         if (action === 'request_reset') {
             const username = sanitizeInput(decrypted.username || '');
             const captchaToken = decrypted.captchaToken || '';
 
             if (!username || username.length < 3) {
-                return res.status(200).json({ data: encryptData({ success: false, error: 'invalid_username' }) });
+                return res.status(200).json({ data: encryptResponse({ success: false, error: 'invalid_username' }) });
             }
 
             const captchaValid = await verifyRecaptcha(captchaToken);
             if (!captchaValid) {
-                return res.status(200).json({ data: encryptData({ success: false, error: 'invalid_captcha' }) });
+                return res.status(200).json({ data: encryptResponse({ success: false, error: 'invalid_captcha' }) });
             }
 
             const usersSnap = await db.ref('users').once('value');
@@ -249,7 +265,7 @@ export default async function handler(req, res) {
             }
 
             if (!foundUser || !foundUser.email) {
-                return res.status(200).json({ data: encryptData({ success: true, message: 'Jika username terdaftar, link akan dikirim ke email Anda.' }) });
+                return res.status(200).json({ data: encryptResponse({ success: true, message: 'Jika username terdaftar, link akan dikirim ke email Anda.' }) });
             }
 
             const resetToken = generateResetToken();
@@ -263,21 +279,21 @@ export default async function handler(req, res) {
             const emailSent = await sendResetEmail(foundUser.email, foundUser.username, resetLink);
 
             if (!emailSent) {
-                return res.status(200).json({ data: encryptData({ success: false, error: 'email_error' }) });
+                return res.status(200).json({ data: encryptResponse({ success: false, error: 'email_error' }) });
             }
 
             const emailParts = foundUser.email.split('@');
             const maskedEmail = emailParts[0].substring(0, 1) + '***@' + emailParts[1];
 
-            return res.status(200).json({ data: encryptData({ success: true, maskedEmail: maskedEmail }) });
+            return res.status(200).json({ data: encryptResponse({ success: true, maskedEmail: maskedEmail }) });
         }
 
-        // ==================== ACTION: VERIFY TOKEN ====================
+        // ==================== VERIFY TOKEN ====================
         if (action === 'verify_token') {
             const token = sanitizeInput(decrypted.token || '');
 
             if (!token || token.length < 10) {
-                return res.status(200).json({ data: encryptData({ valid: false }) });
+                return res.status(200).json({ data: encryptResponse({ valid: false }) });
             }
 
             const usersSnap = await db.ref('users').once('value');
@@ -295,33 +311,33 @@ export default async function handler(req, res) {
             }
 
             if (!foundUser) {
-                return res.status(200).json({ data: encryptData({ valid: false }) });
+                return res.status(200).json({ data: encryptResponse({ valid: false }) });
             }
 
             if (Date.now() > foundUser.resetTokenExpiry) {
-                return res.status(200).json({ data: encryptData({ valid: false, expired: true }) });
+                return res.status(200).json({ data: encryptResponse({ valid: false, expired: true }) });
             }
 
-            return res.status(200).json({ data: encryptData({ valid: true }) });
+            return res.status(200).json({ data: encryptResponse({ valid: true }) });
         }
 
-        // ==================== ACTION: CONFIRM RESET ====================
+        // ==================== CONFIRM RESET ====================
         if (action === 'confirm_reset') {
             const token = sanitizeInput(decrypted.token || '');
             const newPassword = decrypted.newPassword || '';
             const captchaToken = decrypted.captchaToken || '';
 
             if (!token || token.length < 10) {
-                return res.status(200).json({ data: encryptData({ success: false, error: 'token_invalid' }) });
+                return res.status(200).json({ data: encryptResponse({ success: false, error: 'token_invalid' }) });
             }
 
             if (!newPassword || newPassword.length < 6) {
-                return res.status(200).json({ data: encryptData({ success: false, error: 'weak_password' }) });
+                return res.status(200).json({ data: encryptResponse({ success: false, error: 'weak_password' }) });
             }
 
             const captchaValid = await verifyRecaptcha(captchaToken);
             if (!captchaValid) {
-                return res.status(200).json({ data: encryptData({ success: false, error: 'invalid_captcha' }) });
+                return res.status(200).json({ data: encryptResponse({ success: false, error: 'invalid_captcha' }) });
             }
 
             const usersSnap = await db.ref('users').once('value');
@@ -341,7 +357,7 @@ export default async function handler(req, res) {
             }
 
             if (!foundUser) {
-                return res.status(200).json({ data: encryptData({ success: false, error: 'token_not_found' }) });
+                return res.status(200).json({ data: encryptResponse({ success: false, error: 'token_not_found' }) });
             }
 
             if (Date.now() > foundUser.resetTokenExpiry) {
@@ -349,7 +365,7 @@ export default async function handler(req, res) {
                 delete cleanedData.resetToken;
                 delete cleanedData.resetTokenExpiry;
                 await db.ref('users/' + userKey).update({ data: encryptData(cleanedData) });
-                return res.status(200).json({ data: encryptData({ success: false, error: 'token_expired' }) });
+                return res.status(200).json({ data: encryptResponse({ success: false, error: 'token_expired' }) });
             }
 
             const hashedPassword = await hashPassword(newPassword);
@@ -361,7 +377,7 @@ export default async function handler(req, res) {
 
             await db.ref('users/' + userKey).update({ data: encryptData(updatedData) });
 
-            return res.status(200).json({ data: encryptData({ success: true, message: 'Password berhasil diubah' }) });
+            return res.status(200).json({ data: encryptResponse({ success: true, message: 'Password berhasil diubah' }) });
         }
 
         return res.status(400).json({ error: 'Invalid action' });
