@@ -28,7 +28,6 @@
         .form-input { width: 100%; padding: 12px 16px; background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 10px; color: #1e293b; font-size: 14px; transition: all 0.2s ease; }
         .form-input:focus { outline: none; border-color: #0ea5e9; background: #fff; box-shadow: 0 0 0 4px rgba(14,165,233,0.1); }
         .form-input::placeholder { color: #94a3b8; }
-        .form-input.error { border-color: #ef4444; }
         .btn { padding: 13px 24px; border: none; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; justify-content: center; gap: 8px; color: #fff; width: 100%; }
         .btn:hover { transform: translateY(-1px); }
         .btn:active { transform: scale(0.97); }
@@ -65,8 +64,17 @@
         .paket-option .paket-name { font-size: 13px; font-weight: 600; color: #1e293b; }
         .paket-option .paket-price { font-size: 14px; font-weight: 700; color: #0ea5e9; }
         .honeypot-field { position: absolute; left: -9999px; opacity: 0; height: 0; width: 0; overflow: hidden; }
-        .token-warning { background: #fffbeb; border: 1px solid #f59e0b; border-radius: 10px; padding: 12px; margin-bottom: 16px; font-size: 12px; color: #92400e; text-align: center; }
-        .token-warning i { color: #f59e0b; margin-right: 6px; }
+        
+        /* STATUS PAGE */
+        .status-page { text-align: center; padding: 30px 0; display: none; }
+        .status-page.show { display: block; }
+        .status-icon { font-size: 60px; margin-bottom: 16px; }
+        .status-icon.expired { color: #f59e0b; }
+        .status-icon.invalid { color: #ef4444; }
+        .status-icon.used { color: #ef4444; }
+        .status-title { font-size: 20px; font-weight: 700; color: #1e293b; margin-bottom: 8px; }
+        .status-message { font-size: 14px; color: #64748b; line-height: 1.6; }
+        
         @media(max-width:480px) { .register-card { padding: 28px 20px; } .register-header h1 { font-size: 20px; } }
     </style>
 </head>
@@ -74,87 +82,109 @@
 
     <div class="register-container">
         <div class="register-card">
-            <div class="register-header">
-                <div class="register-logo">
-                    <img src="/img.png" alt="Logo" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
-                    <div class="logo-placeholder" style="display:none;"><i class="fas fa-cube"></i></div>
-                </div>
-                <h1>Daftar Akun</h1>
-                <p>Pilih paket dan buat akun baru</p>
-            </div>
-
-            <div class="error-message" id="errorMessage">
-                <i class="fas fa-exclamation-circle"></i> <span id="errorText"></span>
-            </div>
-
-            <div class="token-warning" id="tokenWarning" style="display:none;">
-                <i class="fas fa-exclamation-triangle"></i> Link pendaftaran tidak valid atau sudah expired!
-            </div>
-
-            <div class="honeypot-field" aria-hidden="true">
-                <input type="text" id="website" name="website" tabindex="-1" autocomplete="off">
-            </div>
-
-            <div class="form-group">
-                <label for="username"><i class="fas fa-user"></i> Username</label>
-                <input type="text" id="username" placeholder="Huruf dan angka saja (3-20)" class="form-input" maxlength="20" oninput="validateUsernameInput()">
-            </div>
-
-            <div class="form-group">
-                <label for="password"><i class="fas fa-lock"></i> Password</label>
-                <input type="password" id="password" placeholder="Minimal 6 karakter" class="form-input" maxlength="20">
-                <div class="password-strength"><div class="password-strength-bar" id="passwordStrengthBar"></div></div>
-            </div>
-
-            <div class="form-group">
-                <label for="confirmPassword"><i class="fas fa-lock"></i> Konfirmasi Password</label>
-                <input type="password" id="confirmPassword" placeholder="Ulangi password" class="form-input" maxlength="20">
-            </div>
-
-            <div class="form-group">
-                <label for="phone"><i class="fas fa-phone"></i> Nomor Telepon</label>
-                <input type="tel" id="phone" placeholder="081234567890" class="form-input" maxlength="15" oninput="validatePhoneInput()">
-            </div>
-
-            <div class="form-group">
-                <label for="email"><i class="fas fa-envelope"></i> Email</label>
-                <input type="email" id="email" placeholder="nama@email.com" class="form-input" maxlength="50" oninput="validateEmailInput()">
-            </div>
-
-            <div class="form-group">
-                <label><i class="fas fa-box"></i> Pilih Paket</label>
-                <div class="paket-dropdown">
-                    <div class="paket-select" id="paketSelect" onclick="togglePaketList()">
-                        <span class="placeholder" id="paketPlaceholder">Klik untuk pilih paket...</span>
-                        <i class="fas fa-chevron-down"></i>
+            
+            <!-- FORM SECTION -->
+            <div id="formSection">
+                <div class="register-header">
+                    <div class="register-logo">
+                        <img src="/img.png" alt="Logo" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+                        <div class="logo-placeholder" style="display:none;"><i class="fas fa-cube"></i></div>
                     </div>
-                    <div class="paket-list" id="paketList">
-                        <div class="paket-option" data-paket="1 Minggu" data-harga="15000" onclick="selectPaketOption(this)"><span class="paket-name">1 Minggu</span><span class="paket-price">Rp 15.000</span></div>
-                        <div class="paket-option" data-paket="2 Minggu" data-harga="25000" onclick="selectPaketOption(this)"><span class="paket-name">2 Minggu</span><span class="paket-price">Rp 25.000</span></div>
-                        <div class="paket-option" data-paket="1 Bulan" data-harga="40000" onclick="selectPaketOption(this)"><span class="paket-name">1 Bulan</span><span class="paket-price">Rp 40.000</span></div>
-                        <div class="paket-option" data-paket="2 Bulan" data-harga="50000" onclick="selectPaketOption(this)"><span class="paket-name">2 Bulan</span><span class="paket-price">Rp 50.000</span></div>
-                        <div class="paket-option" data-paket="3 Bulan" data-harga="55000" onclick="selectPaketOption(this)"><span class="paket-name">3 Bulan</span><span class="paket-price">Rp 55.000</span></div>
-                        <div class="paket-option" data-paket="Permanen" data-harga="100000" onclick="selectPaketOption(this)"><span class="paket-name">Permanen</span><span class="paket-price">Rp 100.000</span></div>
+                    <h1>Daftar Akun</h1>
+                    <p>Pilih paket dan buat akun baru</p>
+                </div>
+
+                <div class="error-message" id="errorMessage">
+                    <i class="fas fa-exclamation-circle"></i> <span id="errorText"></span>
+                </div>
+
+                <div class="honeypot-field" aria-hidden="true">
+                    <input type="text" id="website" name="website" tabindex="-1" autocomplete="off">
+                </div>
+
+                <div class="form-group">
+                    <label for="username"><i class="fas fa-user"></i> Username</label>
+                    <input type="text" id="username" placeholder="Huruf dan angka saja (3-20)" class="form-input" maxlength="20" oninput="validateUsernameInput()">
+                </div>
+
+                <div class="form-group">
+                    <label for="password"><i class="fas fa-lock"></i> Password</label>
+                    <input type="password" id="password" placeholder="Minimal 6 karakter" class="form-input" maxlength="20">
+                    <div class="password-strength"><div class="password-strength-bar" id="passwordStrengthBar"></div></div>
+                </div>
+
+                <div class="form-group">
+                    <label for="confirmPassword"><i class="fas fa-lock"></i> Konfirmasi Password</label>
+                    <input type="password" id="confirmPassword" placeholder="Ulangi password" class="form-input" maxlength="20">
+                </div>
+
+                <div class="form-group">
+                    <label for="phone"><i class="fas fa-phone"></i> Nomor Telepon</label>
+                    <input type="tel" id="phone" placeholder="081234567890" class="form-input" maxlength="15" oninput="validatePhoneInput()">
+                </div>
+
+                <div class="form-group">
+                    <label for="email"><i class="fas fa-envelope"></i> Email</label>
+                    <input type="email" id="email" placeholder="nama@email.com" class="form-input" maxlength="50" oninput="validateEmailInput()">
+                </div>
+
+                <div class="form-group">
+                    <label><i class="fas fa-box"></i> Pilih Paket</label>
+                    <div class="paket-dropdown">
+                        <div class="paket-select" id="paketSelect" onclick="togglePaketList()">
+                            <span class="placeholder" id="paketPlaceholder">Klik untuk pilih paket...</span>
+                            <i class="fas fa-chevron-down"></i>
+                        </div>
+                        <div class="paket-list" id="paketList">
+                            <div class="paket-option" data-paket="1 Minggu" data-harga="15000" onclick="selectPaketOption(this)"><span class="paket-name">1 Minggu</span><span class="paket-price">Rp 15.000</span></div>
+                            <div class="paket-option" data-paket="2 Minggu" data-harga="25000" onclick="selectPaketOption(this)"><span class="paket-name">2 Minggu</span><span class="paket-price">Rp 25.000</span></div>
+                            <div class="paket-option" data-paket="1 Bulan" data-harga="40000" onclick="selectPaketOption(this)"><span class="paket-name">1 Bulan</span><span class="paket-price">Rp 40.000</span></div>
+                            <div class="paket-option" data-paket="2 Bulan" data-harga="50000" onclick="selectPaketOption(this)"><span class="paket-name">2 Bulan</span><span class="paket-price">Rp 50.000</span></div>
+                            <div class="paket-option" data-paket="3 Bulan" data-harga="55000" onclick="selectPaketOption(this)"><span class="paket-name">3 Bulan</span><span class="paket-price">Rp 55.000</span></div>
+                            <div class="paket-option" data-paket="Permanen" data-harga="100000" onclick="selectPaketOption(this)"><span class="paket-name">Permanen</span><span class="paket-price">Rp 100.000</span></div>
+                        </div>
                     </div>
+                </div>
+
+                <div class="verification-box">
+                    <input type="checkbox" id="verificationCheck" onchange="toggleSubmitButton()">
+                    <label for="verificationCheck">Saya menyetujui bahwa akun saya perlu <b>diaktivasi oleh admin</b> terlebih dahulu sebelum bisa digunakan.</label>
+                </div>
+
+                <div class="recaptcha-wrapper">
+                    <div class="g-recaptcha" data-sitekey="6LfYOH4tAAAAAO48ez84cjF25XOYz3cN0OOjZ9pc"></div>
+                </div>
+
+                <button class="btn btn-primary" id="btnRegister" onclick="register()" disabled>
+                    <i class="fas fa-user-plus"></i> DAFTAR
+                </button>
+
+                <div class="register-footer">
+                    <p>Sudah punya akun? <a href="/pages/login">Login di sini</a></p>
                 </div>
             </div>
 
-            <div class="verification-box">
-                <input type="checkbox" id="verificationCheck" onchange="toggleSubmitButton()">
-                <label for="verificationCheck">Saya menyetujui bahwa akun saya perlu <b>diaktivasi oleh admin</b> terlebih dahulu sebelum bisa digunakan.</label>
+            <!-- TOKEN EXPIRED -->
+            <div class="status-page" id="expiredPage">
+                <div class="status-icon expired"><i class="fas fa-clock"></i></div>
+                <div class="status-title">Link Expired</div>
+                <div class="status-message">Link pendaftaran ini sudah <b>expired</b>.<br>Silakan minta link baru ke admin.</div>
             </div>
 
-            <div class="recaptcha-wrapper">
-                <div class="g-recaptcha" data-sitekey="6LfYOH4tAAAAAO48ez84cjF25XOYz3cN0OOjZ9pc"></div>
+            <!-- TOKEN INVALID -->
+            <div class="status-page" id="invalidPage">
+                <div class="status-icon invalid"><i class="fas fa-exclamation-circle"></i></div>
+                <div class="status-title">Link Tidak Valid</div>
+                <div class="status-message">Link pendaftaran ini <b>tidak valid</b>.<br>Silakan minta link baru ke admin.</div>
             </div>
 
-            <button class="btn btn-primary" id="btnRegister" onclick="register()" disabled>
-                <i class="fas fa-user-plus"></i> DAFTAR
-            </button>
-
-            <div class="register-footer">
-                <p>Sudah punya akun? <a href="/pages/login">Login di sini</a></p>
+            <!-- TOKEN USED -->
+            <div class="status-page" id="usedPage">
+                <div class="status-icon used"><i class="fas fa-times-circle"></i></div>
+                <div class="status-title">Link Sudah Digunakan</div>
+                <div class="status-message">Link pendaftaran ini <b>sudah digunakan</b>.<br>Silakan minta link baru ke admin.</div>
             </div>
+
         </div>
     </div>
 
@@ -185,6 +215,14 @@
         }
 
         var registerToken = getUrlParam('token') || '';
+
+        function showStatusPage(pageId) {
+            document.getElementById('formSection').style.display = 'none';
+            document.getElementById('expiredPage').classList.remove('show');
+            document.getElementById('invalidPage').classList.remove('show');
+            document.getElementById('usedPage').classList.remove('show');
+            document.getElementById(pageId).classList.add('show');
+        }
 
         async function getFingerprint() {
             var fp = '';
@@ -427,18 +465,58 @@
             return result;
         }
 
+        // ==================== VERIFIKASI TOKEN SAAT HALAMAN DIBUKA ====================
+        async function verifyTokenOnLoad() {
+            if (!registerToken) {
+                showStatusPage('invalidPage');
+                return;
+            }
+
+            if (!fingerprint) fingerprint = await getFingerprint();
+
+            var payload = {
+                action: 'verify_token',
+                token: registerToken,
+                timestamp: Date.now()
+            };
+
+            var encryptedPayload = CryptoJS.AES.encrypt(JSON.stringify(payload), API_SECRET).toString();
+
+            try {
+                var res = await fetch(API_REVANSTORE, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Fingerprint': fingerprint },
+                    body: JSON.stringify({ data: encryptedPayload })
+                });
+
+                var result = await res.json();
+
+                if (result.data) {
+                    var dec = CryptoJS.AES.decrypt(result.data, API_SECRET).toString(CryptoJS.enc.Utf8);
+                    result = JSON.parse(dec);
+                }
+
+                if (result && result.valid) {
+                    document.getElementById('formSection').style.display = 'block';
+                } else if (result && result.error === 'token_used') {
+                    showStatusPage('usedPage');
+                } else if (result && result.error === 'token_expired') {
+                    showStatusPage('expiredPage');
+                } else {
+                    showStatusPage('invalidPage');
+                }
+
+            } catch (e) {
+                showStatusPage('invalidPage');
+            }
+        }
+
         async function register() {
             if (registerInProgress) return;
             registerInProgress = true;
             hideError();
 
             try {
-                if (!registerToken) {
-                    document.getElementById('tokenWarning').style.display = 'block';
-                    Swal.fire({ icon: "error", title: "Link Tidak Valid!", text: "Minta link pendaftaran ke admin.", confirmButtonColor: "#ef4444" });
-                    registerInProgress = false; return;
-                }
-
                 if (!checkSessionTimeout()) { registerInProgress = false; return; }
                 if (!isValidUserAgent()) { Swal.fire({ icon: "error", title: "Browser Tidak Valid!", confirmButtonColor: "#ef4444" }); registerInProgress = false; return; }
                 if (!isValidScreenSize()) { Swal.fire({ icon: "error", title: "Browser Tidak Valid!", confirmButtonColor: "#ef4444" }); registerInProgress = false; return; }
@@ -515,7 +593,7 @@
                     });
                 } else {
                     recordRegisterAttempt();
-                    if (result && result.error === 'token_required') { Swal.fire({ icon: "error", title: "Link Tidak Valid!", text: "Minta link pendaftaran ke admin.", confirmButtonColor: "#ef4444" }); }
+                    if (result && result.error === 'token_required') { Swal.fire({ icon: "error", title: "Link Tidak Valid!", confirmButtonColor: "#ef4444" }); }
                     else if (result && result.error === 'token_invalid') { Swal.fire({ icon: "error", title: "Link Tidak Valid!", confirmButtonColor: "#ef4444" }); }
                     else if (result && result.error === 'token_used') { Swal.fire({ icon: "error", title: "Link Sudah Digunakan!", confirmButtonColor: "#ef4444" }); }
                     else if (result && result.error === 'token_expired') { Swal.fire({ icon: "error", title: "Link Expired!", confirmButtonColor: "#ef4444" }); }
@@ -538,9 +616,10 @@
 
         document.addEventListener('DOMContentLoaded', async function() {
             if (!fingerprint) fingerprint = await getFingerprint();
-            if (!registerToken) {
-                document.getElementById('tokenWarning').style.display = 'block';
-            }
+            
+            document.getElementById('formSection').style.display = 'none';
+            verifyTokenOnLoad();
+            
             document.getElementById('password').addEventListener('input', updatePasswordStrength);
             document.getElementById('username').addEventListener('input', updatePasswordStrength);
             document.getElementById('confirmPassword').addEventListener('paste', function(e) { e.preventDefault(); Swal.fire({ icon: "warning", title: "Paste Tidak Diizinkan!", timer: 2000, showConfirmButton: false }); });
