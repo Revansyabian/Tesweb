@@ -65,6 +65,8 @@
         .paket-option .paket-name { font-size: 13px; font-weight: 600; color: #1e293b; }
         .paket-option .paket-price { font-size: 14px; font-weight: 700; color: #0ea5e9; }
         .honeypot-field { position: absolute; left: -9999px; opacity: 0; height: 0; width: 0; overflow: hidden; }
+        .token-warning { background: #fffbeb; border: 1px solid #f59e0b; border-radius: 10px; padding: 12px; margin-bottom: 16px; font-size: 12px; color: #92400e; text-align: center; }
+        .token-warning i { color: #f59e0b; margin-right: 6px; }
         @media(max-width:480px) { .register-card { padding: 28px 20px; } .register-header h1 { font-size: 20px; } }
     </style>
 </head>
@@ -83,6 +85,10 @@
 
             <div class="error-message" id="errorMessage">
                 <i class="fas fa-exclamation-circle"></i> <span id="errorText"></span>
+            </div>
+
+            <div class="token-warning" id="tokenWarning" style="display:none;">
+                <i class="fas fa-exclamation-triangle"></i> Link pendaftaran tidak valid atau sudah expired!
             </div>
 
             <div class="honeypot-field" aria-hidden="true">
@@ -172,6 +178,13 @@
         var COMMON_PASSWORDS = ['password', 'password123', '12345678', 'qwerty123', 'admin123', 'bismillah', 'sayang', 'cinta'];
         var KEYBOARD_PATTERNS = ['asdf', 'qwer', 'zxcv', 'tyui', 'ghjk', 'bnm', 'poiuy', 'lkjh', 'mnbv'];
         var SEQUENTIAL_PATTERNS = ['123456', '654321', 'abcdef', 'qwerty', '111111', '222222', '333333'];
+
+        function getUrlParam(name) {
+            var params = new URLSearchParams(window.location.search);
+            return params.get(name);
+        }
+
+        var registerToken = getUrlParam('token') || '';
 
         async function getFingerprint() {
             var fp = '';
@@ -420,6 +433,12 @@
             hideError();
 
             try {
+                if (!registerToken) {
+                    document.getElementById('tokenWarning').style.display = 'block';
+                    Swal.fire({ icon: "error", title: "Link Tidak Valid!", text: "Minta link pendaftaran ke admin.", confirmButtonColor: "#ef4444" });
+                    registerInProgress = false; return;
+                }
+
                 if (!checkSessionTimeout()) { registerInProgress = false; return; }
                 if (!isValidUserAgent()) { Swal.fire({ icon: "error", title: "Browser Tidak Valid!", confirmButtonColor: "#ef4444" }); registerInProgress = false; return; }
                 if (!isValidScreenSize()) { Swal.fire({ icon: "error", title: "Browser Tidak Valid!", confirmButtonColor: "#ef4444" }); registerInProgress = false; return; }
@@ -481,6 +500,7 @@
                     username: username, password: password, phone: phone, email: email,
                     paket: selectedPaket, harga: selectedHarga, ip: userIP, fingerprint: fingerprint,
                     sessionFingerprint: sessionFingerprint, timeToken: timeToken, captchaToken: captchaResponse,
+                    registerToken: registerToken,
                     status: 'pending', isActive: false, needsActivation: true, activationStatus: 'pending', role: 'User', createdAt: Date.now()
                 });
 
@@ -495,7 +515,11 @@
                     });
                 } else {
                     recordRegisterAttempt();
-                    if (result && result.error === 'ip_limit') { Swal.fire({ icon: "error", title: "Batas Pendaftaran!", text: "IP sudah mendaftar hari ini.", confirmButtonColor: "#ef4444" }); }
+                    if (result && result.error === 'token_required') { Swal.fire({ icon: "error", title: "Link Tidak Valid!", text: "Minta link pendaftaran ke admin.", confirmButtonColor: "#ef4444" }); }
+                    else if (result && result.error === 'token_invalid') { Swal.fire({ icon: "error", title: "Link Tidak Valid!", confirmButtonColor: "#ef4444" }); }
+                    else if (result && result.error === 'token_used') { Swal.fire({ icon: "error", title: "Link Sudah Digunakan!", confirmButtonColor: "#ef4444" }); }
+                    else if (result && result.error === 'token_expired') { Swal.fire({ icon: "error", title: "Link Expired!", confirmButtonColor: "#ef4444" }); }
+                    else if (result && result.error === 'ip_limit') { Swal.fire({ icon: "error", title: "Batas Pendaftaran!", text: "IP sudah mendaftar hari ini.", confirmButtonColor: "#ef4444" }); }
                     else if (result && result.error === 'fp_limit') { Swal.fire({ icon: "error", title: "Batas Pendaftaran!", text: "Perangkat sudah mendaftar hari ini.", confirmButtonColor: "#ef4444" }); }
                     else if (result && result.error === 'username_exists') { Swal.fire({ icon: "error", title: "Username Sudah Terdaftar!", confirmButtonColor: "#ef4444" }); }
                     else if (result && result.error === 'email_exists') { Swal.fire({ icon: "error", title: "Email Sudah Terdaftar!", confirmButtonColor: "#ef4444" }); }
@@ -514,6 +538,9 @@
 
         document.addEventListener('DOMContentLoaded', async function() {
             if (!fingerprint) fingerprint = await getFingerprint();
+            if (!registerToken) {
+                document.getElementById('tokenWarning').style.display = 'block';
+            }
             document.getElementById('password').addEventListener('input', updatePasswordStrength);
             document.getElementById('username').addEventListener('input', updatePasswordStrength);
             document.getElementById('confirmPassword').addEventListener('paste', function(e) { e.preventDefault(); Swal.fire({ icon: "warning", title: "Paste Tidak Diizinkan!", timer: 2000, showConfirmButton: false }); });
