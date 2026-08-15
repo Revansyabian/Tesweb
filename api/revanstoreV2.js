@@ -213,6 +213,7 @@ export default async function handler(req, res) {
     
     const publicPaths = [
       'login',
+      'register',
       'check_blocked',
       'check_account_status',
       'login_failed',
@@ -338,6 +339,91 @@ export default async function handler(req, res) {
       return res.status(200).json(encryptResponse(result));
     }
 
+    if (path === 'register' && method === 'POST') {
+      const captchaToken = data?.captchaToken || '';
+      const captchaValid = await verifyRecaptchaV2(captchaToken);
+      if (!captchaValid) {
+        return res.status(200).json(encryptResponse({ success: false, error: 'invalid_captcha', message: 'reCAPTCHA tidak valid!' }));
+      }
+
+      const username = data?.username || '';
+      const email = data?.email || '';
+      const userIP = data?.ip || ip;
+      const userFP = data?.fingerprint || fp;
+
+      const ipKey = 'register_ip_' + userIP.replace(/\./g, '_');
+      const ipRef = db.ref('register_limits/' + ipKey);
+      const ipSnap = await ipRef.once('value');
+      const ipRaw = ipSnap.val();
+      if (ipRaw?.data) {
+        try {
+          const ipData = JSON.parse(CryptoJS.AES.decrypt(ipRaw.data, ADMIN_KEY).toString(CryptoJS.enc.Utf8));
+          if (Date.now() - (ipData.lastRegister || 0) < 86400000) {
+            return res.status(200).json(encryptResponse({ success: false, error: 'ip_limit', message: 'IP sudah mendaftar hari ini.' }));
+          }
+        } catch(e) {}
+      }
+
+      if (userFP) {
+        const fpKey = 'register_fp_' + userFP;
+        const fpRef = db.ref('register_limits/' + fpKey);
+        const fpSnap = await fpRef.once('value');
+        const fpRaw = fpSnap.val();
+        if (fpRaw?.data) {
+          try {
+            const fpData = JSON.parse(CryptoJS.AES.decrypt(fpRaw.data, ADMIN_KEY).toString(CryptoJS.enc.Utf8));
+            if (Date.now() - (fpData.lastRegister || 0) < 86400000) {
+              return res.status(200).json(encryptResponse({ success: false, error: 'fp_limit', message: 'Perangkat sudah mendaftar hari ini.' }));
+            }
+          } catch(e) {}
+        }
+      }
+
+      const usersSnap = await db.ref('users').once('value');
+      const users = usersSnap.val();
+      if (users) {
+        for (const key in users) {
+          const userData = await decryptData(users[key]);
+          if (userData && userData.username === username) {
+            return res.status(200).json(encryptResponse({ success: false, error: 'username_exists', message: 'Username sudah terdaftar!' }));
+          }
+          if (userData && email && userData.email === email) {
+            return res.status(200).json(encryptResponse({ success: false, error: 'email_exists', message: 'Email sudah terdaftar!' }));
+          }
+        }
+      }
+
+      const hashedPassword = await hashPassword(data?.password || '');
+      if (!hashedPassword) {
+        return res.status(200).json(encryptResponse({ success: false, error: 'server_error', message: 'Gagal memproses password.' }));
+      }
+
+      const registerData = {
+        ...data,
+        password_hash: hashedPassword,
+        password: undefined,
+        status: 'pending',
+        isActive: false,
+        needsActivation: true,
+        activationStatus: 'pending',
+        role: 'User',
+        createdAt: Date.now()
+      };
+      delete registerData.password;
+
+      const enc = encryptData(registerData);
+      const newRef = db.ref('users').push();
+      await newRef.set({ data: enc });
+
+      await ipRef.set({ data: CryptoJS.AES.encrypt(JSON.stringify({ lastRegister: Date.now() }), ADMIN_KEY).toString() });
+      if (userFP) {
+        await db.ref('register_limits/register_fp_' + userFP).set({ data: CryptoJS.AES.encrypt(JSON.stringify({ lastRegister: Date.now() }), ADMIN_KEY).toString() });
+      }
+
+      await logActivity(username, 'register', 'Pendaftaran baru - ' + (data?.paket || 'Trial'), userIP, userFP);
+      return res.status(200).json(encryptResponse({ success: true, message: 'Pendaftaran berhasil! Tunggu aktivasi admin.' }));
+    }
+
     if (path === 'login' && method === 'POST') {
       const captchaToken = data?.captchaToken || '';
       const captchaValid = await verifyRecaptchaV2(captchaToken);
@@ -362,11 +448,17 @@ export default async function handler(req, res) {
         const decryptedUser = await decryptData(users[key]);
         
         if (decryptedUser && decryptedUser.username === username) {
-          // Verifikasi password dengan bcrypt
           const isPasswordValid = await verifyPassword(password, decryptedUser.password_hash);
           
           if (!isPasswordValid) {
-            continue; // Password salah, lanjutkan loop (atau langsung break untuk hindari timing attack)
+            continue;
+          }
+
+          if (decryptedUser.activationStatus === 'pending') {
+            return res.status(200).json(encryptResponse({ success: false, error: 'pending_activation', message: 'Akun belum diaktivasi oleh admin.' }));
+          }
+          if (decryptedUser.activationStatus === 'rejected') {
+            return res.status(200).json(encryptResponse({ success: false, error: 'rejected', message: 'Akun ditolak oleh admin.' }));
           }
 
           if (decryptedUser.banned === true) {
@@ -524,4 +616,8 @@ export default async function handler(req, res) {
   } catch (error) {
     return res.status(500).json(encryptResponse({ error: 'Terjadi kesalahan pada server.' }));
   }
+}
+
+function encryptData(data) {
+  return CryptoJS.AES.encrypt(JSON.stringify(data), ADMIN_KEY).toString();
 }
