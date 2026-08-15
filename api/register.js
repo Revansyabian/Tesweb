@@ -88,29 +88,6 @@ async function hashPassword(password) {
     return await bcrypt.hash(password, salt);
 }
 
-async function checkRateLimit(ip) {
-    const key = ip.replace(/\./g, '_');
-    const ref = db.ref('rate_limits_register/' + key);
-    const snap = await ref.once('value');
-    const raw = snap.val();
-    const now = Date.now();
-    
-    if (raw && raw.data) {
-        try {
-            const data = decryptData(raw.data);
-            if (now - (data.timestamp || 0) < RATE_LIMIT_WINDOW) {
-                if ((data.count || 0) >= RATE_LIMIT_MAX) return false;
-                data.count = (data.count || 0) + 1;
-                await ref.set({ data: encryptData(data) });
-                return true;
-            }
-        } catch (e) {}
-    }
-    
-    await ref.set({ data: encryptData({ count: 1, timestamp: now }) });
-    return true;
-}
-
 async function verifyRecaptcha(token) {
     if (!token || !RECAPTCHA_V2_SECRET_KEY) return false;
     
@@ -141,10 +118,6 @@ export default async function handler(req, res) {
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
     const fp = req.headers['x-fingerprint'] || '';
 
-    if (!await checkRateLimit(ip)) {
-        return res.status(429).json({ data: encryptResponse({ success: false, error: 'rate_limit', message: 'Terlalu banyak percobaan. Coba lagi nanti.' }) });
-    }
-
     try {
         const body = req.body;
         if (!body || !body.data) {
@@ -158,6 +131,34 @@ export default async function handler(req, res) {
 
         const action = decrypted.action;
 
+        // ==================== ACTION: GENERATE TOKEN ====================
+        if (action === 'generate_token') {
+            try {
+                const userIP = decrypted.ip || ip;
+                const userFP = decrypted.fingerprint || fp;
+
+                const token = crypto.randomBytes(32).toString('hex');
+                const expiry = Date.now() + (15 * 60 * 1000);
+
+                const tokenData = {
+                    token: token,
+                    ip: userIP,
+                    fingerprint: userFP,
+                    createdAt: Date.now(),
+                    expiry: expiry,
+                    used: false
+                };
+
+                await db.ref('register_tokens/' + token).set({ data: encryptData(tokenData) });
+
+                return res.status(200).json({ data: encryptResponse({ success: true, token: token, expiry: expiry }) });
+            } catch (e) {
+                console.error('Generate token error:', e);
+                return res.status(500).json({ data: encryptResponse({ success: false, error: 'server_error', message: 'Gagal membuat sesi.' }) });
+            }
+        }
+
+        // ==================== ACTION: REGISTER ====================
         if (action === 'register') {
             const username = sanitizeInput(decrypted.username || '');
             const password = decrypted.password || '';
@@ -170,7 +171,6 @@ export default async function handler(req, res) {
             const userIP = decrypted.ip || ip;
             const userFP = decrypted.fingerprint || fp;
             const sessionFingerprint = decrypted.sessionFingerprint || '';
-            const timeToken = decrypted.timeToken || '';
             const registerToken = sanitizeInput(decrypted.registerToken || '');
 
             if (!username || username.length < 3) {
@@ -202,9 +202,8 @@ export default async function handler(req, res) {
                 return res.status(200).json({ data: encryptResponse({ success: false, error: 'invalid_captcha', message: 'reCAPTCHA tidak valid!' }) });
             }
 
-            // ==================== VALIDASI REGISTER TOKEN ====================
             if (!registerToken) {
-                return res.status(200).json({ data: encryptResponse({ success: false, error: 'token_required', message: 'Link pendaftaran tidak valid! Minta link ke admin.' }) });
+                return res.status(200).json({ data: encryptResponse({ success: false, error: 'token_required', message: 'Sesi pendaftaran tidak valid! Refresh halaman.' }) });
             }
 
             const tokenRef = db.ref('register_tokens/' + registerToken);
@@ -212,24 +211,23 @@ export default async function handler(req, res) {
             const tokenRaw = tokenSnap.val();
 
             if (!tokenRaw || !tokenRaw.data) {
-                return res.status(200).json({ data: encryptResponse({ success: false, error: 'token_invalid', message: 'Link pendaftaran tidak valid!' }) });
+                return res.status(200).json({ data: encryptResponse({ success: false, error: 'token_invalid', message: 'Sesi pendaftaran tidak valid! Refresh halaman.' }) });
             }
 
             const tokenData = decryptData(tokenRaw.data);
 
             if (!tokenData || !tokenData.token) {
-                return res.status(200).json({ data: encryptResponse({ success: false, error: 'token_invalid', message: 'Link pendaftaran tidak valid!' }) });
+                return res.status(200).json({ data: encryptResponse({ success: false, error: 'token_invalid', message: 'Sesi pendaftaran tidak valid! Refresh halaman.' }) });
             }
 
             if (tokenData.used === true) {
-                return res.status(200).json({ data: encryptResponse({ success: false, error: 'token_used', message: 'Link pendaftaran sudah digunakan!' }) });
+                return res.status(200).json({ data: encryptResponse({ success: false, error: 'token_used', message: 'Sesi pendaftaran sudah digunakan! Refresh halaman.' }) });
             }
 
             if (tokenData.expiry && Date.now() > tokenData.expiry) {
-                return res.status(200).json({ data: encryptResponse({ success: false, error: 'token_expired', message: 'Link pendaftaran sudah expired!' }) });
+                return res.status(200).json({ data: encryptResponse({ success: false, error: 'token_expired', message: 'Sesi pendaftaran sudah expired! Refresh halaman.' }) });
             }
 
-            // Rate limit IP 1x sehari
             const ipKey = 'register_ip_' + userIP.replace(/\./g, '_');
             const ipRef = db.ref('register_limits/' + ipKey);
             const ipSnap = await ipRef.once('value');
@@ -311,7 +309,6 @@ export default async function handler(req, res) {
                 await db.ref('register_limits/register_fp_' + userFP).set({ data: encryptData({ lastRegister: Date.now() }) });
             }
 
-            // Tandai token sudah dipakai
             await tokenRef.update({ data: encryptData({ ...tokenData, used: true, usedAt: Date.now(), usedBy: username }) });
 
             return res.status(200).json({ data: encryptResponse({ success: true, message: 'Pendaftaran berhasil! Tunggu aktivasi admin.' }) });
