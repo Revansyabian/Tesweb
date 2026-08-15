@@ -8,9 +8,7 @@ if (!ADMIN_KEY) {
     throw new Error('ADMIN_KEY is required!');
 }
 
-// API_SECRET untuk decrypt dari browser (harus sama dengan di browser)
 const API_SECRET = process.env.API_SECRET || '1417-1426-1527-1517';
-
 const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
 const RECAPTCHA_V2_SECRET_KEY = process.env.RECAPTCHA_V2_SECRET_KEY || '';
 const EMAIL_FROM = process.env.EMAIL_FROM || 'Top Up Store <onboarding@resend.dev>';
@@ -35,17 +33,17 @@ if (!admin.apps.length) {
 
 const db = admin.database();
 
-// ==================== ENCRYPT (untuk response ke browser) ====================
+// ==================== ENCRYPT RESPONSE (BROWSER) ====================
 function encryptResponse(data) {
     return CryptoJS.AES.encrypt(JSON.stringify(data), API_SECRET).toString();
 }
 
-// ==================== ENCRYPT (untuk database) ====================
+// ==================== ENCRYPT DATA (DATABASE) ====================
 function encryptData(data) {
     return CryptoJS.AES.encrypt(JSON.stringify(data), ADMIN_KEY).toString();
 }
 
-// ==================== DECRYPT (dari browser - pakai API_SECRET) ====================
+// ==================== DECRYPT PAYLOAD (DARI BROWSER) ====================
 function decryptPayload(raw) {
     if (!raw) return null;
     try {
@@ -56,7 +54,7 @@ function decryptPayload(raw) {
     }
 }
 
-// ==================== DECRYPT (dari database - pakai ADMIN_KEY) ====================
+// ==================== DECRYPT DATA (DARI DATABASE) ====================
 function decryptData(raw) {
     if (!raw) return raw;
     try {
@@ -65,7 +63,7 @@ function decryptData(raw) {
     } catch (e) { return raw; }
 }
 
-// ==================== SANITIZE (ANTI-XSS) ====================
+// ==================== SANITIZE (ANTI-XSS & HTML INJECTION) ====================
 function sanitizeInput(str) {
     if (!str) return '';
     return String(str)
@@ -90,7 +88,9 @@ function sanitizeInput(str) {
         .replace(/<style/gi, '')
         .replace(/expression/gi, '')
         .replace(/eval/gi, '')
-        .replace(/alert/gi, '');
+        .replace(/alert/gi, '')
+        .replace(/document\./gi, '')
+        .replace(/window\./gi, '');
 }
 
 // ==================== PASSWORD HASH ====================
@@ -226,7 +226,6 @@ export default async function handler(req, res) {
             return res.status(400).json({ error: 'No data' });
         }
 
-        // Decrypt dari browser pakai API_SECRET
         const decrypted = decryptPayload(body.data);
         if (!decrypted || !decrypted.action) {
             return res.status(403).json({ error: 'Access denied' });
@@ -234,130 +233,163 @@ export default async function handler(req, res) {
 
         const action = decrypted.action;
 
-        // ==================== REQUEST RESET ====================
+        // ==================== ACTION: REQUEST RESET ====================
         if (action === 'request_reset') {
             const username = sanitizeInput(decrypted.username || '');
             const captchaToken = decrypted.captchaToken || '';
 
+            // Validasi username
             if (!username || username.length < 3) {
-                return res.status(200).json({ data: encryptResponse({ success: false, error: 'invalid_username' }) });
+                return res.status(200).json({ data: encryptResponse({ success: false, error: 'invalid_username', message: 'Username tidak valid!' }) });
             }
 
+            // Validasi reCAPTCHA
             const captchaValid = await verifyRecaptcha(captchaToken);
             if (!captchaValid) {
-                return res.status(200).json({ data: encryptResponse({ success: false, error: 'invalid_captcha' }) });
+                return res.status(200).json({ data: encryptResponse({ success: false, error: 'invalid_captcha', message: 'reCAPTCHA tidak valid!' }) });
             }
 
+            // Cari user di database
             const usersSnap = await db.ref('users').once('value');
             const users = usersSnap.val();
+
+            if (!users) {
+                return res.status(200).json({ data: encryptResponse({ success: false, error: 'user_not_found', message: 'Username tidak terdaftar!' }) });
+            }
+
             let foundUser = null;
             let userKey = null;
 
-            if (users) {
-                for (const key in users) {
-                    const userData = decryptData(users[key].data);
-                    if (userData && userData.username === username && userData.email) {
-                        foundUser = userData;
-                        userKey = key;
-                        break;
-                    }
+            for (const key in users) {
+                const userData = decryptData(users[key].data);
+                if (userData && userData.username === username) {
+                    foundUser = userData;
+                    userKey = key;
+                    break;
                 }
             }
 
-            if (!foundUser || !foundUser.email) {
-                return res.status(200).json({ data: encryptResponse({ success: true, message: 'Jika username terdaftar, link akan dikirim ke email Anda.' }) });
+            // Validasi: User HARUS terdaftar
+            if (!foundUser) {
+                return res.status(200).json({ data: encryptResponse({ success: false, error: 'user_not_found', message: 'Username tidak terdaftar!' }) });
             }
 
+            // Validasi: User HARUS punya email
+            if (!foundUser.email || foundUser.email.trim() === '') {
+                return res.status(200).json({ data: encryptResponse({ success: false, error: 'email_not_found', message: 'Akun ini tidak memiliki email terdaftar. Hubungi admin.' }) });
+            }
+
+            // Validasi: User tidak boleh banned
+            if (foundUser.banned === true) {
+                return res.status(200).json({ data: encryptResponse({ success: false, error: 'account_banned', message: 'Akun Anda dibanned. Hubungi admin.' }) });
+            }
+
+            // Validasi: User tidak boleh ditangguhkan
+            if (foundUser.forceLogout === true) {
+                return res.status(200).json({ data: encryptResponse({ success: false, error: 'account_suspended', message: 'Akun Anda ditangguhkan. Hubungi admin.' }) });
+            }
+
+            // Generate token unik
             const resetToken = generateResetToken();
             const resetTokenExpiry = Date.now() + RESET_TOKEN_EXPIRY;
 
+            // Simpan token ke user
             const updatedData = { ...foundUser, resetToken: resetToken, resetTokenExpiry: resetTokenExpiry };
             await db.ref('users/' + userKey).update({ data: encryptData(updatedData) });
 
+            // Buat link unik
             const resetLink = BASE_URL + '/pages/confirm-password?token=' + resetToken;
 
+            // Kirim email
             const emailSent = await sendResetEmail(foundUser.email, foundUser.username, resetLink);
 
             if (!emailSent) {
-                return res.status(200).json({ data: encryptResponse({ success: false, error: 'email_error' }) });
+                return res.status(200).json({ data: encryptResponse({ success: false, error: 'email_error', message: 'Gagal mengirim email. Coba lagi nanti.' }) });
             }
 
+            // Mask email
             const emailParts = foundUser.email.split('@');
             const maskedEmail = emailParts[0].substring(0, 1) + '***@' + emailParts[1];
 
-            return res.status(200).json({ data: encryptResponse({ success: true, maskedEmail: maskedEmail }) });
+            return res.status(200).json({ data: encryptResponse({ success: true, maskedEmail: maskedEmail, message: 'Link reset telah dikirim ke email Anda.' }) });
         }
 
-        // ==================== VERIFY TOKEN ====================
+        // ==================== ACTION: VERIFY TOKEN ====================
         if (action === 'verify_token') {
             const token = sanitizeInput(decrypted.token || '');
 
             if (!token || token.length < 10) {
-                return res.status(200).json({ data: encryptResponse({ valid: false }) });
+                return res.status(200).json({ data: encryptResponse({ valid: false, error: 'token_invalid' }) });
             }
 
             const usersSnap = await db.ref('users').once('value');
             const users = usersSnap.val();
+
+            if (!users) {
+                return res.status(200).json({ data: encryptResponse({ valid: false, error: 'token_not_found' }) });
+            }
+
             let foundUser = null;
 
-            if (users) {
-                for (const key in users) {
-                    const userData = decryptData(users[key].data);
-                    if (userData && userData.resetToken === token) {
-                        foundUser = userData;
-                        break;
-                    }
+            for (const key in users) {
+                const userData = decryptData(users[key].data);
+                if (userData && userData.resetToken === token) {
+                    foundUser = userData;
+                    break;
                 }
             }
 
             if (!foundUser) {
-                return res.status(200).json({ data: encryptResponse({ valid: false }) });
+                return res.status(200).json({ data: encryptResponse({ valid: false, error: 'token_not_found' }) });
             }
 
             if (Date.now() > foundUser.resetTokenExpiry) {
-                return res.status(200).json({ data: encryptResponse({ valid: false, expired: true }) });
+                return res.status(200).json({ data: encryptResponse({ valid: false, expired: true, error: 'token_expired' }) });
             }
 
             return res.status(200).json({ data: encryptResponse({ valid: true }) });
         }
 
-        // ==================== CONFIRM RESET ====================
+        // ==================== ACTION: CONFIRM RESET ====================
         if (action === 'confirm_reset') {
             const token = sanitizeInput(decrypted.token || '');
             const newPassword = decrypted.newPassword || '';
             const captchaToken = decrypted.captchaToken || '';
 
             if (!token || token.length < 10) {
-                return res.status(200).json({ data: encryptResponse({ success: false, error: 'token_invalid' }) });
+                return res.status(200).json({ data: encryptResponse({ success: false, error: 'token_invalid', message: 'Link tidak valid!' }) });
             }
 
             if (!newPassword || newPassword.length < 6) {
-                return res.status(200).json({ data: encryptResponse({ success: false, error: 'weak_password' }) });
+                return res.status(200).json({ data: encryptResponse({ success: false, error: 'weak_password', message: 'Password minimal 6 karakter!' }) });
             }
 
             const captchaValid = await verifyRecaptcha(captchaToken);
             if (!captchaValid) {
-                return res.status(200).json({ data: encryptResponse({ success: false, error: 'invalid_captcha' }) });
+                return res.status(200).json({ data: encryptResponse({ success: false, error: 'invalid_captcha', message: 'reCAPTCHA tidak valid!' }) });
             }
 
             const usersSnap = await db.ref('users').once('value');
             const users = usersSnap.val();
+
+            if (!users) {
+                return res.status(200).json({ data: encryptResponse({ success: false, error: 'token_not_found', message: 'Link tidak valid!' }) });
+            }
+
             let foundUser = null;
             let userKey = null;
 
-            if (users) {
-                for (const key in users) {
-                    const userData = decryptData(users[key].data);
-                    if (userData && userData.resetToken === token) {
-                        foundUser = userData;
-                        userKey = key;
-                        break;
-                    }
+            for (const key in users) {
+                const userData = decryptData(users[key].data);
+                if (userData && userData.resetToken === token) {
+                    foundUser = userData;
+                    userKey = key;
+                    break;
                 }
             }
 
             if (!foundUser) {
-                return res.status(200).json({ data: encryptResponse({ success: false, error: 'token_not_found' }) });
+                return res.status(200).json({ data: encryptResponse({ success: false, error: 'token_not_found', message: 'Link tidak valid!' }) });
             }
 
             if (Date.now() > foundUser.resetTokenExpiry) {
@@ -365,7 +397,7 @@ export default async function handler(req, res) {
                 delete cleanedData.resetToken;
                 delete cleanedData.resetTokenExpiry;
                 await db.ref('users/' + userKey).update({ data: encryptData(cleanedData) });
-                return res.status(200).json({ data: encryptResponse({ success: false, error: 'token_expired' }) });
+                return res.status(200).json({ data: encryptResponse({ success: false, error: 'token_expired', message: 'Link expired! Minta link baru.' }) });
             }
 
             const hashedPassword = await hashPassword(newPassword);
@@ -377,7 +409,7 @@ export default async function handler(req, res) {
 
             await db.ref('users/' + userKey).update({ data: encryptData(updatedData) });
 
-            return res.status(200).json({ data: encryptResponse({ success: true, message: 'Password berhasil diubah' }) });
+            return res.status(200).json({ data: encryptResponse({ success: true, message: 'Password berhasil diubah!' }) });
         }
 
         return res.status(400).json({ error: 'Invalid action' });
