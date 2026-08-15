@@ -1,6 +1,7 @@
 import CryptoJS from 'crypto-js';
 import admin from 'firebase-admin';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 
 const ADMIN_KEY = process.env.ADMIN_KEY;
 if (!ADMIN_KEY) {
@@ -27,14 +28,17 @@ if (!admin.apps.length) {
 
 const db = admin.database();
 
+// ==================== ENCRYPT RESPONSE (BROWSER) ====================
 function encryptResponse(data) {
     return CryptoJS.AES.encrypt(JSON.stringify(data), API_SECRET).toString();
 }
 
+// ==================== ENCRYPT DATA (DATABASE) ====================
 function encryptData(data) {
     return CryptoJS.AES.encrypt(JSON.stringify(data), ADMIN_KEY).toString();
 }
 
+// ==================== DECRYPT PAYLOAD (DARI BROWSER) ====================
 function decryptPayload(raw) {
     if (!raw) return null;
     try {
@@ -45,6 +49,7 @@ function decryptPayload(raw) {
     }
 }
 
+// ==================== DECRYPT DATA (DARI DATABASE) ====================
 function decryptData(raw) {
     if (!raw) return raw;
     try {
@@ -191,7 +196,7 @@ export default async function handler(req, res) {
                 return res.status(200).json({ data: encryptResponse({ success: false, error: 'invalid_captcha', message: 'reCAPTCHA tidak valid!' }) });
             }
 
-            // ==================== RATE LIMIT IP (1x sehari) ====================
+            // Rate limit IP 1x sehari
             const ipKey = 'register_ip_' + userIP.replace(/\./g, '_');
             const ipRef = db.ref('register_limits/' + ipKey);
             const ipSnap = await ipRef.once('value');
@@ -206,7 +211,7 @@ export default async function handler(req, res) {
                 } catch (e) {}
             }
             
-            // ==================== RATE LIMIT FP (1x sehari) ====================
+            // Rate limit FP 1x sehari
             if (userFP) {
                 const fpKey = 'register_fp_' + userFP;
                 const fpRef = db.ref('register_limits/' + fpKey);
@@ -223,7 +228,7 @@ export default async function handler(req, res) {
                 }
             }
 
-            // ==================== CEK USERNAME & EMAIL ====================
+            // Cek username & email
             const usersSnap = await db.ref('users').once('value');
             const users = usersSnap.val();
             
@@ -239,13 +244,11 @@ export default async function handler(req, res) {
                 }
             }
 
-            // ==================== HASH PASSWORD ====================
             const hashedPassword = await hashPassword(password);
             if (!hashedPassword) {
                 return res.status(200).json({ data: encryptResponse({ success: false, error: 'server_error', message: 'Gagal memproses password.' }) });
             }
 
-            // ==================== SIMPAN DATA REGISTER ====================
             const registerData = {
                 username: username,
                 password_hash: hashedPassword,
@@ -272,7 +275,6 @@ export default async function handler(req, res) {
             const newRef = db.ref('users').push();
             await newRef.set({ data: enc });
 
-            // ==================== SIMPAN RATE LIMIT ====================
             await ipRef.set({ data: encryptData({ lastRegister: Date.now() }) });
             if (userFP) {
                 await db.ref('register_limits/register_fp_' + userFP).set({ data: encryptData({ lastRegister: Date.now() }) });
