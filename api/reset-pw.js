@@ -63,7 +63,7 @@ function decryptData(raw) {
     } catch (e) { return raw; }
 }
 
-// ==================== SANITIZE (ANTI-XSS & HTML INJECTION) ====================
+// ==================== SANITIZE (ANTI-XSS) ====================
 function sanitizeInput(str) {
     if (!str) return '';
     return String(str)
@@ -88,9 +88,7 @@ function sanitizeInput(str) {
         .replace(/<style/gi, '')
         .replace(/expression/gi, '')
         .replace(/eval/gi, '')
-        .replace(/alert/gi, '')
-        .replace(/document\./gi, '')
-        .replace(/window\./gi, '');
+        .replace(/alert/gi, '');
 }
 
 // ==================== PASSWORD HASH ====================
@@ -208,7 +206,6 @@ export default async function handler(req, res) {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'DENY');
     res.setHeader('X-XSS-Protection', '1; mode=block');
-    res.setHeader('Content-Security-Policy', "default-src 'self'");
 
     if (req.method === 'OPTIONS') return res.status(200).end();
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -238,18 +235,15 @@ export default async function handler(req, res) {
             const username = sanitizeInput(decrypted.username || '');
             const captchaToken = decrypted.captchaToken || '';
 
-            // Validasi username
             if (!username || username.length < 3) {
                 return res.status(200).json({ data: encryptResponse({ success: false, error: 'invalid_username', message: 'Username tidak valid!' }) });
             }
 
-            // Validasi reCAPTCHA
             const captchaValid = await verifyRecaptcha(captchaToken);
             if (!captchaValid) {
                 return res.status(200).json({ data: encryptResponse({ success: false, error: 'invalid_captcha', message: 'reCAPTCHA tidak valid!' }) });
             }
 
-            // Cari user di database
             const usersSnap = await db.ref('users').once('value');
             const users = usersSnap.val();
 
@@ -269,45 +263,36 @@ export default async function handler(req, res) {
                 }
             }
 
-            // Validasi: User HARUS terdaftar
             if (!foundUser) {
                 return res.status(200).json({ data: encryptResponse({ success: false, error: 'user_not_found', message: 'Username tidak terdaftar!' }) });
             }
 
-            // Validasi: User HARUS punya email
             if (!foundUser.email || foundUser.email.trim() === '') {
                 return res.status(200).json({ data: encryptResponse({ success: false, error: 'email_not_found', message: 'Akun ini tidak memiliki email terdaftar. Hubungi admin.' }) });
             }
 
-            // Validasi: User tidak boleh banned
             if (foundUser.banned === true) {
                 return res.status(200).json({ data: encryptResponse({ success: false, error: 'account_banned', message: 'Akun Anda dibanned. Hubungi admin.' }) });
             }
 
-            // Validasi: User tidak boleh ditangguhkan
             if (foundUser.forceLogout === true) {
                 return res.status(200).json({ data: encryptResponse({ success: false, error: 'account_suspended', message: 'Akun Anda ditangguhkan. Hubungi admin.' }) });
             }
 
-            // Generate token unik
             const resetToken = generateResetToken();
             const resetTokenExpiry = Date.now() + RESET_TOKEN_EXPIRY;
 
-            // Simpan token ke user
             const updatedData = { ...foundUser, resetToken: resetToken, resetTokenExpiry: resetTokenExpiry };
             await db.ref('users/' + userKey).update({ data: encryptData(updatedData) });
 
-            // Buat link unik
             const resetLink = BASE_URL + '/pages/confirm-password?token=' + resetToken;
 
-            // Kirim email
             const emailSent = await sendResetEmail(foundUser.email, foundUser.username, resetLink);
 
             if (!emailSent) {
                 return res.status(200).json({ data: encryptResponse({ success: false, error: 'email_error', message: 'Gagal mengirim email. Coba lagi nanti.' }) });
             }
 
-            // Mask email
             const emailParts = foundUser.email.split('@');
             const maskedEmail = emailParts[0].substring(0, 1) + '***@' + emailParts[1];
 
