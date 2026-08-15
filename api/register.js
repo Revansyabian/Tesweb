@@ -28,33 +28,39 @@ if (!admin.apps.length) {
 
 const db = admin.database();
 
-// ==================== ENCRYPT RESPONSE (BROWSER) ====================
 function encryptResponse(data) {
     return CryptoJS.AES.encrypt(JSON.stringify(data), API_SECRET).toString();
 }
 
-// ==================== ENCRYPT DATA (DATABASE) ====================
 function encryptData(data) {
     return CryptoJS.AES.encrypt(JSON.stringify(data), ADMIN_KEY).toString();
 }
 
-// ==================== DECRYPT PAYLOAD (DARI BROWSER) ====================
 function decryptPayload(raw) {
     if (!raw) return null;
     try {
         const dec = CryptoJS.AES.decrypt(raw, API_SECRET).toString(CryptoJS.enc.Utf8);
+        if (!dec) return null;
         return JSON.parse(dec);
     } catch (e) {
         return null;
     }
 }
 
-// ==================== DECRYPT DATA (DARI DATABASE) ====================
 function decryptData(raw) {
     if (!raw) return raw;
     try {
-        const dec = CryptoJS.AES.decrypt(raw, ADMIN_KEY).toString(CryptoJS.enc.Utf8);
-        return JSON.parse(dec);
+        if (typeof raw === 'string') {
+            const dec = CryptoJS.AES.decrypt(raw, ADMIN_KEY).toString(CryptoJS.enc.Utf8);
+            if (!dec) return raw;
+            return JSON.parse(dec);
+        }
+        if (raw.data) {
+            const dec = CryptoJS.AES.decrypt(raw.data, ADMIN_KEY).toString(CryptoJS.enc.Utf8);
+            if (!dec) return raw;
+            return JSON.parse(dec);
+        }
+        return raw;
     } catch (e) { return raw; }
 }
 
@@ -152,7 +158,6 @@ export default async function handler(req, res) {
 
         const action = decrypted.action;
 
-        // ==================== ACTION: REGISTER ====================
         if (action === 'register') {
             const username = sanitizeInput(decrypted.username || '');
             const password = decrypted.password || '';
@@ -166,6 +171,7 @@ export default async function handler(req, res) {
             const userFP = decrypted.fingerprint || fp;
             const sessionFingerprint = decrypted.sessionFingerprint || '';
             const timeToken = decrypted.timeToken || '';
+            const registerToken = sanitizeInput(decrypted.registerToken || '');
 
             if (!username || username.length < 3) {
                 return res.status(200).json({ data: encryptResponse({ success: false, error: 'invalid_username', message: 'Username minimal 3 karakter!' }) });
@@ -196,6 +202,33 @@ export default async function handler(req, res) {
                 return res.status(200).json({ data: encryptResponse({ success: false, error: 'invalid_captcha', message: 'reCAPTCHA tidak valid!' }) });
             }
 
+            // ==================== VALIDASI REGISTER TOKEN ====================
+            if (!registerToken) {
+                return res.status(200).json({ data: encryptResponse({ success: false, error: 'token_required', message: 'Link pendaftaran tidak valid! Minta link ke admin.' }) });
+            }
+
+            const tokenRef = db.ref('register_tokens/' + registerToken);
+            const tokenSnap = await tokenRef.once('value');
+            const tokenRaw = tokenSnap.val();
+
+            if (!tokenRaw || !tokenRaw.data) {
+                return res.status(200).json({ data: encryptResponse({ success: false, error: 'token_invalid', message: 'Link pendaftaran tidak valid!' }) });
+            }
+
+            const tokenData = decryptData(tokenRaw.data);
+
+            if (!tokenData || !tokenData.token) {
+                return res.status(200).json({ data: encryptResponse({ success: false, error: 'token_invalid', message: 'Link pendaftaran tidak valid!' }) });
+            }
+
+            if (tokenData.used === true) {
+                return res.status(200).json({ data: encryptResponse({ success: false, error: 'token_used', message: 'Link pendaftaran sudah digunakan!' }) });
+            }
+
+            if (tokenData.expiry && Date.now() > tokenData.expiry) {
+                return res.status(200).json({ data: encryptResponse({ success: false, error: 'token_expired', message: 'Link pendaftaran sudah expired!' }) });
+            }
+
             // Rate limit IP 1x sehari
             const ipKey = 'register_ip_' + userIP.replace(/\./g, '_');
             const ipRef = db.ref('register_limits/' + ipKey);
@@ -211,7 +244,6 @@ export default async function handler(req, res) {
                 } catch (e) {}
             }
             
-            // Rate limit FP 1x sehari
             if (userFP) {
                 const fpKey = 'register_fp_' + userFP;
                 const fpRef = db.ref('register_limits/' + fpKey);
@@ -228,7 +260,6 @@ export default async function handler(req, res) {
                 }
             }
 
-            // Cek username & email
             const usersSnap = await db.ref('users').once('value');
             const users = usersSnap.val();
             
@@ -279,6 +310,9 @@ export default async function handler(req, res) {
             if (userFP) {
                 await db.ref('register_limits/register_fp_' + userFP).set({ data: encryptData({ lastRegister: Date.now() }) });
             }
+
+            // Tandai token sudah dipakai
+            await tokenRef.update({ data: encryptData({ ...tokenData, used: true, usedAt: Date.now(), usedBy: username }) });
 
             return res.status(200).json({ data: encryptResponse({ success: true, message: 'Pendaftaran berhasil! Tunggu aktivasi admin.' }) });
         }
