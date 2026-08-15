@@ -11,7 +11,7 @@ if (!ADMIN_KEY) {
 const API_SECRET = process.env.API_SECRET || '1417-1426-1527-1517';
 const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
 const RECAPTCHA_V2_SECRET_KEY = process.env.RECAPTCHA_V2_SECRET_KEY || '';
-const EMAIL_FROM = process.env.EMAIL_FROM || 'Top Up Store <onboarding@resend.dev>';
+const EMAIL_FROM = process.env.EMAIL_FROM || 'Web top up bussid <onboarding@resend.dev>';
 const BASE_URL = process.env.BASE_URL || 'https://tesweb-kohl.vercel.app';
 
 const RESET_TOKEN_EXPIRY = 15 * 60 * 1000;
@@ -33,17 +33,14 @@ if (!admin.apps.length) {
 
 const db = admin.database();
 
-// ==================== ENCRYPT RESPONSE (BROWSER) ====================
 function encryptResponse(data) {
     return CryptoJS.AES.encrypt(JSON.stringify(data), API_SECRET).toString();
 }
 
-// ==================== ENCRYPT DATA (DATABASE) ====================
 function encryptData(data) {
     return CryptoJS.AES.encrypt(JSON.stringify(data), ADMIN_KEY).toString();
 }
 
-// ==================== DECRYPT PAYLOAD (DARI BROWSER) ====================
 function decryptPayload(raw) {
     if (!raw) return null;
     try {
@@ -54,7 +51,6 @@ function decryptPayload(raw) {
     }
 }
 
-// ==================== DECRYPT DATA (DARI DATABASE) ====================
 function decryptData(raw) {
     if (!raw) return raw;
     try {
@@ -63,7 +59,6 @@ function decryptData(raw) {
     } catch (e) { return raw; }
 }
 
-// ==================== SANITIZE (ANTI-XSS) ====================
 function sanitizeInput(str) {
     if (!str) return '';
     return String(str)
@@ -91,13 +86,11 @@ function sanitizeInput(str) {
         .replace(/alert/gi, '');
 }
 
-// ==================== PASSWORD HASH ====================
 async function hashPassword(password) {
     const salt = await bcrypt.genSalt(SALT_ROUNDS);
     return await bcrypt.hash(password, salt);
 }
 
-// ==================== RATE LIMITING ====================
 async function checkRateLimit(ip) {
     const key = ip.replace(/\./g, '_');
     const ref = db.ref('rate_limits_reset_pw/' + key);
@@ -121,7 +114,6 @@ async function checkRateLimit(ip) {
     return true;
 }
 
-// ==================== VERIFY RECAPTCHA ====================
 async function verifyRecaptcha(token) {
     if (!token || !RECAPTCHA_V2_SECRET_KEY) return false;
     
@@ -138,12 +130,10 @@ async function verifyRecaptcha(token) {
     }
 }
 
-// ==================== GENERATE TOKEN ====================
 function generateResetToken() {
     return crypto.randomBytes(32).toString('hex');
 }
 
-// ==================== SEND EMAIL ====================
 async function sendResetEmail(toEmail, username, resetLink) {
     if (!RESEND_API_KEY) {
         console.error('RESEND_API_KEY is not set!');
@@ -198,7 +188,6 @@ async function sendResetEmail(toEmail, username, resetLink) {
     }
 }
 
-// ==================== MAIN HANDLER ====================
 export default async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -214,34 +203,34 @@ export default async function handler(req, res) {
     const fp = req.headers['x-fingerprint'] || '';
 
     if (!await checkRateLimit(ip)) {
-        return res.status(429).json({ error: 'Terlalu banyak request. Coba lagi nanti.' });
+        return res.status(429).json({ data: encryptResponse({ success: false, error: 'rate_limit', message: 'Terlalu banyak percobaan. Coba lagi nanti.' }) });
     }
 
     try {
         const body = req.body;
         if (!body || !body.data) {
-            return res.status(400).json({ error: 'No data' });
+            return res.status(400).json({ data: encryptResponse({ success: false, error: 'no_data', message: 'Data tidak ditemukan!' }) });
         }
 
         const decrypted = decryptPayload(body.data);
         if (!decrypted || !decrypted.action) {
-            return res.status(403).json({ error: 'Access denied' });
+            return res.status(403).json({ data: encryptResponse({ success: false, error: 'access_denied', message: 'Akses ditolak!' }) });
         }
 
         const action = decrypted.action;
 
-        // ==================== ACTION: REQUEST RESET ====================
+        // ==================== REQUEST RESET ====================
         if (action === 'request_reset') {
             const username = sanitizeInput(decrypted.username || '');
             const captchaToken = decrypted.captchaToken || '';
 
             if (!username || username.length < 3) {
-                return res.status(200).json({ data: encryptResponse({ success: false, error: 'invalid_username', message: 'Username tidak valid!' }) });
+                return res.status(200).json({ data: encryptResponse({ success: false, error: 'invalid_username', message: 'Username minimal 3 karakter!' }) });
             }
 
             const captchaValid = await verifyRecaptcha(captchaToken);
             if (!captchaValid) {
-                return res.status(200).json({ data: encryptResponse({ success: false, error: 'invalid_captcha', message: 'reCAPTCHA tidak valid!' }) });
+                return res.status(200).json({ data: encryptResponse({ success: false, error: 'invalid_captcha', message: 'reCAPTCHA tidak valid! Silakan coba lagi.' }) });
             }
 
             const usersSnap = await db.ref('users').once('value');
@@ -264,19 +253,19 @@ export default async function handler(req, res) {
             }
 
             if (!foundUser) {
-                return res.status(200).json({ data: encryptResponse({ success: false, error: 'user_not_found', message: 'Username tidak terdaftar!' }) });
+                return res.status(200).json({ data: encryptResponse({ success: false, error: 'user_not_found', message: 'Username tidak terdaftar! Periksa kembali username Anda.' }) });
             }
 
             if (!foundUser.email || foundUser.email.trim() === '') {
-                return res.status(200).json({ data: encryptResponse({ success: false, error: 'email_not_found', message: 'Akun ini tidak memiliki email terdaftar. Hubungi admin.' }) });
+                return res.status(200).json({ data: encryptResponse({ success: false, error: 'email_not_found', message: 'Akun ini tidak memiliki email terdaftar! Hubungi admin.' }) });
             }
 
             if (foundUser.banned === true) {
-                return res.status(200).json({ data: encryptResponse({ success: false, error: 'account_banned', message: 'Akun Anda dibanned. Hubungi admin.' }) });
+                return res.status(200).json({ data: encryptResponse({ success: false, error: 'account_banned', message: 'Akun Anda dibanned! Hubungi admin.' }) });
             }
 
             if (foundUser.forceLogout === true) {
-                return res.status(200).json({ data: encryptResponse({ success: false, error: 'account_suspended', message: 'Akun Anda ditangguhkan. Hubungi admin.' }) });
+                return res.status(200).json({ data: encryptResponse({ success: false, error: 'account_suspended', message: 'Akun Anda ditangguhkan! Hubungi admin.' }) });
             }
 
             const resetToken = generateResetToken();
@@ -290,28 +279,28 @@ export default async function handler(req, res) {
             const emailSent = await sendResetEmail(foundUser.email, foundUser.username, resetLink);
 
             if (!emailSent) {
-                return res.status(200).json({ data: encryptResponse({ success: false, error: 'email_error', message: 'Gagal mengirim email. Coba lagi nanti.' }) });
+                return res.status(200).json({ data: encryptResponse({ success: false, error: 'email_error', message: 'Gagal mengirim email! Coba lagi nanti.' }) });
             }
 
             const emailParts = foundUser.email.split('@');
             const maskedEmail = emailParts[0].substring(0, 1) + '***@' + emailParts[1];
 
-            return res.status(200).json({ data: encryptResponse({ success: true, maskedEmail: maskedEmail, message: 'Link reset telah dikirim ke email Anda.' }) });
+            return res.status(200).json({ data: encryptResponse({ success: true, maskedEmail: maskedEmail, message: 'Link reset telah dikirim ke email Anda!' }) });
         }
 
-        // ==================== ACTION: VERIFY TOKEN ====================
+        // ==================== VERIFY TOKEN ====================
         if (action === 'verify_token') {
             const token = sanitizeInput(decrypted.token || '');
 
             if (!token || token.length < 10) {
-                return res.status(200).json({ data: encryptResponse({ valid: false, error: 'token_invalid' }) });
+                return res.status(200).json({ data: encryptResponse({ valid: false, error: 'token_invalid', message: 'Link tidak valid!' }) });
             }
 
             const usersSnap = await db.ref('users').once('value');
             const users = usersSnap.val();
 
             if (!users) {
-                return res.status(200).json({ data: encryptResponse({ valid: false, error: 'token_not_found' }) });
+                return res.status(200).json({ data: encryptResponse({ valid: false, error: 'token_not_found', message: 'Link tidak valid!' }) });
             }
 
             let foundUser = null;
@@ -325,17 +314,17 @@ export default async function handler(req, res) {
             }
 
             if (!foundUser) {
-                return res.status(200).json({ data: encryptResponse({ valid: false, error: 'token_not_found' }) });
+                return res.status(200).json({ data: encryptResponse({ valid: false, error: 'token_not_found', message: 'Link tidak valid atau sudah digunakan!' }) });
             }
 
             if (Date.now() > foundUser.resetTokenExpiry) {
-                return res.status(200).json({ data: encryptResponse({ valid: false, expired: true, error: 'token_expired' }) });
+                return res.status(200).json({ data: encryptResponse({ valid: false, expired: true, error: 'token_expired', message: 'Link expired!' }) });
             }
 
             return res.status(200).json({ data: encryptResponse({ valid: true }) });
         }
 
-        // ==================== ACTION: CONFIRM RESET ====================
+        // ==================== CONFIRM RESET ====================
         if (action === 'confirm_reset') {
             const token = sanitizeInput(decrypted.token || '');
             const newPassword = decrypted.newPassword || '';
@@ -374,7 +363,7 @@ export default async function handler(req, res) {
             }
 
             if (!foundUser) {
-                return res.status(200).json({ data: encryptResponse({ success: false, error: 'token_not_found', message: 'Link tidak valid!' }) });
+                return res.status(200).json({ data: encryptResponse({ success: false, error: 'token_not_found', message: 'Link tidak valid atau sudah digunakan!' }) });
             }
 
             if (Date.now() > foundUser.resetTokenExpiry) {
@@ -394,12 +383,12 @@ export default async function handler(req, res) {
 
             await db.ref('users/' + userKey).update({ data: encryptData(updatedData) });
 
-            return res.status(200).json({ data: encryptResponse({ success: true, message: 'Password berhasil diubah!' }) });
+            return res.status(200).json({ data: encryptResponse({ success: true, message: 'Password berhasil diubah! Silakan login dengan password baru.' }) });
         }
 
-        return res.status(400).json({ error: 'Invalid action' });
+        return res.status(400).json({ data: encryptResponse({ success: false, error: 'invalid_action', message: 'Aksi tidak valid!' }) });
     } catch (error) {
         console.error('Reset password error:', error);
-        return res.status(500).json({ error: 'Internal Server Error' });
+        return res.status(500).json({ data: encryptResponse({ success: false, error: 'server_error', message: 'Terjadi kesalahan pada server. Coba lagi nanti.' }) });
     }
 }
