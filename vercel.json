@@ -3,6 +3,7 @@
     { "source": "/", "destination": "/index.html" },
     { "source": "/pages/login", "destination": "/pages/login.html" },
     { "source": "/pages/dashboard", "destination": "/pages/dashboard.html" },
+    { "source": "/pages/register", "destination": "/pages/register.html" },
     { "source": "/pages/reset-password", "destination": "/pages/reset-password.html" },
     { "source": "/pages/confirm-password", "destination": "/pages/confirm-password.html" },
     { "source": "/api/revanstoreV2", "destination": "/api/revanstoreV2" },
