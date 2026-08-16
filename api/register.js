@@ -13,7 +13,6 @@ const RECAPTCHA_V2_SECRET_KEY = process.env.RECAPTCHA_V2_SECRET_KEY || '';
 const SALT_ROUNDS = 12;
 const RATE_LIMIT_MAX = 5;
 const RATE_LIMIT_WINDOW = 60000;
-const ALLOWED_DOMAIN = process.env.ALLOWED_DOMAIN || 'tesweb-kohl.vercel.app';
 
 if (!admin.apps.length) {
     const key = process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n');
@@ -131,32 +130,13 @@ async function verifyRecaptcha(token) {
 export default async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Fingerprint, X-CSRF-Token');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Fingerprint');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'DENY');
     res.setHeader('X-XSS-Protection', '1; mode=block');
-    res.setHeader('Content-Security-Policy', "default-src 'self'");
-    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
-    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-    res.setHeader('Permissions-Policy', 'geolocation=(), camera=(), microphone=()');
 
     if (req.method === 'OPTIONS') return res.status(200).end();
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-
-    const proto = req.headers['x-forwarded-proto'] || '';
-    if (proto && proto !== 'https') {
-        return res.status(403).json({ data: encryptResponse({ success: false, error: 'https_required' }) });
-    }
-
-    const contentType = req.headers['content-type'] || '';
-    if (!contentType.includes('application/json')) {
-        return res.status(415).json({ data: encryptResponse({ success: false, error: 'invalid_content_type' }) });
-    }
-
-    const userAgent = req.headers['user-agent'] || '';
-    if (!userAgent || userAgent.includes('Headless') || userAgent.includes('PhantomJS') || userAgent.includes('puppeteer') || userAgent.includes('Playwright')) {
-        return res.status(403).json({ data: encryptResponse({ success: false, error: 'invalid_user_agent' }) });
-    }
 
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
     const fp = req.headers['x-fingerprint'] || '';
@@ -168,28 +148,17 @@ export default async function handler(req, res) {
     try {
         const body = req.body;
         if (!body || !body.data) {
-            return res.status(400).json({ data: encryptResponse({ success: false, error: 'no_data' }) });
+            return res.status(400).json({ data: encryptResponse({ success: false, error: 'no_data', message: 'Data tidak ditemukan!' }) });
         }
 
         const decrypted = decryptPayload(body.data);
         if (!decrypted || !decrypted.action) {
-            return res.status(403).json({ data: encryptResponse({ success: false, error: 'access_denied' }) });
+            return res.status(403).json({ data: encryptResponse({ success: false, error: 'access_denied', message: 'Akses ditolak!' }) });
         }
 
         const action = decrypted.action;
 
         if (action === 'register') {
-            const referer = req.headers.referer || '';
-            if (referer && !referer.includes(ALLOWED_DOMAIN)) {
-                return res.status(403).json({ data: encryptResponse({ success: false, error: 'invalid_referer' }) });
-            }
-
-            const timeToken = decrypted.timeToken || '';
-            const expectedTimeToken = CryptoJS.MD5(Math.floor(Date.now() / 300000) + API_SECRET + 'register').toString();
-            if (timeToken && timeToken !== expectedTimeToken) {
-                return res.status(403).json({ data: encryptResponse({ success: false, error: 'invalid_time_token' }) });
-            }
-
             const username = sanitizeInput(decrypted.username || '');
             const password = decrypted.password || '';
             const confirmPassword = decrypted.confirmPassword || '';
@@ -278,7 +247,7 @@ export default async function handler(req, res) {
 
             const hashedPassword = await hashPassword(password);
             if (!hashedPassword) {
-                return res.status(200).json({ data: encryptResponse({ success: false, error: 'server_error' }) });
+                return res.status(200).json({ data: encryptResponse({ success: false, error: 'server_error', message: 'Gagal memproses password.' }) });
             }
 
             const registerData = {
@@ -315,9 +284,9 @@ export default async function handler(req, res) {
             return res.status(200).json({ data: encryptResponse({ success: true, message: 'Pendaftaran berhasil! Tunggu aktivasi admin.' }) });
         }
 
-        return res.status(400).json({ data: encryptResponse({ success: false, error: 'invalid_action' }) });
+        return res.status(400).json({ data: encryptResponse({ success: false, error: 'invalid_action', message: 'Aksi tidak valid!' }) });
     } catch (error) {
         console.error('Register error:', error);
-        return res.status(500).json({ data: encryptResponse({ success: false, error: 'server_error' }) });
+        return res.status(500).json({ data: encryptResponse({ success: false, error: 'server_error', message: 'Terjadi kesalahan pada server.' }) });
     }
 }
