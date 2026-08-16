@@ -64,14 +64,6 @@
         .paket-option .paket-name { font-size: 13px; font-weight: 600; color: #1e293b; }
         .paket-option .paket-price { font-size: 14px; font-weight: 700; color: #0ea5e9; }
         .honeypot-field { position: absolute; left: -9999px; opacity: 0; height: 0; width: 0; overflow: hidden; }
-        .status-page { text-align: center; padding: 30px 0; display: none; }
-        .status-page.show { display: block; }
-        .status-icon { font-size: 60px; margin-bottom: 16px; }
-        .status-icon.expired { color: #f59e0b; }
-        .status-icon.invalid { color: #ef4444; }
-        .status-icon.used { color: #ef4444; }
-        .status-title { font-size: 20px; font-weight: 700; color: #1e293b; margin-bottom: 8px; }
-        .status-message { font-size: 14px; color: #64748b; line-height: 1.6; }
         @media(max-width:480px) { .register-card { padding: 28px 20px; } .register-header h1 { font-size: 20px; } }
     </style>
 </head>
@@ -80,96 +72,82 @@
     <div class="register-container">
         <div class="register-card">
             
-            <div id="formSection">
-                <div class="register-header">
-                    <div class="register-logo">
-                        <img src="/img.png" alt="Logo" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
-                        <div class="logo-placeholder" style="display:none;"><i class="fas fa-cube"></i></div>
+            <div class="register-header">
+                <div class="register-logo">
+                    <img src="/img.png" alt="Logo" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+                    <div class="logo-placeholder" style="display:none;"><i class="fas fa-cube"></i></div>
+                </div>
+                <h1>Daftar Akun</h1>
+                <p>Pilih paket dan buat akun baru</p>
+            </div>
+
+            <div class="error-message" id="errorMessage">
+                <i class="fas fa-exclamation-circle"></i> <span id="errorText"></span>
+            </div>
+
+            <div class="honeypot-field" aria-hidden="true">
+                <input type="text" id="website" name="website" tabindex="-1" autocomplete="off">
+            </div>
+
+            <div class="form-group">
+                <label for="username"><i class="fas fa-user"></i> Username</label>
+                <input type="text" id="username" placeholder="Huruf dan angka saja (3-20)" class="form-input" maxlength="20" oninput="validateUsernameInput()">
+            </div>
+
+            <div class="form-group">
+                <label for="password"><i class="fas fa-lock"></i> Password</label>
+                <input type="password" id="password" placeholder="Minimal 6 karakter" class="form-input" maxlength="20">
+                <div class="password-strength"><div class="password-strength-bar" id="passwordStrengthBar"></div></div>
+            </div>
+
+            <div class="form-group">
+                <label for="confirmPassword"><i class="fas fa-lock"></i> Konfirmasi Password</label>
+                <input type="password" id="confirmPassword" placeholder="Ulangi password" class="form-input" maxlength="20">
+            </div>
+
+            <div class="form-group">
+                <label for="phone"><i class="fas fa-phone"></i> Nomor Telepon</label>
+                <input type="tel" id="phone" placeholder="081234567890" class="form-input" maxlength="15" oninput="validatePhoneInput()">
+            </div>
+
+            <div class="form-group">
+                <label for="email"><i class="fas fa-envelope"></i> Email</label>
+                <input type="email" id="email" placeholder="nama@email.com" class="form-input" maxlength="50" oninput="validateEmailInput()">
+            </div>
+
+            <div class="form-group">
+                <label><i class="fas fa-box"></i> Pilih Paket</label>
+                <div class="paket-dropdown">
+                    <div class="paket-select" id="paketSelect" onclick="togglePaketList()">
+                        <span class="placeholder" id="paketPlaceholder">Klik untuk pilih paket...</span>
+                        <i class="fas fa-chevron-down"></i>
                     </div>
-                    <h1>Daftar Akun</h1>
-                    <p>Pilih paket dan buat akun baru</p>
-                </div>
-
-                <div class="error-message" id="errorMessage">
-                    <i class="fas fa-exclamation-circle"></i> <span id="errorText"></span>
-                </div>
-
-                <div class="honeypot-field" aria-hidden="true">
-                    <input type="text" id="website" name="website" tabindex="-1" autocomplete="off">
-                </div>
-
-                <div class="form-group">
-                    <label for="username"><i class="fas fa-user"></i> Username</label>
-                    <input type="text" id="username" placeholder="Huruf dan angka saja (3-20)" class="form-input" maxlength="20" oninput="validateUsernameInput()">
-                </div>
-
-                <div class="form-group">
-                    <label for="password"><i class="fas fa-lock"></i> Password</label>
-                    <input type="password" id="password" placeholder="Minimal 6 karakter" class="form-input" maxlength="20">
-                    <div class="password-strength"><div class="password-strength-bar" id="passwordStrengthBar"></div></div>
-                </div>
-
-                <div class="form-group">
-                    <label for="confirmPassword"><i class="fas fa-lock"></i> Konfirmasi Password</label>
-                    <input type="password" id="confirmPassword" placeholder="Ulangi password" class="form-input" maxlength="20">
-                </div>
-
-                <div class="form-group">
-                    <label for="phone"><i class="fas fa-phone"></i> Nomor Telepon</label>
-                    <input type="tel" id="phone" placeholder="081234567890" class="form-input" maxlength="15" oninput="validatePhoneInput()">
-                </div>
-
-                <div class="form-group">
-                    <label for="email"><i class="fas fa-envelope"></i> Email</label>
-                    <input type="email" id="email" placeholder="nama@email.com" class="form-input" maxlength="50" oninput="validateEmailInput()">
-                </div>
-
-                <div class="form-group">
-                    <label><i class="fas fa-box"></i> Pilih Paket</label>
-                    <div class="paket-dropdown">
-                        <div class="paket-select" id="paketSelect" onclick="togglePaketList()">
-                            <span class="placeholder" id="paketPlaceholder">Klik untuk pilih paket...</span>
-                            <i class="fas fa-chevron-down"></i>
-                        </div>
-                        <div class="paket-list" id="paketList">
-                            <div class="paket-option" data-paket="1 Minggu" data-harga="15000" onclick="selectPaketOption(this)"><span class="paket-name">1 Minggu</span><span class="paket-price">Rp 15.000</span></div>
-                            <div class="paket-option" data-paket="2 Minggu" data-harga="25000" onclick="selectPaketOption(this)"><span class="paket-name">2 Minggu</span><span class="paket-price">Rp 25.000</span></div>
-                            <div class="paket-option" data-paket="1 Bulan" data-harga="40000" onclick="selectPaketOption(this)"><span class="paket-name">1 Bulan</span><span class="paket-price">Rp 40.000</span></div>
-                            <div class="paket-option" data-paket="2 Bulan" data-harga="50000" onclick="selectPaketOption(this)"><span class="paket-name">2 Bulan</span><span class="paket-price">Rp 50.000</span></div>
-                            <div class="paket-option" data-paket="3 Bulan" data-harga="55000" onclick="selectPaketOption(this)"><span class="paket-name">3 Bulan</span><span class="paket-price">Rp 55.000</span></div>
-                            <div class="paket-option" data-paket="Permanen" data-harga="100000" onclick="selectPaketOption(this)"><span class="paket-name">Permanen</span><span class="paket-price">Rp 100.000</span></div>
-                        </div>
+                    <div class="paket-list" id="paketList">
+                        <div class="paket-option" data-paket="1 Minggu" data-harga="15000" onclick="selectPaketOption(this)"><span class="paket-name">1 Minggu</span><span class="paket-price">Rp 15.000</span></div>
+                        <div class="paket-option" data-paket="2 Minggu" data-harga="25000" onclick="selectPaketOption(this)"><span class="paket-name">2 Minggu</span><span class="paket-price">Rp 25.000</span></div>
+                        <div class="paket-option" data-paket="1 Bulan" data-harga="40000" onclick="selectPaketOption(this)"><span class="paket-name">1 Bulan</span><span class="paket-price">Rp 40.000</span></div>
+                        <div class="paket-option" data-paket="2 Bulan" data-harga="50000" onclick="selectPaketOption(this)"><span class="paket-name">2 Bulan</span><span class="paket-price">Rp 50.000</span></div>
+                        <div class="paket-option" data-paket="3 Bulan" data-harga="55000" onclick="selectPaketOption(this)"><span class="paket-name">3 Bulan</span><span class="paket-price">Rp 55.000</span></div>
+                        <div class="paket-option" data-paket="Permanen" data-harga="100000" onclick="selectPaketOption(this)"><span class="paket-name">Permanen</span><span class="paket-price">Rp 100.000</span></div>
                     </div>
-                </div>
-
-                <div class="verification-box">
-                    <input type="checkbox" id="verificationCheck" onchange="toggleSubmitButton()">
-                    <label for="verificationCheck">Saya menyetujui bahwa akun saya perlu <b>diaktivasi oleh admin</b> terlebih dahulu sebelum bisa digunakan.</label>
-                </div>
-
-                <div class="recaptcha-wrapper">
-                    <div class="g-recaptcha" data-sitekey="6LfYOH4tAAAAAO48ez84cjF25XOYz3cN0OOjZ9pc"></div>
-                </div>
-
-                <button class="btn btn-primary" id="btnRegister" onclick="register()" disabled>
-                    <i class="fas fa-user-plus"></i> DAFTAR
-                </button>
-
-                <div class="register-footer">
-                    <p>Sudah punya akun? <a href="/pages/login">Login di sini</a></p>
                 </div>
             </div>
 
-            <div class="status-page" id="expiredPage">
-                <div class="status-icon expired"><i class="fas fa-clock"></i></div>
-                <div class="status-title">Sesi Expired</div>
-                <div class="status-message">Sesi pendaftaran sudah <b>expired</b>.<br>Refresh halaman untuk mendapatkan sesi baru.</div>
+            <div class="verification-box">
+                <input type="checkbox" id="verificationCheck" onchange="toggleSubmitButton()">
+                <label for="verificationCheck">Saya menyetujui bahwa akun saya perlu <b>diaktivasi oleh admin</b> terlebih dahulu sebelum bisa digunakan.</label>
             </div>
 
-            <div class="status-page" id="invalidPage">
-                <div class="status-icon invalid"><i class="fas fa-exclamation-circle"></i></div>
-                <div class="status-title">Gagal Memuat</div>
-                <div class="status-message">Gagal membuat sesi pendaftaran.<br>Refresh halaman untuk mencoba lagi.</div>
+            <div class="recaptcha-wrapper">
+                <div class="g-recaptcha" data-sitekey="6LfYOH4tAAAAAO48ez84cjF25XOYz3cN0OOjZ9pc"></div>
+            </div>
+
+            <button class="btn btn-primary" id="btnRegister" onclick="register()" disabled>
+                <i class="fas fa-user-plus"></i> DAFTAR
+            </button>
+
+            <div class="register-footer">
+                <p>Sudah punya akun? <a href="/pages/login">Login di sini</a></p>
             </div>
 
         </div>
@@ -185,24 +163,14 @@
         var registerInProgress = false;
         var selectedPaket = '';
         var selectedHarga = 0;
-        var registerToken = '';
         var sessionFingerprint = CryptoJS.MD5(Date.now() + Math.random() + navigator.userAgent).toString();
         var lastSubmitTime = 0;
         var SUBMIT_COOLDOWN = 3000;
-        var SESSION_TIMEOUT = 15 * 60 * 1000;
-        var pageLoadTime = Date.now();
         var FORBIDDEN_USERNAMES = ['admin', 'administrator', 'root', 'system', 'owner', 'moderator', 'staff', 'support', 'ceo', 'boss'];
         var THROWAWAY_DOMAINS = ['mailinator.com', 'tempmail.com', 'guerrillamail.com', '10minutemail.com', 'yopmail.com', 'tempmail.net', 'dispostable.com'];
         var COMMON_PASSWORDS = ['password', 'password123', '12345678', 'qwerty123', 'admin123', 'bismillah', 'sayang', 'cinta'];
         var KEYBOARD_PATTERNS = ['asdf', 'qwer', 'zxcv', 'tyui', 'ghjk', 'bnm', 'poiuy', 'lkjh', 'mnbv'];
         var SEQUENTIAL_PATTERNS = ['123456', '654321', 'abcdef', 'qwerty', '111111', '222222', '333333'];
-
-        function showStatusPage(pageId) {
-            document.getElementById('formSection').style.display = 'none';
-            document.getElementById('expiredPage').classList.remove('show');
-            document.getElementById('invalidPage').classList.remove('show');
-            document.getElementById(pageId).classList.add('show');
-        }
 
         async function getFingerprint() {
             var fp = '';
@@ -282,14 +250,6 @@
             if (cleaned.startsWith('0')) return cleaned.length >= 10 && cleaned.length <= 13;
             if (cleaned.startsWith('62')) return cleaned.length >= 11 && cleaned.length <= 14;
             return false;
-        }
-
-        function checkSessionTimeout() {
-            if (Date.now() - pageLoadTime > SESSION_TIMEOUT) {
-                showStatusPage('expiredPage');
-                return false;
-            }
-            return true;
         }
 
         function isValidUserAgent() {
@@ -439,58 +399,12 @@
             return result;
         }
 
-        async function autoGenerateToken() {
-            if (!fingerprint) fingerprint = await getFingerprint();
-            
-            var userIP = 'unknown';
-            try {
-                var ipRes = await fetch('https://api.ipify.org?format=json');
-                var ipData = await ipRes.json();
-                userIP = ipData.ip || 'unknown';
-            } catch (e) {}
-            
-            var payload = {
-                action: 'generate_token',
-                ip: userIP,
-                fingerprint: fingerprint,
-                timestamp: Date.now()
-            };
-            
-            var encryptedPayload = CryptoJS.AES.encrypt(JSON.stringify(payload), API_SECRET).toString();
-            
-            try {
-                var res = await fetch(API_REVANSTORE, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-Fingerprint': fingerprint },
-                    body: JSON.stringify({ data: encryptedPayload })
-                });
-                
-                var result = await res.json();
-                
-                if (result.data) {
-                    var dec = CryptoJS.AES.decrypt(result.data, API_SECRET).toString(CryptoJS.enc.Utf8);
-                    result = JSON.parse(dec);
-                }
-                
-                if (result && result.success && result.token) {
-                    registerToken = result.token;
-                    document.getElementById('formSection').style.display = 'block';
-                } else {
-                    showStatusPage('invalidPage');
-                }
-                
-            } catch (e) {
-                showStatusPage('invalidPage');
-            }
-        }
-
         async function register() {
             if (registerInProgress) return;
             registerInProgress = true;
             hideError();
 
             try {
-                if (!checkSessionTimeout()) { registerInProgress = false; return; }
                 if (!isValidUserAgent()) { Swal.fire({ icon: "error", title: "Browser Tidak Valid!", confirmButtonColor: "#ef4444" }); registerInProgress = false; return; }
                 if (!isValidScreenSize()) { Swal.fire({ icon: "error", title: "Browser Tidak Valid!", confirmButtonColor: "#ef4444" }); registerInProgress = false; return; }
 
@@ -549,7 +463,6 @@
                     username: username, password: password, phone: phone, email: email,
                     paket: selectedPaket, harga: selectedHarga, ip: userIP, fingerprint: fingerprint,
                     sessionFingerprint: sessionFingerprint, captchaToken: captchaResponse,
-                    registerToken: registerToken,
                     status: 'pending', isActive: false, needsActivation: true, activationStatus: 'pending', role: 'User', createdAt: Date.now()
                 });
 
@@ -564,9 +477,7 @@
                     });
                 } else {
                     recordRegisterAttempt();
-                    if (result && result.error === 'token_expired') { Swal.fire({ icon: "error", title: "Sesi Expired!", text: "Refresh halaman untuk sesi baru.", confirmButtonColor: "#ef4444" }); }
-                    else if (result && result.error === 'token_used') { Swal.fire({ icon: "error", title: "Sesi Sudah Digunakan!", confirmButtonColor: "#ef4444" }); }
-                    else if (result && result.error === 'ip_limit') { Swal.fire({ icon: "error", title: "Batas Pendaftaran!", text: "IP sudah mendaftar hari ini.", confirmButtonColor: "#ef4444" }); }
+                    if (result && result.error === 'ip_limit') { Swal.fire({ icon: "error", title: "Batas Pendaftaran!", text: "IP sudah mendaftar hari ini.", confirmButtonColor: "#ef4444" }); }
                     else if (result && result.error === 'fp_limit') { Swal.fire({ icon: "error", title: "Batas Pendaftaran!", text: "Perangkat sudah mendaftar hari ini.", confirmButtonColor: "#ef4444" }); }
                     else if (result && result.error === 'username_exists') { Swal.fire({ icon: "error", title: "Username Sudah Terdaftar!", confirmButtonColor: "#ef4444" }); }
                     else if (result && result.error === 'email_exists') { Swal.fire({ icon: "error", title: "Email Sudah Terdaftar!", confirmButtonColor: "#ef4444" }); }
@@ -585,9 +496,6 @@
 
         document.addEventListener('DOMContentLoaded', async function() {
             if (!fingerprint) fingerprint = await getFingerprint();
-            
-            document.getElementById('formSection').style.display = 'none';
-            autoGenerateToken();
             
             document.getElementById('password').addEventListener('input', updatePasswordStrength);
             document.getElementById('username').addEventListener('input', updatePasswordStrength);
