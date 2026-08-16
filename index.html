@@ -132,26 +132,12 @@
         </div>
     </div>
 
-    <!-- BLOCKED SCREEN (DENGAN INFO IP & FP) -->
+    <!-- BLOCKED SCREEN - TEKS SESUAI PERMINTAAN -->
     <div id="blockedScreen" style="display:none; padding: 40px 16px; min-height:100vh; background:#00BFFF;">
         <div class="blocked">
-            <div class="blocked__title" id="blockedTitle">⛔ AKSES DITOLAK</div>
-            <p class="blocked__msg" id="blockedMessage">Anda telah melakukan 3 kali percobaan akses yang salah. Untuk keamanan, IP dan perangkat Anda telah diblokir sementara.</p>
-            <div style="background:#f8f8f8;border-radius:8px;padding:12px;margin:12px 0;text-align:left;font-size:13px;">
-                <div class="blocked__info-row">
-                    <span class="blocked__info-label"><i class="fas fa-network-wired"></i> IP Address</span>
-                    <span id="blockedIPDisplay" style="font-family:monospace;font-size:12px;">-</span>
-                </div>
-                <div class="blocked__info-row">
-                    <span class="blocked__info-label"><i class="fas fa-fingerprint"></i> Fingerprint</span>
-                    <span id="blockedFPDisplay" style="font-family:monospace;font-size:12px;">-</span>
-                </div>
-                <div class="blocked__info-row">
-                    <span class="blocked__info-label"><i class="fas fa-clock"></i> Status</span>
-                    <span style="color:var(--red);font-weight:600;">DIBLOKIR</span>
-                </div>
-            </div>
-            <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
+            <div class="blocked__title">AKSES DITOLAK</div>
+            <p class="blocked__msg">Akses ditolak, jika ingin dibuka silakan hubungi admin.</p>
+            <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:16px;">
                 <button class="btn btn--red" onclick="contactAdmin()"><i class="fab fa-whatsapp"></i> Hubungi Admin</button>
                 <button class="btn btn--blue" onclick="location.reload()"><i class="fas fa-sync-alt"></i> Coba Lagi</button>
             </div>
@@ -170,17 +156,9 @@
         var isBlocked = false;
         var blockedChecked = false;
 
-        function showBlockedScreen(ipAddress, fpValue) {
+        function showBlockedScreen() {
             document.getElementById('landingPage').style.display = 'none';
             document.getElementById('blockedScreen').style.display = 'block';
-            
-            if (ipAddress) {
-                document.getElementById('blockedIPDisplay').textContent = ipAddress;
-            }
-            if (fpValue) {
-                var displayFP = fpValue.length > 24 ? fpValue.substring(0, 20) + '...' : fpValue;
-                document.getElementById('blockedFPDisplay').textContent = displayFP;
-            }
         }
 
         function contactAdmin() {
@@ -256,7 +234,6 @@
                 '<button onclick="window.open(\'https://wa.me/' + WHATSAPP_NUMBER + '?text=Assalamualaikum%20admin%2C%20info%20perbaikan\',\'_blank\')" style="display:inline-flex;align-items:center;padding:10px 16px;background:#E63946;color:#fff;border:none;border-radius:8px;font-weight:600;font-size:13px;cursor:pointer;">Hubungi Admin</button></div></div>';
         }
 
-        // ==================== CHECK BLOCKED (SESUAI DASHBOARD.JS) ====================
         async function checkBlocked() {
             if (blockedChecked) return isBlocked;
             
@@ -292,16 +269,10 @@
                     if (dec) result = JSON.parse(dec);
                 }
                 
-                console.log('[CHECK BLOCKED] Result:', result);
-                
                 if (result && result.blocked === true) {
                     isBlocked = true;
                     blockedChecked = true;
-                    
-                    var ipDisplay = result.ip || 'IP tidak diketahui';
-                    var fpDisplay = result.fingerprint || fp;
-                    
-                    showBlockedScreen(ipDisplay, fpDisplay);
+                    showBlockedScreen();
                     return true;
                 }
                 
@@ -317,7 +288,6 @@
             }
         }
 
-        // ==================== MAIN ====================
         (async function() {
             grecaptcha.ready(async function() {
                 var maintenance = await periksaMaintenance();
@@ -328,7 +298,6 @@
                     return;
                 }
 
-                // LANGSUNG REDIRECT KE DASHBOARD
                 window.location.href = '/pages/dashboard';
             });
         })();
