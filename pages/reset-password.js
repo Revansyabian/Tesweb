@@ -119,16 +119,16 @@ function showMaintenancePage(dataMaintenance) {
     safeSetHTML(document.body, html);
 }
 
+// ==================== PERIKSA MAINTENANCE (FIX - HANDLE RESPONSE) ====================
 async function periksaMaintenance() {
     try {
         var payload = {
-            path: 'maintenance_status',
-            method: 'GET',
-            data: null,
+            action: 'check_maintenance',
             timestamp: Date.now()
         };
         var encryptedPayload = CryptoJS.AES.encrypt(JSON.stringify(payload), API_SECRET).toString();
-        var res = await fetch(API_REVANSTORE, {
+        
+        var res = await fetch(API_RESET, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -136,30 +136,47 @@ async function periksaMaintenance() {
             },
             body: JSON.stringify({ data: encryptedPayload })
         });
+        
         var result = await res.json();
-        if (result.encrypted && result.data) {
+        
+        // DECRYPT RESPONSE
+        if (result.data) {
             var dec = CryptoJS.AES.decrypt(result.data, API_SECRET).toString(CryptoJS.enc.Utf8);
-            if (dec) result = JSON.parse(dec);
+            if (dec) {
+                result = JSON.parse(dec);
+            }
         }
-        if (result && (result.maintenance === true || result.title || result.message)) {
-            return result;
+        
+        console.log('[MAINTENANCE] Result:', result);
+        
+        // CEK APAKAH MAINTENANCE ACTIVE
+        if (result && result.maintenance === true) {
+            return {
+                maintenance: true,
+                title: result.title || 'SEDANG PERBAIKAN SISTEM',
+                message: result.message || 'Website sedang dalam perbaikan oleh admin.',
+                until: result.until || null
+            };
         }
+        
         return null;
     } catch (e) {
+        console.error('[MAINTENANCE] Error:', e);
         return null;
     }
 }
 
+// ==================== CHECK BLOCKED ====================
 async function checkIfBlocked() {
     try {
         var payload = {
-            path: 'check_blocked',
-            method: 'POST',
-            data: { fingerprint: fingerprint },
+            action: 'check_blocked',
+            fingerprint: fingerprint,
             timestamp: Date.now()
         };
         var encryptedPayload = CryptoJS.AES.encrypt(JSON.stringify(payload), API_SECRET).toString();
-        var res = await fetch(API_REVANSTORE, {
+        
+        var res = await fetch(API_RESET, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -167,16 +184,24 @@ async function checkIfBlocked() {
             },
             body: JSON.stringify({ data: encryptedPayload })
         });
+        
         var result = await res.json();
-        if (result.encrypted && result.data) {
+        
+        if (result.data) {
             var dec = CryptoJS.AES.decrypt(result.data, API_SECRET).toString(CryptoJS.enc.Utf8);
-            if (dec) result = JSON.parse(dec);
+            if (dec) {
+                result = JSON.parse(dec);
+            }
         }
+        
+        console.log('[CHECK BLOCKED] Result:', result);
+        
         if (result && result.blocked === true) {
             return true;
         }
         return false;
     } catch (e) {
+        console.error('[CHECK BLOCKED] Error:', e);
         return false;
     }
 }
@@ -188,6 +213,7 @@ async function resetPassword() {
     try {
         if (!fingerprint) fingerprint = await getFingerprint();
         
+        // CEK MAINTENANCE DULU
         var maintenance = await periksaMaintenance();
         if (maintenance) {
             showMaintenancePage(maintenance);
@@ -252,7 +278,9 @@ async function resetPassword() {
         
         if (result.data) {
             var dec = CryptoJS.AES.decrypt(result.data, API_SECRET).toString(CryptoJS.enc.Utf8);
-            result = JSON.parse(dec);
+            if (dec) {
+                result = JSON.parse(dec);
+            }
         }
         
         setButtonLoading(false);
@@ -317,6 +345,7 @@ async function resetPassword() {
 document.addEventListener('DOMContentLoaded', async function() {
     if (!fingerprint) fingerprint = await getFingerprint();
     
+    // CEK MAINTENANCE DULU
     var maintenance = await periksaMaintenance();
     if (maintenance) {
         showMaintenancePage(maintenance);
