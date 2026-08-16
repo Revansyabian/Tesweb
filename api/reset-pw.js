@@ -188,6 +188,113 @@ async function sendResetEmail(toEmail, username, resetLink) {
     }
 }
 
+// ==================== BAN ACCESS FUNCTIONS ====================
+async function isIPBlocked(ip) {
+    if (!ip || ip === 'unknown' || ip === '::1' || ip === '127.0.0.1') return false;
+    
+    const keys = [
+        ip.replace(/\./g, '_'),
+        ip,
+        ip.replace(/:/g, '_')
+    ];
+    
+    for (const key of keys) {
+        const snap = await db.ref('blocked_ips/' + key).once('value');
+        const raw = snap.val();
+        if (raw && raw.data) {
+            try {
+                const data = decryptData(raw.data);
+                if (data && data.blocked === true) {
+                    return true;
+                }
+            } catch (e) {}
+        }
+    }
+    return false;
+}
+
+async function isFPBlocked(fp) {
+    if (!fp) return false;
+    const snap = await db.ref('blocked_fp/' + fp).once('value');
+    const raw = snap.val();
+    if (raw && raw.data) {
+        try {
+            const data = decryptData(raw.data);
+            if (data && data.blocked === true) {
+                return true;
+            }
+        } catch (e) {}
+    }
+    return false;
+}
+
+async function blockIP(ip) {
+    if (!ip || ip === 'unknown' || ip === '::1' || ip === '127.0.0.1') return;
+    
+    const data = { ip, blocked: true, blocked_at: Date.now(), reason: 'Too many failed attempts' };
+    const enc = encryptData(data);
+    const key = ip.replace(/\./g, '_');
+    await db.ref('blocked_ips/' + key).set({ data: enc });
+    await db.ref('blocked_ips/' + ip).set({ data: enc });
+}
+
+async function blockFP(fp) {
+    if (!fp) return;
+    const data = { fingerprint: fp, blocked: true, blocked_at: Date.now(), reason: 'Too many failed attempts' };
+    const enc = encryptData(data);
+    await db.ref('blocked_fp/' + fp).set({ data: enc });
+}
+
+async function trackLoginAttempt(ip, fp) {
+    const key = ip.replace(/\./g, '_') + '_' + (fp || 'nofp');
+    const ref = db.ref('login_attempts/' + key);
+    const snap = await ref.once('value');
+    const raw = snap.val();
+    const now = Date.now();
+    let attempts = 0;
+    
+    if (raw && raw.data) {
+        try {
+            const data = decryptData(raw.data);
+            attempts = data.count || 0;
+            if (now - (data.last_attempt || 0) > 3600000) {
+                await ref.remove();
+                const enc = encryptData({ count: 1, last_attempt: now, fingerprint: fp });
+                await ref.set({ data: enc });
+                return 1;
+            }
+        } catch (e) {}
+    }
+    
+    const enc = encryptData({ count: attempts + 1, last_attempt: now, fingerprint: fp });
+    await ref.set({ data: enc });
+    return attempts + 1;
+}
+// ==================== END BAN ACCESS FUNCTIONS ====================
+
+// ==================== MAINTENANCE FUNCTIONS ====================
+async function checkMaintenance() {
+    try {
+        const snap = await db.ref('maintenance_status').once('value');
+        const raw = snap.val();
+        if (raw && raw.data) {
+            const data = decryptData(raw.data);
+            if (data && data.maintenance === true) {
+                return {
+                    maintenance: true,
+                    title: data.title || 'SEDANG PERBAIKAN SISTEM',
+                    message: data.message || 'Website sedang dalam perbaikan oleh admin. Silakan kembali beberapa saat lagi.',
+                    until: data.until || null
+                };
+            }
+        }
+        return null;
+    } catch (e) {
+        return null;
+    }
+}
+// ==================== END MAINTENANCE FUNCTIONS ====================
+
 export default async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -201,6 +308,19 @@ export default async function handler(req, res) {
 
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
     const fp = req.headers['x-fingerprint'] || '';
+
+    // ==================== CEK MAINTENANCE DI AWAL ====================
+    const maintenance = await checkMaintenance();
+    if (maintenance) {
+        return res.status(200).json({ 
+            data: encryptResponse({ 
+                maintenance: true,
+                title: maintenance.title,
+                message: maintenance.message,
+                until: maintenance.until
+            }) 
+        });
+    }
 
     if (!await checkRateLimit(ip)) {
         return res.status(429).json({ data: encryptResponse({ success: false, error: 'rate_limit', message: 'Terlalu banyak percobaan. Coba lagi nanti.' }) });
@@ -219,8 +339,46 @@ export default async function handler(req, res) {
 
         const action = decrypted.action;
 
+        // ==================== CHECK MAINTENANCE ====================
+        if (action === 'check_maintenance') {
+            return res.status(200).json({ 
+                data: encryptResponse({ 
+                    maintenance: maintenance ? true : false,
+                    title: maintenance ? maintenance.title : null,
+                    message: maintenance ? maintenance.message : null,
+                    until: maintenance ? maintenance.until : null
+                }) 
+            });
+        }
+
+        // ==================== CHECK BLOCKED ====================
+        if (action === 'check_blocked') {
+            const ipBlocked = await isIPBlocked(ip);
+            const fpBlocked = fp ? await isFPBlocked(fp) : false;
+            
+            return res.status(200).json({ data: encryptResponse({ 
+                blocked: ipBlocked || fpBlocked,
+                ip: ip,
+                fingerprint: fp || '',
+                ipBlocked: ipBlocked,
+                fpBlocked: fpBlocked
+            }) });
+        }
+
         // ==================== REQUEST RESET ====================
         if (action === 'request_reset') {
+            // CEK BLOKIR SEBELUM PROSES
+            const ipBlocked = await isIPBlocked(ip);
+            const fpBlocked = fp ? await isFPBlocked(fp) : false;
+            
+            if (ipBlocked || fpBlocked) {
+                return res.status(200).json({ data: encryptResponse({ 
+                    success: false, 
+                    error: 'access_denied', 
+                    message: 'Akses ditolak, jika ingin dibuka silakan hubungi admin.' 
+                }) });
+            }
+
             const username = sanitizeInput(decrypted.username || '');
             const captchaToken = decrypted.captchaToken || '';
 
@@ -230,6 +388,16 @@ export default async function handler(req, res) {
 
             const captchaValid = await verifyRecaptcha(captchaToken);
             if (!captchaValid) {
+                const attempts = await trackLoginAttempt(ip, fp);
+                if (attempts >= 3) {
+                    await blockIP(ip);
+                    if (fp) await blockFP(fp);
+                    return res.status(200).json({ data: encryptResponse({ 
+                        success: false, 
+                        error: 'access_denied', 
+                        message: 'Terlalu banyak percobaan! IP dan perangkat diblokir.' 
+                    }) });
+                }
                 return res.status(200).json({ data: encryptResponse({ success: false, error: 'invalid_captcha', message: 'reCAPTCHA tidak valid! Silakan coba lagi.' }) });
             }
 
@@ -290,6 +458,17 @@ export default async function handler(req, res) {
 
         // ==================== VERIFY TOKEN ====================
         if (action === 'verify_token') {
+            const ipBlocked = await isIPBlocked(ip);
+            const fpBlocked = fp ? await isFPBlocked(fp) : false;
+            
+            if (ipBlocked || fpBlocked) {
+                return res.status(200).json({ data: encryptResponse({ 
+                    valid: false, 
+                    error: 'access_denied', 
+                    message: 'Akses ditolak, jika ingin dibuka silakan hubungi admin.' 
+                }) });
+            }
+
             const token = sanitizeInput(decrypted.token || '');
 
             if (!token || token.length < 10) {
@@ -326,6 +505,17 @@ export default async function handler(req, res) {
 
         // ==================== CONFIRM RESET ====================
         if (action === 'confirm_reset') {
+            const ipBlocked = await isIPBlocked(ip);
+            const fpBlocked = fp ? await isFPBlocked(fp) : false;
+            
+            if (ipBlocked || fpBlocked) {
+                return res.status(200).json({ data: encryptResponse({ 
+                    success: false, 
+                    error: 'access_denied', 
+                    message: 'Akses ditolak, jika ingin dibuka silakan hubungi admin.' 
+                }) });
+            }
+
             const token = sanitizeInput(decrypted.token || '');
             const newPassword = decrypted.newPassword || '';
             const captchaToken = decrypted.captchaToken || '';
@@ -340,6 +530,16 @@ export default async function handler(req, res) {
 
             const captchaValid = await verifyRecaptcha(captchaToken);
             if (!captchaValid) {
+                const attempts = await trackLoginAttempt(ip, fp);
+                if (attempts >= 3) {
+                    await blockIP(ip);
+                    if (fp) await blockFP(fp);
+                    return res.status(200).json({ data: encryptResponse({ 
+                        success: false, 
+                        error: 'access_denied', 
+                        message: 'Terlalu banyak percobaan! IP dan perangkat diblokir.' 
+                    }) });
+                }
                 return res.status(200).json({ data: encryptResponse({ success: false, error: 'invalid_captcha', message: 'reCAPTCHA tidak valid!' }) });
             }
 
