@@ -1,8 +1,6 @@
 var API_REVANSTORE = '/api/revanstoreV2';
-var API_RVNSTORE = '/api/rvnstore';
 var WHATSAPP_NUMBER = "6285199120995";
 var MAX_PASSWORD_LENGTH = 20;
-var MAX_TOPUP_AMOUNT = 2147483647;
 var API_SECRET = '1417-1426-1527-1517';
 
 var currentUser = null;
@@ -162,7 +160,7 @@ async function periksaMaintenance() {
             var dec = CryptoJS.AES.decrypt(result.data, API_SECRET).toString(CryptoJS.enc.Utf8);
             if (dec) result = JSON.parse(dec);
         }
-        if (result && result.maintenance === true) {
+        if (result && (result.maintenance === true || result.title || result.message)) {
             return result;
         }
         return null;
@@ -172,9 +170,9 @@ async function periksaMaintenance() {
 }
 
 function tampilkanHalamanMaintenance(dataMaintenance) {
-    var judul = sanitize((dataMaintenance && dataMaintenance.judul) ? dataMaintenance.judul : 'SEDANG PERBAIKAN SISTEM');
-    var pesan = sanitize((dataMaintenance && dataMaintenance.pesan) ? dataMaintenance.pesan : 'Website sedang dalam perbaikan oleh admin. Silakan kembali beberapa saat lagi.');
-    var sampai = (dataMaintenance && dataMaintenance.sampai) ? dataMaintenance.sampai : null;
+    var judul = sanitize((dataMaintenance && (dataMaintenance.title || dataMaintenance.judul)) ? (dataMaintenance.title || dataMaintenance.judul) : 'SEDANG PERBAIKAN SISTEM');
+    var pesan = sanitize((dataMaintenance && (dataMaintenance.message || dataMaintenance.pesan)) ? (dataMaintenance.message || dataMaintenance.pesan) : 'Website sedang dalam perbaikan oleh admin. Silakan kembali beberapa saat lagi.');
+    var sampai = (dataMaintenance && (dataMaintenance.until || dataMaintenance.sampai)) ? (dataMaintenance.until || dataMaintenance.sampai) : null;
     var teksEstimasi = sanitize(sampai ? 'Estimasi selesai: ' + new Date(sampai).toLocaleString('id-ID') : 'Mohon maaf atas ketidaknyamanan ini.');
 
     document.body.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#e0f2fe 0%,#bae6fd 50%,#7dd3fc 100%);padding:20px;font-family:\'Segoe UI\',sans-serif;">' +
@@ -238,6 +236,22 @@ function tampilkanPopupDitangguhkan() {
     });
 }
 
+function tampilkanPopupBelumAktif() {
+    Swal.fire({
+        icon: 'warning',
+        title: 'AKUN BELUM AKTIF',
+        html: '<p>Akun Anda belum diaktivasi oleh admin.</p><p style="color:#0ea5e9;background:#E6F9FF;padding:8px;border-radius:8px;"><b>Silakan aktivasi dengan menghubungi nomor di bawah ini:</b></p><p style="font-size:18px;font-weight:700;color:#25D366;margin-top:8px;"><i class="fab fa-whatsapp"></i> ' + WHATSAPP_NUMBER + '</p>',
+        confirmButtonText: '<i class="fab fa-whatsapp"></i> Hubungi Admin',
+        confirmButtonColor: '#25D366',
+        showCancelButton: true,
+        cancelButtonText: 'Tutup',
+        cancelButtonColor: '#64748b',
+        allowOutsideClick: false
+    }).then(function(r) {
+        if (r.isConfirmed) window.open('https://wa.me/' + WHATSAPP_NUMBER + '?text=Assalamualaikum%20admin%2C%20saya%20ingin%20aktivasi%20akun', '_blank');
+    });
+}
+
 async function callRevanstore(path, method, data) {
     if (!fingerprint) fingerprint = await getFingerprint();
     if (isBlocked && path !== 'check_blocked') throw new Error('Akses ditolak');
@@ -266,20 +280,6 @@ async function callRevanstore(path, method, data) {
         if (dec) return JSON.parse(dec);
     }
     return result;
-}
-
-async function callRvnstore(endpoint, method, body, authToken) {
-    var res = await fetch(API_RVNSTORE, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            endpoint: endpoint,
-            method: method || 'POST',
-            body: body || null,
-            authToken: authToken || null
-        })
-    });
-    return await res.json();
 }
 
 function showAlert(message, type, duration) {
@@ -317,39 +317,6 @@ function showLoading(message) {
 function hideLoading() {
     var overlay = document.getElementById('loadingOverlay');
     if (overlay) overlay.style.display = 'none';
-}
-
-function formatCurrency(amount) {
-    if (!amount && amount !== 0) return 'Rp 0';
-    return new Intl.NumberFormat('id-ID', {
-        style: 'currency',
-        currency: 'IDR',
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0
-    }).format(Math.abs(amount));
-}
-
-function parseAmount(input) {
-    if (!input || input.trim() === '') return 0;
-    var cleaned = input.toUpperCase().replace(/\s/g, '');
-    if (cleaned === '2M' || cleaned === '2 M') return MAX_TOPUP_AMOUNT;
-    var multiplier = 1;
-    var cleanInput = cleaned;
-    if (cleaned.includes('M') && !cleaned.includes('JT') && !cleaned.includes('MAX')) {
-        multiplier = 1000000000;
-        cleanInput = cleaned.replace('M', '');
-    } else if (cleaned.includes('JT')) {
-        multiplier = 1000000;
-        cleanInput = cleaned.replace('JT', '');
-    } else if (cleaned.includes('RB') || cleaned.includes('K')) {
-        multiplier = 1000;
-        cleanInput = cleaned.replace(/[KRB]/g, '');
-    } else if (cleaned.includes('MAX')) {
-        return MAX_TOPUP_AMOUNT;
-    }
-    var number = parseFloat(cleanInput.replace(/\./g, '').replace(',', '.'));
-    var result = isNaN(number) ? 0 : Math.round(number * multiplier);
-    return Math.min(result, MAX_TOPUP_AMOUNT);
 }
 
 function updatePasswordCounter() {
@@ -471,6 +438,20 @@ async function login() {
         if (result && result.forceLogout) {
             hideLoading();
             tampilkanPopupDitangguhkan();
+            loginInProgress = false;
+            return;
+        }
+        if (result && result.error === 'pending_activation') {
+            hideLoading();
+            tampilkanPopupBelumAktif();
+            grecaptcha.reset();
+            loginInProgress = false;
+            return;
+        }
+        if (result && result.error === 'rejected') {
+            hideLoading();
+            Swal.fire({ icon: "error", title: "AKUN DITOLAK", text: "Akun Anda ditolak oleh admin.", confirmButtonColor: "#ef4444" });
+            grecaptcha.reset();
             loginInProgress = false;
             return;
         }
