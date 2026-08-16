@@ -11,6 +11,9 @@ if (!ADMIN_KEY) {
 const API_SECRET = process.env.API_SECRET || '1417-1426-1527-1517';
 const RECAPTCHA_V2_SECRET_KEY = process.env.RECAPTCHA_V2_SECRET_KEY || '';
 const SALT_ROUNDS = 12;
+const RATE_LIMIT_MAX = 5;
+const RATE_LIMIT_WINDOW = 60000;
+const ALLOWED_DOMAIN = process.env.ALLOWED_DOMAIN || 'tesweb-kohl.vercel.app';
 
 if (!admin.apps.length) {
     const key = process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n');
@@ -86,6 +89,29 @@ async function hashPassword(password) {
     return await bcrypt.hash(password, salt);
 }
 
+async function checkRateLimit(ip) {
+    const key = ip.replace(/\./g, '_');
+    const ref = db.ref('rate_limits_register/' + key);
+    const snap = await ref.once('value');
+    const raw = snap.val();
+    const now = Date.now();
+    
+    if (raw && raw.data) {
+        try {
+            const data = decryptData(raw.data);
+            if (now - (data.timestamp || 0) < RATE_LIMIT_WINDOW) {
+                if ((data.count || 0) >= RATE_LIMIT_MAX) return false;
+                data.count = (data.count || 0) + 1;
+                await ref.set({ data: encryptData(data) });
+                return true;
+            }
+        } catch (e) {}
+    }
+    
+    await ref.set({ data: encryptData({ count: 1, timestamp: now }) });
+    return true;
+}
+
 async function verifyRecaptcha(token) {
     if (!token || !RECAPTCHA_V2_SECRET_KEY) return false;
     
@@ -105,16 +131,39 @@ async function verifyRecaptcha(token) {
 export default async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Fingerprint');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Fingerprint, X-CSRF-Token');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'DENY');
     res.setHeader('X-XSS-Protection', '1; mode=block');
+    res.setHeader('Content-Security-Policy', "default-src 'self'");
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('Permissions-Policy', 'geolocation=(), camera=(), microphone=()');
 
     if (req.method === 'OPTIONS') return res.status(200).end();
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
+    const proto = req.headers['x-forwarded-proto'] || '';
+    if (proto && proto !== 'https') {
+        return res.status(403).json({ data: encryptResponse({ success: false, error: 'https_required' }) });
+    }
+
+    const contentType = req.headers['content-type'] || '';
+    if (!contentType.includes('application/json')) {
+        return res.status(415).json({ data: encryptResponse({ success: false, error: 'invalid_content_type' }) });
+    }
+
+    const userAgent = req.headers['user-agent'] || '';
+    if (!userAgent || userAgent.includes('Headless') || userAgent.includes('PhantomJS') || userAgent.includes('puppeteer') || userAgent.includes('Playwright')) {
+        return res.status(403).json({ data: encryptResponse({ success: false, error: 'invalid_user_agent' }) });
+    }
+
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
     const fp = req.headers['x-fingerprint'] || '';
+
+    if (!await checkRateLimit(ip)) {
+        return res.status(429).json({ data: encryptResponse({ success: false, error: 'rate_limit', message: 'Terlalu banyak percobaan.' }) });
+    }
 
     try {
         const body = req.body;
@@ -129,37 +178,21 @@ export default async function handler(req, res) {
 
         const action = decrypted.action;
 
-        // ==================== GENERATE TOKEN ====================
-        if (action === 'generate_token') {
-            try {
-                const userIP = decrypted.ip || ip;
-                const userFP = decrypted.fingerprint || fp;
-
-                const token = crypto.randomBytes(32).toString('hex');
-                const expiry = Date.now() + (15 * 60 * 1000);
-
-                const tokenData = {
-                    token: token,
-                    ip: userIP,
-                    fingerprint: userFP,
-                    createdAt: Date.now(),
-                    expiry: expiry,
-                    used: false
-                };
-
-                await db.ref('register_tokens/' + token).set({ data: encryptData(tokenData) });
-
-                return res.status(200).json({ data: encryptResponse({ success: true, token: token, expiry: expiry }) });
-            } catch (e) {
-                console.error('Generate token error:', e);
-                return res.status(500).json({ data: encryptResponse({ success: false, error: 'server_error' }) });
-            }
-        }
-
-        // ==================== REGISTER ====================
         if (action === 'register') {
+            const referer = req.headers.referer || '';
+            if (referer && !referer.includes(ALLOWED_DOMAIN)) {
+                return res.status(403).json({ data: encryptResponse({ success: false, error: 'invalid_referer' }) });
+            }
+
+            const timeToken = decrypted.timeToken || '';
+            const expectedTimeToken = CryptoJS.MD5(Math.floor(Date.now() / 300000) + API_SECRET + 'register').toString();
+            if (timeToken && timeToken !== expectedTimeToken) {
+                return res.status(403).json({ data: encryptResponse({ success: false, error: 'invalid_time_token' }) });
+            }
+
             const username = sanitizeInput(decrypted.username || '');
             const password = decrypted.password || '';
+            const confirmPassword = decrypted.confirmPassword || '';
             const phone = sanitizeInput(decrypted.phone || '');
             const email = sanitizeInput(decrypted.email || '');
             const paket = sanitizeInput(decrypted.paket || '');
@@ -167,36 +200,35 @@ export default async function handler(req, res) {
             const captchaToken = decrypted.captchaToken || '';
             const userIP = decrypted.ip || ip;
             const userFP = decrypted.fingerprint || fp;
-            const registerToken = sanitizeInput(decrypted.registerToken || '');
+            const sessionFingerprint = decrypted.sessionFingerprint || '';
 
-            if (!registerToken) {
-                return res.status(200).json({ data: encryptResponse({ success: false, error: 'token_required' }) });
+            if (!username || username.length < 3) {
+                return res.status(200).json({ data: encryptResponse({ success: false, error: 'invalid_username', message: 'Username minimal 3 karakter!' }) });
             }
 
-            const tokenSnap = await db.ref('register_tokens/' + registerToken).once('value');
-            const tokenRaw = tokenSnap.val();
-
-            if (!tokenRaw || !tokenRaw.data) {
-                return res.status(200).json({ data: encryptResponse({ success: false, error: 'token_invalid' }) });
+            if (!password || password.length < 6) {
+                return res.status(200).json({ data: encryptResponse({ success: false, error: 'weak_password', message: 'Password minimal 6 karakter!' }) });
             }
 
-            const tokenData = decryptData(tokenRaw.data);
-
-            if (!tokenData || !tokenData.token) {
-                return res.status(200).json({ data: encryptResponse({ success: false, error: 'token_invalid' }) });
+            if (password !== confirmPassword) {
+                return res.status(200).json({ data: encryptResponse({ success: false, error: 'password_mismatch', message: 'Password tidak cocok!' }) });
             }
 
-            if (tokenData.used === true) {
-                return res.status(200).json({ data: encryptResponse({ success: false, error: 'token_used' }) });
+            if (!phone || phone.length < 10) {
+                return res.status(200).json({ data: encryptResponse({ success: false, error: 'invalid_phone', message: 'Nomor telepon tidak valid!' }) });
             }
 
-            if (tokenData.expiry && Date.now() > tokenData.expiry) {
-                return res.status(200).json({ data: encryptResponse({ success: false, error: 'token_expired' }) });
+            if (!email || !email.includes('@')) {
+                return res.status(200).json({ data: encryptResponse({ success: false, error: 'invalid_email', message: 'Email tidak valid!' }) });
+            }
+
+            if (!paket) {
+                return res.status(200).json({ data: encryptResponse({ success: false, error: 'paket_not_selected', message: 'Pilih paket terlebih dahulu!' }) });
             }
 
             const captchaValid = await verifyRecaptcha(captchaToken);
             if (!captchaValid) {
-                return res.status(200).json({ data: encryptResponse({ success: false, error: 'invalid_captcha' }) });
+                return res.status(200).json({ data: encryptResponse({ success: false, error: 'invalid_captcha', message: 'reCAPTCHA tidak valid!' }) });
             }
 
             const ipKey = 'register_ip_' + userIP.replace(/\./g, '_');
@@ -208,7 +240,7 @@ export default async function handler(req, res) {
                 try {
                     const ipData = decryptData(ipRaw.data);
                     if (Date.now() - (ipData.lastRegister || 0) < 86400000) {
-                        return res.status(200).json({ data: encryptResponse({ success: false, error: 'ip_limit' }) });
+                        return res.status(200).json({ data: encryptResponse({ success: false, error: 'ip_limit', message: 'IP sudah mendaftar hari ini.' }) });
                     }
                 } catch (e) {}
             }
@@ -223,7 +255,7 @@ export default async function handler(req, res) {
                     try {
                         const fpData = decryptData(fpRaw.data);
                         if (Date.now() - (fpData.lastRegister || 0) < 86400000) {
-                            return res.status(200).json({ data: encryptResponse({ success: false, error: 'fp_limit' }) });
+                            return res.status(200).json({ data: encryptResponse({ success: false, error: 'fp_limit', message: 'Perangkat sudah mendaftar hari ini.' }) });
                         }
                     } catch (e) {}
                 }
@@ -236,10 +268,10 @@ export default async function handler(req, res) {
                 for (const key in users) {
                     const userData = decryptData(users[key].data);
                     if (userData && userData.username === username) {
-                        return res.status(200).json({ data: encryptResponse({ success: false, error: 'username_exists' }) });
+                        return res.status(200).json({ data: encryptResponse({ success: false, error: 'username_exists', message: 'Username sudah terdaftar!' }) });
                     }
                     if (userData && email && userData.email === email) {
-                        return res.status(200).json({ data: encryptResponse({ success: false, error: 'email_exists' }) });
+                        return res.status(200).json({ data: encryptResponse({ success: false, error: 'email_exists', message: 'Email sudah terdaftar!' }) });
                     }
                 }
             }
@@ -258,6 +290,7 @@ export default async function handler(req, res) {
                 harga: harga,
                 ip: userIP,
                 fingerprint: userFP,
+                sessionFingerprint: sessionFingerprint,
                 status: 'pending',
                 isActive: false,
                 needsActivation: true,
@@ -279,9 +312,7 @@ export default async function handler(req, res) {
                 await db.ref('register_limits/register_fp_' + userFP).set({ data: encryptData({ lastRegister: Date.now() }) });
             }
 
-            await db.ref('register_tokens/' + registerToken).update({ data: encryptData({ ...tokenData, used: true, usedAt: Date.now(), usedBy: username }) });
-
-            return res.status(200).json({ data: encryptResponse({ success: true, message: 'Pendaftaran berhasil!' }) });
+            return res.status(200).json({ data: encryptResponse({ success: true, message: 'Pendaftaran berhasil! Tunggu aktivasi admin.' }) });
         }
 
         return res.status(400).json({ data: encryptResponse({ success: false, error: 'invalid_action' }) });
