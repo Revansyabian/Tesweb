@@ -1,4 +1,3 @@
-// reset-password.js
 var API_RESET = '/api/reset-pw';
 var API_REVANSTORE = '/api/revanstoreV2';
 var API_SECRET = '1417-1426-1527-1517';
@@ -57,15 +56,23 @@ function validateUsernameInput() {
 }
 
 function showError(msg) {
-    document.getElementById('errorText').textContent = msg;
-    document.getElementById('errorMessage').classList.add('show');
-    document.getElementById('successMessage').classList.remove('show');
+    var el = document.getElementById('errorText');
+    var container = document.getElementById('errorMessage');
+    if (el) el.textContent = msg;
+    if (container) {
+        container.classList.add('show');
+        document.getElementById('successMessage').classList.remove('show');
+    }
 }
 
 function showSuccess(msg) {
-    document.getElementById('successText').textContent = msg;
-    document.getElementById('successMessage').classList.add('show');
-    document.getElementById('errorMessage').classList.remove('show');
+    var el = document.getElementById('successText');
+    var container = document.getElementById('successMessage');
+    if (el) el.textContent = msg;
+    if (container) {
+        container.classList.add('show');
+        document.getElementById('errorMessage').classList.remove('show');
+    }
 }
 
 function setButtonLoading(loading) {
@@ -100,17 +107,17 @@ function tampilkanHalamanMaintenance(dataMaintenance) {
     safeSetHTML(document.body, html);
 }
 
-function tampilkanHalamanBanAkses(until) {
-    var untilText = sanitize((until || 0) === 0 ? 'PERMANEN' : ('sampai ' + new Date(until).toLocaleString('id-ID')));
+// ==================== FUNGSI BAN AKSES (TEKS SUDAH DIUBAH) ====================
+function showBanAccessPage(until) {
+    var untilText = (until || 0) === 0 ? 'PERMANEN' : ('sampai ' + new Date(until).toLocaleString('id-ID'));
     var html = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#f0f9ff 0%,#bae6fd 50%,#7dd3fc 100%);padding:20px;font-family:\'Segoe UI\',sans-serif;">' +
         '<div style="background:#ffffff;border-radius:24px;padding:48px 36px;width:100%;max-width:420px;text-align:center;box-shadow:0 20px 60px rgba(0,191,255,0.15);border:1px solid rgba(0,191,255,0.1);">' +
         '<div style="font-size:72px;color:#f59e0b;margin-bottom:12px;">🚫</div>' +
-        '<h2 style="font-size:24px;font-weight:700;color:#0c4a6e;margin-bottom:8px;">AKSES DIBLOKIR</h2>' +
-        '<p style="font-size:14px;color:#64748b;margin-bottom:6px;">Maaf, akses Anda diblokir oleh admin.</p>' +
-        '<div style="background:#fef3c7;color:#92400e;padding:12px 16px;border-radius:12px;font-weight:600;font-size:14px;margin:16px 0 24px;">Durasi: ' + untilText + '</div>' +
+        '<h2 style="font-size:24px;font-weight:700;color:#0c4a6e;margin-bottom:8px;">AKSES DITOLAK</h2>' +
+        '<p style="font-size:14px;color:#64748b;margin-bottom:6px;">Akses ditolak, jika ingin dibuka silakan hubungi admin.</p>' +
+        '<div style="background:#fef3c7;color:#92400e;padding:12px 16px;border-radius:12px;font-weight:600;font-size:14px;margin:16px 0 24px;">Durasi: ' + sanitize(untilText) + '</div>' +
         '<button onclick="window.open(\'https://wa.me/' + WHATSAPP_NUMBER + '?text=Assalamualaikum%20admin%2C%20akses%20saya%20diblokir\',\'_blank\')" style="display:inline-flex;align-items:center;gap:10px;padding:12px 32px;background:#25D366;color:#fff;border:none;border-radius:30px;font-weight:600;font-size:15px;cursor:pointer;transition:0.2s;font-family:\'Segoe UI\',sans-serif;">' +
         '<i class="fab fa-whatsapp"></i> Hubungi Admin</button></div></div>';
-
     safeSetHTML(document.body, html);
 }
 
@@ -192,7 +199,7 @@ async function resetPassword() {
         
         var blocked = await checkIfBlocked();
         if (blocked) {
-            tampilkanHalamanBanAkses(0);
+            showBanAccessPage(0);
             resetInProgress = false;
             return;
         }
@@ -320,7 +327,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     
     var blocked = await checkIfBlocked();
     if (blocked) {
-        tampilkanHalamanBanAkses(0);
+        showBanAccessPage(0);
         return;
     }
     
