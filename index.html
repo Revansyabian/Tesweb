@@ -70,6 +70,16 @@
             font-weight: 600;
             margin-bottom: 16px;
         }
+        .blocked__info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            font-size: 12px;
+            color: var(--gray);
+            border-bottom: 1px solid #eee;
+        }
+        .blocked__info-row:last-child { border-bottom: none; }
+        .blocked__info-label { font-weight: 600; color: var(--black); }
 
         .btn {
             display: inline-flex;
@@ -92,6 +102,13 @@
             box-shadow: 0 4px 14px rgba(0,0,0,0.2);
         }
         .btn--red:hover { opacity: 0.85; }
+        .btn--blue {
+            background: var(--sky);
+            color: var(--white);
+            border: 2px solid var(--white);
+            box-shadow: 0 4px 14px rgba(0,0,0,0.2);
+        }
+        .btn--blue:hover { opacity: 0.85; }
     </style>
     <script src="https://www.google.com/recaptcha/api.js?render=6LcVBn4tAAAAAINTTIleUbUZr1ZykvyB6WA-oOfT"></script>
 </head>
@@ -115,18 +132,31 @@
         </div>
     </div>
 
-    <!-- BLOCKED -->
-    <div id="blockedScreen" style="display:none; padding: 40px 16px;">
+    <!-- BLOCKED SCREEN (DENGAN INFO IP & FP) -->
+    <div id="blockedScreen" style="display:none; padding: 40px 16px; min-height:100vh; background:#00BFFF;">
         <div class="blocked">
-            <div class="blocked__title" id="blockedTitle">Akses Ditolak</div>
-            <p class="blocked__msg" id="blockedMessage">Maaf, akses Anda ditolak.</p>
-            <div class="blocked__badge" id="blockedInfo">akses di block</div>
-            <br>
-            <button class="btn btn--red" onclick="contactAdmin()">Hubungi Admin</button>
+            <div class="blocked__title" id="blockedTitle">⛔ AKSES DITOLAK</div>
+            <p class="blocked__msg" id="blockedMessage">Anda telah melakukan 3 kali percobaan akses yang salah. Untuk keamanan, IP dan perangkat Anda telah diblokir sementara.</p>
+            <div style="background:#f8f8f8;border-radius:8px;padding:12px;margin:12px 0;text-align:left;font-size:13px;">
+                <div class="blocked__info-row">
+                    <span class="blocked__info-label"><i class="fas fa-network-wired"></i> IP Address</span>
+                    <span id="blockedIPDisplay" style="font-family:monospace;font-size:12px;">-</span>
+                </div>
+                <div class="blocked__info-row">
+                    <span class="blocked__info-label"><i class="fas fa-fingerprint"></i> Fingerprint</span>
+                    <span id="blockedFPDisplay" style="font-family:monospace;font-size:12px;">-</span>
+                </div>
+                <div class="blocked__info-row">
+                    <span class="blocked__info-label"><i class="fas fa-clock"></i> Status</span>
+                    <span style="color:var(--red);font-weight:600;">DIBLOKIR</span>
+                </div>
+            </div>
+            <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
+                <button class="btn btn--red" onclick="contactAdmin()"><i class="fab fa-whatsapp"></i> Hubungi Admin</button>
+                <button class="btn btn--blue" onclick="location.reload()"><i class="fas fa-sync-alt"></i> Coba Lagi</button>
+            </div>
         </div>
     </div>
-
-    <!-- MAINTENANCE (dibuat via JS) -->
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
     <script>
@@ -136,20 +166,29 @@
         var STORAGE_SECRET = 'session';
         var API_SECRET = '1417-1426-1527-1517';
         var RECAPTCHA_V3_SITE_KEY = '6LcVBn4tAAAAAINTTIleUbUZr1ZykvyB6WA-oOfT';
+        var fingerprint = '';
+        var isBlocked = false;
+        var blockedChecked = false;
 
-        function showBlocked(title, message, info) {
+        function showBlockedScreen(ipAddress, fpValue) {
             document.getElementById('landingPage').style.display = 'none';
             document.getElementById('blockedScreen').style.display = 'block';
-            if (title) document.getElementById('blockedTitle').textContent = title;
-            if (message) document.getElementById('blockedMessage').textContent = message;
-            if (info) document.getElementById('blockedInfo').textContent = info;
+            
+            if (ipAddress) {
+                document.getElementById('blockedIPDisplay').textContent = ipAddress;
+            }
+            if (fpValue) {
+                var displayFP = fpValue.length > 24 ? fpValue.substring(0, 20) + '...' : fpValue;
+                document.getElementById('blockedFPDisplay').textContent = displayFP;
+            }
         }
 
         function contactAdmin() {
-            window.open('https://wa.me/' + WHATSAPP_NUMBER + '?text=Assalamualaikum%20admin%2C%20saya%20ingin%20bertanya', '_blank');
+            window.open('https://wa.me/' + WHATSAPP_NUMBER + '?text=Assalamualaikum%20admin%2C%20akses%20saya%20diblokir', '_blank');
         }
 
         async function getFingerprint() {
+            if (fingerprint) return fingerprint;
             var fp = '';
             fp += navigator.userAgent || '';
             fp += navigator.language || '';
@@ -159,7 +198,8 @@
             fp += navigator.hardwareConcurrency || '';
             fp += navigator.deviceMemory || '';
             fp += navigator.platform || '';
-            return CryptoJS.MD5(fp).toString();
+            fingerprint = CryptoJS.MD5(fp).toString();
+            return fingerprint;
         }
 
         async function getRecaptchaV3Token(action) {
@@ -172,6 +212,7 @@
 
         async function periksaMaintenance() {
             try {
+                var fp = await getFingerprint();
                 var payload = {
                     path: 'maintenance_status',
                     method: 'GET',
@@ -183,7 +224,7 @@
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'X-Fingerprint': await getFingerprint()
+                        'X-Fingerprint': fp
                     },
                     body: JSON.stringify({ data: encryptedPayload })
                 });
@@ -215,41 +256,75 @@
                 '<button onclick="window.open(\'https://wa.me/' + WHATSAPP_NUMBER + '?text=Assalamualaikum%20admin%2C%20info%20perbaikan\',\'_blank\')" style="display:inline-flex;align-items:center;padding:10px 16px;background:#E63946;color:#fff;border:none;border-radius:8px;font-weight:600;font-size:13px;cursor:pointer;">Hubungi Admin</button></div></div>';
         }
 
-        async function checkBlockedSilently() {
+        // ==================== CHECK BLOCKED (SESUAI DASHBOARD.JS) ====================
+        async function checkBlocked() {
+            if (blockedChecked) return isBlocked;
+            
             try {
-                var fingerprint = await getFingerprint();
+                var fp = await getFingerprint();
                 var captchaToken = await getRecaptchaV3Token('check_blocked');
+                
                 var payload = {
                     path: 'check_blocked',
                     method: 'POST',
-                    data: { fingerprint: fingerprint, captchaToken: captchaToken },
+                    data: {
+                        fingerprint: fp,
+                        captchaToken: captchaToken
+                    },
                     timestamp: Date.now()
                 };
+                
                 var encryptedPayload = CryptoJS.AES.encrypt(JSON.stringify(payload), API_SECRET).toString();
+                
                 var res = await fetch(API_REVANSTORE, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-Fingerprint': fingerprint },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Fingerprint': fp
+                    },
                     body: JSON.stringify({ data: encryptedPayload })
                 });
+                
                 var result = await res.json();
+                
                 if (result.encrypted && result.data) {
                     var dec = CryptoJS.AES.decrypt(result.data, API_SECRET).toString(CryptoJS.enc.Utf8);
                     if (dec) result = JSON.parse(dec);
                 }
-                return result && result.blocked;
+                
+                console.log('[CHECK BLOCKED] Result:', result);
+                
+                if (result && result.blocked === true) {
+                    isBlocked = true;
+                    blockedChecked = true;
+                    
+                    var ipDisplay = result.ip || 'IP tidak diketahui';
+                    var fpDisplay = result.fingerprint || fp;
+                    
+                    showBlockedScreen(ipDisplay, fpDisplay);
+                    return true;
+                }
+                
+                isBlocked = false;
+                blockedChecked = true;
+                return false;
+                
             } catch (e) {
+                console.error('[CHECK BLOCKED] Error:', e);
+                isBlocked = false;
+                blockedChecked = true;
                 return false;
             }
         }
 
+        // ==================== MAIN ====================
         (async function() {
             grecaptcha.ready(async function() {
                 var maintenance = await periksaMaintenance();
                 if (maintenance) { tampilkanMaintenance(maintenance); return; }
 
-                var blocked = await checkBlockedSilently();
+                var blocked = await checkBlocked();
                 if (blocked) {
-                    showBlocked('Akses Ditolak', 'Maaf, akses Anda ditolak.', 'IP Di block');
                     return;
                 }
 
