@@ -1,7 +1,8 @@
-
+// reset-password.js
 var API_RESET = '/api/reset-pw';
 var API_REVANSTORE = '/api/revanstoreV2';
 var API_SECRET = '1417-1426-1527-1517';
+var WHATSAPP_NUMBER = "6285199120995";
 var fingerprint = '';
 var resetInProgress = false;
 
@@ -33,6 +34,18 @@ function sanitize(str) {
         .replace(/<\/script/gi, '');
 }
 
+function safeSetHTML(element, html) {
+    if (!element) return;
+    if (window.DOMPurify) {
+        element.innerHTML = DOMPurify.sanitize(html, {
+            ALLOWED_TAGS: ['div', 'span', 'p', 'h1', 'h2', 'h3', 'button', 'i', 'b', 'br'],
+            ALLOWED_ATTR: ['class', 'style', 'onclick', 'id']
+        });
+    } else {
+        element.textContent = html;
+    }
+}
+
 function validateUsernameInput() {
     var input = document.getElementById('username');
     var value = input.value;
@@ -62,29 +75,43 @@ function setButtonLoading(loading) {
 }
 
 function tampilkanHalamanMaintenance(dataMaintenance) {
-    var judul = sanitize((dataMaintenance && (dataMaintenance.title || dataMaintenance.judul)) ? (dataMaintenance.title || dataMaintenance.judul) : 'SEDANG PERBAIKAN SISTEM');
-    var pesan = sanitize((dataMaintenance && (dataMaintenance.message || dataMaintenance.pesan)) ? (dataMaintenance.message || dataMaintenance.pesan) : 'Website sedang dalam perbaikan oleh admin. Silakan kembali beberapa saat lagi.');
-    var sampai = (dataMaintenance && (dataMaintenance.until || dataMaintenance.sampai)) ? (dataMaintenance.until || dataMaintenance.sampai) : null;
-    var teksEstimasi = sanitize(sampai ? 'Estimasi selesai: ' + new Date(sampai).toLocaleString('id-ID') : 'Mohon maaf atas ketidaknyamanan ini.');
+    var judul = (dataMaintenance && (dataMaintenance.title || dataMaintenance.judul)) 
+        ? (dataMaintenance.title || dataMaintenance.judul) 
+        : 'SEDANG PERBAIKAN SISTEM';
+    var pesan = (dataMaintenance && (dataMaintenance.message || dataMaintenance.pesan)) 
+        ? (dataMaintenance.message || dataMaintenance.pesan) 
+        : 'Website sedang dalam perbaikan oleh admin. Silakan kembali beberapa saat lagi.';
+    var sampai = (dataMaintenance && (dataMaintenance.until || dataMaintenance.sampai)) 
+        ? (dataMaintenance.until || dataMaintenance.sampai) 
+        : null;
+    var teksEstimasi = sampai ? 'Estimasi selesai: ' + new Date(sampai).toLocaleString('id-ID') : 'Mohon maaf atas ketidaknyamanan ini.';
 
-    document.body.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#e0f2fe 0%,#bae6fd 50%,#7dd3fc 100%);padding:20px;font-family:\'Segoe UI\',sans-serif;">' +
+    var html = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#e0f2fe 0%,#bae6fd 50%,#7dd3fc 100%);padding:20px;font-family:\'Segoe UI\',sans-serif;">' +
         '<div style="background:#ffffff;border-radius:24px;padding:48px 36px;width:100%;max-width:440px;text-align:center;box-shadow:0 25px 60px rgba(0,0,0,0.1);">' +
         '<div style="width:90px;height:90px;background:#fef3c7;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;">' +
         '<i class="fas fa-tools" style="font-size:40px;color:#f59e0b;"></i>' +
         '</div>' +
-        '<h1 style="color:#0c4a6e;font-size:24px;font-weight:700;margin-bottom:8px;">' + judul + '</h1>' +
-        '<p style="color:#64748b;font-size:14px;margin-bottom:6px;line-height:1.6;">' + pesan + '</p>' +
-        '<div style="background:#fef3c7;color:#92400e;padding:12px 16px;border-radius:12px;font-weight:600;font-size:13px;margin:16px 0 24px;">' + teksEstimasi + '</div></div></div>';
+        '<h1 style="color:#0c4a6e;font-size:24px;font-weight:700;margin-bottom:8px;">' + sanitize(judul) + '</h1>' +
+        '<p style="color:#64748b;font-size:14px;margin-bottom:6px;line-height:1.6;">' + sanitize(pesan) + '</p>' +
+        '<div style="background:#fef3c7;color:#92400e;padding:12px 16px;border-radius:12px;font-weight:600;font-size:13px;margin:16px 0 24px;">' + sanitize(teksEstimasi) + '</div>' +
+        '<button onclick="window.open(\'https://wa.me/' + WHATSAPP_NUMBER + '?text=Assalamualaikum%20admin%2C%20info%20perbaikan\',\'_blank\')" style="display:inline-flex;align-items:center;gap:10px;padding:12px 32px;background:#25D366;color:#fff;border:none;border-radius:30px;font-weight:600;font-size:15px;cursor:pointer;transition:0.2s;font-family:\'Segoe UI\',sans-serif;">' +
+        '<i class="fab fa-whatsapp"></i> Hubungi Admin</button></div></div>';
+
+    safeSetHTML(document.body, html);
 }
 
 function tampilkanHalamanBanAkses(until) {
     var untilText = sanitize((until || 0) === 0 ? 'PERMANEN' : ('sampai ' + new Date(until).toLocaleString('id-ID')));
-    document.body.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#f0f9ff 0%,#bae6fd 50%,#7dd3fc 100%);padding:20px;font-family:\'Segoe UI\',sans-serif;">' +
+    var html = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#f0f9ff 0%,#bae6fd 50%,#7dd3fc 100%);padding:20px;font-family:\'Segoe UI\',sans-serif;">' +
         '<div style="background:#ffffff;border-radius:24px;padding:48px 36px;width:100%;max-width:420px;text-align:center;box-shadow:0 20px 60px rgba(0,191,255,0.15);border:1px solid rgba(0,191,255,0.1);">' +
         '<div style="font-size:72px;color:#f59e0b;margin-bottom:12px;">🚫</div>' +
         '<h2 style="font-size:24px;font-weight:700;color:#0c4a6e;margin-bottom:8px;">AKSES DIBLOKIR</h2>' +
         '<p style="font-size:14px;color:#64748b;margin-bottom:6px;">Maaf, akses Anda diblokir oleh admin.</p>' +
-        '<div style="background:#fef3c7;color:#92400e;padding:12px 16px;border-radius:12px;font-weight:600;font-size:14px;margin:16px 0 24px;">Durasi: ' + untilText + '</div></div></div>';
+        '<div style="background:#fef3c7;color:#92400e;padding:12px 16px;border-radius:12px;font-weight:600;font-size:14px;margin:16px 0 24px;">Durasi: ' + untilText + '</div>' +
+        '<button onclick="window.open(\'https://wa.me/' + WHATSAPP_NUMBER + '?text=Assalamualaikum%20admin%2C%20akses%20saya%20diblokir\',\'_blank\')" style="display:inline-flex;align-items:center;gap:10px;padding:12px 32px;background:#25D366;color:#fff;border:none;border-radius:30px;font-weight:600;font-size:15px;cursor:pointer;transition:0.2s;font-family:\'Segoe UI\',sans-serif;">' +
+        '<i class="fab fa-whatsapp"></i> Hubungi Admin</button></div></div>';
+
+    safeSetHTML(document.body, html);
 }
 
 async function periksaMaintenance() {
