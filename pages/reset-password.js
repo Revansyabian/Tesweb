@@ -4,6 +4,41 @@ var API_SECRET = '1417-1426-1527-1517';
 var WHATSAPP_NUMBER = "6285199120995";
 var fingerprint = '';
 var resetInProgress = false;
+var isBlocked = false;
+var blockedChecked = false;
+
+// ==================== STORAGE FUNCTIONS ====================
+function storageSet(key, value) {
+    try {
+        var allData = storageGetAll();
+        allData[key] = value;
+        var encrypted = CryptoJS.AES.encrypt(JSON.stringify(allData), 'session_local_secret').toString();
+        localStorage.setItem('app_data', encrypted);
+    } catch (e) {}
+}
+
+function storageGet(key) {
+    var allData = storageGetAll();
+    return allData[key] !== undefined ? allData[key] : null;
+}
+
+function storageRemove(key) {
+    var allData = storageGetAll();
+    delete allData[key];
+    var encrypted = CryptoJS.AES.encrypt(JSON.stringify(allData), 'session_local_secret').toString();
+    localStorage.setItem('app_data', encrypted);
+}
+
+function storageGetAll() {
+    try {
+        var encrypted = localStorage.getItem('app_data');
+        if (!encrypted) return {};
+        var decrypted = CryptoJS.AES.decrypt(encrypted, 'session_local_secret').toString(CryptoJS.enc.Utf8);
+        return JSON.parse(decrypted) || {};
+    } catch (e) {
+        return {};
+    }
+}
 
 async function getFingerprint() {
     var fp = '';
@@ -119,16 +154,17 @@ function showMaintenancePage(dataMaintenance) {
     safeSetHTML(document.body, html);
 }
 
-// ==================== PERIKSA MAINTENANCE (FIX - HANDLE RESPONSE) ====================
+// ==================== PERIKSA MAINTENANCE (PAKE FUNGSI DARI DASHBOARD) ====================
 async function periksaMaintenance() {
     try {
         var payload = {
-            action: 'check_maintenance',
+            path: 'maintenance_status',
+            method: 'GET',
+            data: null,
             timestamp: Date.now()
         };
         var encryptedPayload = CryptoJS.AES.encrypt(JSON.stringify(payload), API_SECRET).toString();
-        
-        var res = await fetch(API_RESET, {
+        var res = await fetch(API_REVANSTORE, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -136,47 +172,33 @@ async function periksaMaintenance() {
             },
             body: JSON.stringify({ data: encryptedPayload })
         });
-        
         var result = await res.json();
-        
-        // DECRYPT RESPONSE
-        if (result.data) {
+        if (result.encrypted && result.data) {
             var dec = CryptoJS.AES.decrypt(result.data, API_SECRET).toString(CryptoJS.enc.Utf8);
-            if (dec) {
-                result = JSON.parse(dec);
-            }
+            if (dec) result = JSON.parse(dec);
         }
-        
-        console.log('[MAINTENANCE] Result:', result);
-        
-        // CEK APAKAH MAINTENANCE ACTIVE
-        if (result && result.maintenance === true) {
-            return {
-                maintenance: true,
-                title: result.title || 'SEDANG PERBAIKAN SISTEM',
-                message: result.message || 'Website sedang dalam perbaikan oleh admin.',
-                until: result.until || null
-            };
+        if (result && (result.maintenance === true || result.title || result.message)) {
+            return result;
         }
-        
         return null;
     } catch (e) {
-        console.error('[MAINTENANCE] Error:', e);
         return null;
     }
 }
 
-// ==================== CHECK BLOCKED ====================
+// ==================== CHECK IF BLOCKED (PAKE FUNGSI DARI DASHBOARD) ====================
 async function checkIfBlocked() {
+    if (blockedChecked) return isBlocked;
+    if (!fingerprint) fingerprint = await getFingerprint();
     try {
         var payload = {
-            action: 'check_blocked',
-            fingerprint: fingerprint,
+            path: 'check_blocked',
+            method: 'POST',
+            data: { fingerprint: fingerprint },
             timestamp: Date.now()
         };
         var encryptedPayload = CryptoJS.AES.encrypt(JSON.stringify(payload), API_SECRET).toString();
-        
-        var res = await fetch(API_RESET, {
+        var res = await fetch(API_REVANSTORE, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -184,26 +206,48 @@ async function checkIfBlocked() {
             },
             body: JSON.stringify({ data: encryptedPayload })
         });
-        
         var result = await res.json();
-        
-        if (result.data) {
+        if (result.encrypted && result.data) {
             var dec = CryptoJS.AES.decrypt(result.data, API_SECRET).toString(CryptoJS.enc.Utf8);
-            if (dec) {
-                result = JSON.parse(dec);
-            }
+            if (dec) result = JSON.parse(dec);
         }
-        
-        console.log('[CHECK BLOCKED] Result:', result);
-        
-        if (result && result.blocked === true) {
-            return true;
+        if (result && result.blocked) {
+            isBlocked = true;
+            storageSet('perangkat_diblokir', 'true');
+        } else {
+            isBlocked = false;
+            storageRemove('perangkat_diblokir');
         }
-        return false;
+        blockedChecked = true;
     } catch (e) {
-        console.error('[CHECK BLOCKED] Error:', e);
-        return false;
+        isBlocked = storageGet('perangkat_diblokir') === 'true';
+        blockedChecked = true;
     }
+    return isBlocked;
+}
+
+// ==================== TAMPILKAN HALAMAN MAINTENANCE (PAKE DARI DASHBOARD) ====================
+function tampilkanHalamanMaintenance(dataMaintenance) {
+    var judul = sanitize((dataMaintenance && (dataMaintenance.title || dataMaintenance.judul)) ? (dataMaintenance.title || dataMaintenance.judul) : 'SEDANG PERBAIKAN SISTEM');
+    var pesan = sanitize((dataMaintenance && (dataMaintenance.message || dataMaintenance.pesan)) ? (dataMaintenance.message || dataMaintenance.pesan) : 'Website sedang dalam perbaikan oleh admin. Silakan kembali beberapa saat lagi.');
+    var sampai = (dataMaintenance && (dataMaintenance.until || dataMaintenance.sampai)) ? (dataMaintenance.until || dataMaintenance.sampai) : null;
+    var teksEstimasi = sanitize(sampai ? 'Estimasi selesai: ' + new Date(sampai).toLocaleString('id-ID') : 'Mohon maaf atas ketidaknyamanan ini.');
+
+    document.body.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#e0f2fe 0%,#bae6fd 50%,#7dd3fc 100%);padding:20px;font-family:\'Segoe UI\',sans-serif;">' +
+        '<div style="background:#ffffff;border-radius:24px;padding:48px 36px;width:100%;max-width:440px;text-align:center;box-shadow:0 25px 60px rgba(0,0,0,0.1);">' +
+        '<div style="width:90px;height:90px;background:#fef3c7;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;">' +
+        '<i class="fas fa-tools" style="font-size:40px;color:#f59e0b;"></i>' +
+        '</div>' +
+        '<h1 style="color:#0c4a6e;font-size:24px;font-weight:700;margin-bottom:8px;">' + judul + '</h1>' +
+        '<p style="color:#64748b;font-size:14px;margin-bottom:6px;line-height:1.6;">' + pesan + '</p>' +
+        '<div style="background:#fef3c7;color:#92400e;padding:12px 16px;border-radius:12px;font-weight:600;font-size:13px;margin:16px 0 24px;">' + teksEstimasi + '</div>' +
+        '<button onclick="window.open(\'https://wa.me/' + WHATSAPP_NUMBER + '?text=Assalamualaikum%20admin%2C%20info%20perbaikan\',\'_blank\')" style="display:inline-flex;align-items:center;gap:10px;padding:12px 32px;background:#25D366;color:#fff;border:none;border-radius:30px;font-weight:600;font-size:15px;cursor:pointer;transition:0.2s;font-family:\'Segoe UI\',sans-serif;">' +
+        '<i class="fab fa-whatsapp"></i> Hubungi Admin</button></div></div>';
+}
+
+// ==================== TAMPILKAN HALAMAN BLOKIR (PAKE DARI DASHBOARD) ====================
+function tampilkanHalamanBlokir() {
+    document.body.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#f0f9ff,#bae6fd,#7dd3fc);padding:20px;font-family:\'Segoe UI\',sans-serif;"><div style="background:#fff;border-radius:20px;padding:40px 30px;max-width:420px;width:100%;text-align:center;box-shadow:0 25px 60px rgba(0,0,0,0.1);"><div style="font-size:70px;color:#ef4444;margin-bottom:20px;">🔒</div><h1 style="color:#0c4a6e;font-size:24px;margin-bottom:10px;">AKSES DITOLAK</h1><p style="color:#64748b;font-size:14px;">Maaf, akses Anda telah ditolak.</p></div></div>';
 }
 
 async function resetPassword() {
@@ -213,17 +257,16 @@ async function resetPassword() {
     try {
         if (!fingerprint) fingerprint = await getFingerprint();
         
-        // CEK MAINTENANCE DULU
         var maintenance = await periksaMaintenance();
         if (maintenance) {
-            showMaintenancePage(maintenance);
+            tampilkanHalamanMaintenance(maintenance);
             resetInProgress = false;
             return;
         }
         
         var blocked = await checkIfBlocked();
         if (blocked) {
-            showBanAccessPage(0);
+            tampilkanHalamanBlokir();
             resetInProgress = false;
             return;
         }
@@ -345,16 +388,15 @@ async function resetPassword() {
 document.addEventListener('DOMContentLoaded', async function() {
     if (!fingerprint) fingerprint = await getFingerprint();
     
-    // CEK MAINTENANCE DULU
     var maintenance = await periksaMaintenance();
     if (maintenance) {
-        showMaintenancePage(maintenance);
+        tampilkanHalamanMaintenance(maintenance);
         return;
     }
     
     var blocked = await checkIfBlocked();
     if (blocked) {
-        showBanAccessPage(0);
+        tampilkanHalamanBlokir();
         return;
     }
     
