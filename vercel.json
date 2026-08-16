@@ -8,6 +8,7 @@
     { "source": "/pages/confirm-password", "destination": "/pages/confirm-password.html" },
     { "source": "/api/revanstoreV2", "destination": "/api/revanstoreV2" },
     { "source": "/api/rvnstore", "destination": "/api/rvnstore" },
-    { "source": "/api/reset-pw", "destination": "/api/reset-pw" }
+    { "source": "/api/reset-pw", "destination": "/api/reset-pw" },
+    { "source": "/api/register", "destination": "/api/register" }
   ]
 }
