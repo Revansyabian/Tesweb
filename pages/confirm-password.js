@@ -1,4 +1,4 @@
-
+// confirm-password.js
 var API_RESET = '/api/reset-pw';
 var API_REVANSTORE = '/api/revanstoreV2';
 var API_SECRET = '1417-1426-1527-1517';
@@ -44,8 +44,6 @@ function showPage(pageId) {
     document.getElementById('loadingPage').classList.remove('show');
     document.getElementById('expiredPage').classList.remove('show');
     document.getElementById('invalidPage').classList.remove('show');
-    document.getElementById('maintenancePage').classList.remove('show');
-    document.getElementById('banAksesPage').classList.remove('show');
     document.getElementById('formSection').classList.remove('show');
     document.getElementById('successPage').classList.remove('show');
     document.getElementById(pageId).classList.add('show');
