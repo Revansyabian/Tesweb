@@ -473,7 +473,7 @@
                     var waMessage = 'Assalamualaikum min, tolong aktivasi akun saya%0A%0AUsername: ' + encodeURIComponent(username) + '%0APaket: ' + encodeURIComponent(selectedPaket) + '%0AHarga: Rp ' + selectedHarga.toLocaleString() + '%0AEmail: ' + encodeURIComponent(email) + '%0ANo. HP: ' + encodeURIComponent(phone);
                     Swal.fire({ icon: "success", title: "Pendaftaran Berhasil!", timer: 3000, showConfirmButton: false }).then(function() {
                         window.open('https://wa.me/' + WHATSAPP_NUMBER + '?text=' + waMessage, '_blank');
-                        window.location.href = 'index.html';
+                        window.location.href = '/';
                     });
                 } else {
                     recordRegisterAttempt();
