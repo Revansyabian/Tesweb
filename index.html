@@ -3,342 +3,106 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width,initial-scale=1.0">
-    <title>BUSSID TopUp</title>
+    <title>Login - Top Up</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <meta name="theme-color" content="#00BFFF">
-    <link rel="manifest" href="manifest.json">
-    <link rel="apple-touch-icon" href="icon-192.png">
+    <meta name="theme-color" content="#0ea5e9">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-            background: #00BFFF;
-            min-height: 100vh;
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 50%, #7dd3fc 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+        .login-container { width: 100%; max-width: 420px; }
+        .login-card { background: #fff; border-radius: 24px; padding: 45px 35px 35px; box-shadow: 0 25px 60px rgba(0, 0, 0, 0.08); animation: fadeIn 0.4s ease; margin: auto; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .login-header { text-align: center; margin-bottom: 32px; }
+        .login-logo {
+            width: 100px;
+            height: 100px;
+            border-radius: 22px;
+            margin: 0 auto 16px;
+            overflow: hidden;
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 20px;
-        }
-
-        .container {
-            background: #ffffff;
-            border-radius: 24px;
-            padding: 48px 36px;
-            max-width: 420px;
-            width: 100%;
-            text-align: center;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
-            border: 1px solid rgba(0, 191, 255, 0.1);
-            animation: fadeIn 0.5s ease;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .logo {
-            width: 100px;
-            height: 100px;
-            border-radius: 20px;
-            object-fit: cover;
             background: #f0f9ff;
-            padding: 6px;
-            margin: 0 auto 20px;
-            display: block;
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+            border: 2px solid #e0f2fe;
+            box-shadow: 0 8px 20px rgba(14, 165, 233, 0.15);
         }
-
-        .logo i {
-            font-size: 60px;
-            color: #00BFFF;
-            line-height: 88px;
-        }
-
-        .title {
-            font-size: 22px;
-            font-weight: 700;
-            color: #1e293b;
-            margin-bottom: 8px;
-        }
-
-        .title span {
-            color: #00BFFF;
-        }
-
-        .subtitle {
-            font-size: 14px;
-            color: #64748b;
-            margin-bottom: 24px;
-            line-height: 1.6;
-        }
-
-        .alert-box {
-            background: #E6F9FF;
-            border: 1px solid #bae6fd;
-            border-radius: 12px;
-            padding: 16px 20px;
-            margin-bottom: 20px;
-        }
-
-        .alert-box i {
-            color: #00BFFF;
-            font-size: 20px;
-            margin-right: 8px;
-        }
-
-        .alert-box .alert-text {
-            font-size: 14px;
-            color: #0c4a6e;
-            font-weight: 500;
-        }
-
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            padding: 14px 32px;
-            border: none;
-            border-radius: 12px;
-            font-size: 15px;
-            font-weight: 600;
-            cursor: pointer;
-            font-family: 'Segoe UI', system-ui, sans-serif;
-            transition: 0.2s;
-            width: 100%;
-        }
-
-        .btn-primary {
-            background: #00BFFF;
-            color: #fff;
-            box-shadow: 0 4px 16px rgba(0, 191, 255, 0.3);
-        }
-        .btn-primary:hover {
-            background: #0099CC;
-            transform: translateY(-2px);
-            box-shadow: 0 6px 24px rgba(0, 191, 255, 0.4);
-        }
-
-        .footer-text {
-            margin-top: 20px;
-            font-size: 13px;
-            color: #94a3b8;
-        }
-
-        .footer-text a {
-            color: #00BFFF;
-            text-decoration: none;
-            font-weight: 600;
-        }
-        .footer-text a:hover {
-            text-decoration: underline;
-        }
-
-        .divider {
-            height: 1px;
-            background: #e2e8f0;
-            margin: 16px 0;
-        }
-
-        @media (max-width: 480px) {
-            .container {
-                padding: 32px 20px;
-            }
-            .title {
-                font-size: 18px;
-            }
-        }
+        .login-logo img { width: 100%; height: 100%; object-fit: cover; }
+        .login-logo .logo-placeholder { font-size: 48px; color: #0ea5e9; }
+        .login-header h1 { color: #0c4a6e; font-size: 28px; font-weight: 700; }
+        .login-header p { color: #64748b; font-size: 14px; margin-top: 6px; }
+        .login-footer { margin-top: 28px; text-align: center; color: #94a3b8; font-size: 13px; padding-top: 18px; border-top: 1px solid #f1f5f9; }
+        .login-footer a { color: #0ea5e9; text-decoration: none; font-weight: 600; }
+        .login-footer a:hover { text-decoration: underline; }
+        .login-links { display: flex; justify-content: space-between; margin-top: 16px; font-size: 13px; }
+        .login-links a { color: #0ea5e9; text-decoration: none; font-weight: 600; }
+        .login-links a:hover { text-decoration: underline; }
+        .form-group { margin-bottom: 22px; }
+        .form-group label { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; color: #475569; font-size: 13px; font-weight: 600; }
+        .form-group label i { color: #0ea5e9; }
+        .form-input { width: 100%; padding: 14px 18px; background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 12px; color: #1e293b; font-size: 15px; transition: all 0.2s ease; }
+        .form-input:focus { outline: none; border-color: #0ea5e9; background: #fff; box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.1); }
+        .form-input::placeholder { color: #94a3b8; }
+        .btn { padding: 14px 24px; border: none; border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; justify-content: center; gap: 10px; color: #fff; letter-spacing: 0.3px; width: 100%; }
+        .btn:hover { transform: translateY(-1px); box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1); }
+        .btn:active { transform: scale(0.97); }
+        .btn-primary { background: #0ea5e9; }
+        .btn-primary:hover { background: #0284c7; }
+        .recaptcha-wrapper { margin-bottom: 20px; display: flex; justify-content: center; }
+        .password-counter { text-align: right; font-size: 11px; color: #94a3b8; margin-top: 4px; }
+        .spinner { width: 40px; height: 40px; border: 4px solid #333; border-top: 4px solid #0ea5e9; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @media(max-width:480px) { .login-card { padding: 30px 22px; } .login-header h1 { font-size: 22px; } .login-logo { width: 80px; height: 80px; border-radius: 18px; } }
     </style>
-    <script src="https://www.google.com/recaptcha/api.js?render=6LcVBn4tAAAAAINTTIleUbUZr1ZykvyB6WA-oOfT"></script>
+    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
 </head>
 <body>
 
-    <!-- MAIN CONTAINER -->
-    <div class="container" id="mainContainer">
-        <div class="logo">
-            <i class="fas fa-cube"></i>
+    <div id="loadingOverlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:99999;justify-content:center;align-items:center">
+        <div style="background:#1a1a2e;padding:30px 40px;border-radius:16px;text-align:center;color:#fff">
+            <div class="spinner"></div>
+            <p id="loadingMessage" style="margin-top:15px;font-size:14px">Memproses...</p>
         </div>
-
-        <h1 class="title">Revan<span>Store</span></h1>
-        <p class="subtitle">Top Up BUSSID Terpercaya</p>
-
-        <div class="alert-box">
-            <span class="alert-text">Hai! Selamat datang di Web Top Up BUSSID</span>
-        </div>
-
-        <button class="btn btn-primary" onclick="goToDashboard()">
-            <i class="fas fa-arrow-right"></i> Masuk Dashboard
-        </button>
-
-        <div class="divider"></div>
-
-        <p class="footer-text">
-            Belum punya akun? <a href="/pages/register">Silakan daftar</a>
-        </p>
     </div>
 
+    <div class="login-container">
+        <div class="login-card">
+            <div class="login-header">
+                <div class="login-logo">
+                    <img src="/img.png" alt="Logo" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+                    <div class="logo-placeholder" style="display:none;">
+                        <i class="fas fa-cube"></i>
+                    </div>
+                </div>
+                <h1>TOP UP</h1>
+                <p>Silakan login untuk melanjutkan</p>
+            </div>
+            <div class="form-group">
+                <label for="username"><i class="fas fa-user"></i> Username</label>
+                <input type="text" id="username" placeholder="Masukkan username" class="form-input" autocomplete="username">
+            </div>
+            <div class="form-group">
+                <label for="password"><i class="fas fa-lock"></i> Password</label>
+                <input type="password" id="password" placeholder="Masukkan password" class="form-input" maxlength="20" autocomplete="current-password">
+                <div class="password-counter"><span id="passwordCharCount">0/20</span></div>
+            </div>
+            <div class="recaptcha-wrapper">
+                <div class="g-recaptcha" data-sitekey="6LfYOH4tAAAAAO48ez84cjF25XOYz3cN0OOjZ9pc"></div>
+            </div>
+            <button class="btn btn-primary" id="btnLogin" onclick="login()">
+                <i class="fas fa-sign-in-alt"></i> LOGIN
+            </button>
+            <div class="login-links">
+                <a href="/pages/reset-password"><i class="fas fa-key"></i> Lupa Password?</a>
+                <a href="/pages/register"><i class="fas fa-user-plus"></i> Daftar Akun</a>
+            </div>
+            <div class="login-footer">
+                <p><i class="fas fa-info-circle"></i>silakan register jika belum memiliki akun</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
-    <script>
-        var API_REVANSTORE = '/api/revanstoreV2';
-        var WHATSAPP_NUMBER = '6285199120995';
-        var API_SECRET = '1417-1426-1527-1517';
-        var RECAPTCHA_V3_SITE_KEY = '6LcVBn4tAAAAAINTTIleUbUZr1ZykvyB6WA-oOfT';
-        var fingerprint = '';
-        var isBlocked = false;
-        var blockedChecked = false;
-
-        function goToDashboard() {
-            window.location.href = '/pages/dashboard';
-        }
-
-        function showBlockedScreen() {
-            var html = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#00BFFF;padding:20px;font-family:\'Segoe UI\',sans-serif;">' +
-                '<div style="background:#ffffff;border-radius:24px;padding:48px 36px;width:100%;max-width:420px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.1);border:2px solid #ef4444;">' +
-                '<div style="font-size:72px;color:#ef4444;margin-bottom:12px;">🔒</div>' +
-                '<h2 style="font-size:24px;font-weight:700;color:#1e293b;margin-bottom:8px;">AKSES DITOLAK</h2>' +
-                '<p style="font-size:14px;color:#64748b;margin-bottom:6px;">Akses ditolak, jika ingin dibuka silakan hubungi admin.</p>' +
-                '<div style="background:#fef3c7;color:#92400e;padding:12px 16px;border-radius:12px;font-weight:600;font-size:14px;margin:16px 0 24px;">Durasi: PERMANEN</div>' +
-                '<button onclick="window.open(\'https://wa.me/' + WHATSAPP_NUMBER + '?text=Assalamualaikum%20admin%2C%20akses%20saya%20diblokir\',\'_blank\')" style="display:inline-flex;align-items:center;gap:10px;padding:12px 32px;background:#25D366;color:#fff;border:none;border-radius:30px;font-weight:600;font-size:15px;cursor:pointer;transition:0.2s;font-family:\'Segoe UI\',sans-serif;">' +
-                '<i class="fab fa-whatsapp"></i> Hubungi Admin</button></div></div>';
-
-            document.body.innerHTML = html;
-        }
-
-        function tampilkanMaintenance(data) {
-            var judul = (data && (data.title || data.judul)) ? (data.title || data.judul) : 'SEDANG PERBAIKAN';
-            var pesan = (data && (data.message || data.pesan)) ? (data.message || data.pesan) : 'Silakan kembali beberapa saat lagi.';
-            var sampai = (data && (data.until || data.sampai)) ? (data.until || data.sampai) : null;
-            var estimasi = sampai ? 'Estimasi selesai: ' + new Date(sampai).toLocaleString('id-ID') : 'Mohon maaf atas ketidaknyamanan ini.';
-
-            document.body.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#00BFFF;padding:20px;font-family:\'Segoe UI\',sans-serif;">' +
-                '<div style="background:#fff;border-radius:12px;padding:28px 20px;max-width:340px;width:100%;text-align:center;border:2px solid #E63946;box-shadow:0 4px 20px rgba(0,0,0,0.15);">' +
-                '<div style="font-size:16px;font-weight:700;color:#E63946;background:#FDE8E8;display:inline-block;padding:4px 12px;border-radius:6px;">' + judul + '</div>' +
-                '<p style="font-size:13px;color:#555;margin:12px 0;background:#f8f8f8;padding:8px;border-radius:6px;">' + pesan + '</p>' +
-                '<div style="background:#FDE8E8;color:#E63946;padding:6px 10px;border-radius:6px;font-weight:600;font-size:12px;margin-bottom:16px;">' + estimasi + '</div>' +
-                '<button onclick="window.open(\'https://wa.me/' + WHATSAPP_NUMBER + '?text=Assalamualaikum%20admin%2C%20info%20perbaikan\',\'_blank\')" style="display:inline-flex;align-items:center;padding:10px 16px;background:#E63946;color:#fff;border:none;border-radius:8px;font-weight:600;font-size:13px;cursor:pointer;">Hubungi Admin</button></div></div>';
-        }
-
-        async function getFingerprint() {
-            if (fingerprint) return fingerprint;
-            var fp = '';
-            fp += navigator.userAgent || '';
-            fp += navigator.language || '';
-            fp += (screen.width || 0) + 'x' + (screen.height || 0);
-            fp += screen.colorDepth || '';
-            fp += new Date().getTimezoneOffset();
-            fp += navigator.hardwareConcurrency || '';
-            fp += navigator.deviceMemory || '';
-            fp += navigator.platform || '';
-            fingerprint = CryptoJS.MD5(fp).toString();
-            return fingerprint;
-        }
-
-        async function getRecaptchaV3Token(action) {
-            try {
-                return await grecaptcha.execute(RECAPTCHA_V3_SITE_KEY, { action: action });
-            } catch (e) {
-                return null;
-            }
-        }
-
-        async function periksaMaintenance() {
-            try {
-                var fp = await getFingerprint();
-                var payload = {
-                    path: 'maintenance_status',
-                    method: 'GET',
-                    data: null,
-                    timestamp: Date.now()
-                };
-                var encryptedPayload = CryptoJS.AES.encrypt(JSON.stringify(payload), API_SECRET).toString();
-                var res = await fetch(API_REVANSTORE, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Fingerprint': fp
-                    },
-                    body: JSON.stringify({ data: encryptedPayload })
-                });
-                var result = await res.json();
-                if (result.encrypted && result.data) {
-                    var dec = CryptoJS.AES.decrypt(result.data, API_SECRET).toString(CryptoJS.enc.Utf8);
-                    if (dec) result = JSON.parse(dec);
-                }
-                if (result && (result.maintenance === true || result.title || result.message)) {
-                    return result;
-                }
-                return null;
-            } catch (e) {
-                return null;
-            }
-        }
-
-        async function checkBlocked() {
-            if (blockedChecked) return isBlocked;
-            
-            try {
-                var fp = await getFingerprint();
-                var captchaToken = await getRecaptchaV3Token('check_blocked');
-                
-                var payload = {
-                    path: 'check_blocked',
-                    method: 'POST',
-                    data: {
-                        fingerprint: fp,
-                        captchaToken: captchaToken
-                    },
-                    timestamp: Date.now()
-                };
-                
-                var encryptedPayload = CryptoJS.AES.encrypt(JSON.stringify(payload), API_SECRET).toString();
-                
-                var res = await fetch(API_REVANSTORE, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Fingerprint': fp
-                    },
-                    body: JSON.stringify({ data: encryptedPayload })
-                });
-                
-                var result = await res.json();
-                
-                if (result.encrypted && result.data) {
-                    var dec = CryptoJS.AES.decrypt(result.data, API_SECRET).toString(CryptoJS.enc.Utf8);
-                    if (dec) result = JSON.parse(dec);
-                }
-                
-                if (result && result.blocked === true) {
-                    isBlocked = true;
-                    blockedChecked = true;
-                    showBlockedScreen();
-                    return true;
-                }
-                
-                isBlocked = false;
-                blockedChecked = true;
-                return false;
-                
-            } catch (e) {
-                console.error('[CHECK BLOCKED] Error:', e);
-                isBlocked = false;
-                blockedChecked = true;
-                return false;
-            }
-        }
-
-        (async function() {
-            grecaptcha.ready(async function() {
-                var maintenance = await periksaMaintenance();
-                if (maintenance) { tampilkanMaintenance(maintenance); return; }
-
-                var blocked = await checkBlocked();
-                if (blocked) {
-                    return;
-                }
-            });
-        })();
-    </script>
+    <script src="pages/login.js"></script>
 </body>
 </html>
