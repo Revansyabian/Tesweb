@@ -330,7 +330,7 @@ function updatePasswordCounter() {
 function openModal(id) {
     document.getElementById(id).classList.add('show');
     document.body.style.overflow = 'hidden';
-    // Reset captcha di modal
+    // Reset captcha dan status
     try {
         if (id === 'modalReset') {
             var resetCaptcha = document.querySelector('#modalReset .g-recaptcha');
@@ -354,14 +354,17 @@ function openModal(id) {
 function closeModal(id) {
     document.getElementById(id).classList.remove('show');
     document.body.style.overflow = '';
-    // Reset form
+    // Reset form dan captcha
     if (id === 'modalReset') {
         document.getElementById('resetError').classList.remove('show');
         document.getElementById('resetSuccess').classList.remove('show');
         document.getElementById('resetUsername').value = '';
         document.getElementById('btnResetModal').disabled = true;
         resetCaptchaDone = false;
-        try { grecaptcha.reset(document.querySelector('#modalReset .g-recaptcha')); } catch(e) {}
+        try { 
+            var rc = document.querySelector('#modalReset .g-recaptcha');
+            if (rc && grecaptcha) grecaptcha.reset(rc);
+        } catch(e) {}
     }
     if (id === 'modalRegister') {
         document.getElementById('registerError').classList.remove('show');
@@ -378,7 +381,10 @@ function closeModal(id) {
         selectedPaket = '';
         selectedHarga = 0;
         registerCaptchaDone = false;
-        try { grecaptcha.reset(document.querySelector('#modalRegister .g-recaptcha')); } catch(e) {}
+        try { 
+            var rc2 = document.querySelector('#modalRegister .g-recaptcha');
+            if (rc2 && grecaptcha) grecaptcha.reset(rc2);
+        } catch(e) {}
     }
 }
 
@@ -428,14 +434,14 @@ async function submitResetPassword() {
         var username = sanitize(document.getElementById('resetUsername').value.trim());
         
         if (!username || username.length < 3) {
-            showResetError('Username minimal 3 karakter!');
+            Swal.fire({ icon: "warning", title: "Username Tidak Valid!", text: "Masukkan username minimal 3 karakter.", confirmButtonColor: "#00BFFF" });
             resetInProgress = false;
             return;
         }
         
         var usernameRegex = /^[a-zA-Z0-9_.]+$/;
         if (!usernameRegex.test(username)) {
-            showResetError('Username hanya boleh huruf, angka, underscore (_), dan titik (.)');
+            Swal.fire({ icon: "error", title: "Simbol Tidak Diizinkan!", confirmButtonColor: "#ef4444" });
             resetInProgress = false;
             return;
         }
@@ -443,7 +449,7 @@ async function submitResetPassword() {
         var captchaResponse = '';
         try { captchaResponse = grecaptcha.getResponse(document.querySelector('#modalReset .g-recaptcha')); } catch(e) {}
         if (!captchaResponse || captchaResponse.length === 0) {
-            showResetError('Centang "I\'m not a robot" dulu ya!');
+            Swal.fire({ icon: "warning", title: "reCAPTCHA Diperlukan!", text: "Centang \"I'm not a robot\" dulu ya!", confirmButtonColor: "#00BFFF" });
             resetInProgress = false;
             return;
         }
@@ -514,7 +520,7 @@ async function submitResetPassword() {
             } else if (result && result.message) {
                 errorMsg = result.message;
             }
-            showResetError(errorMsg);
+            Swal.fire({ icon: "error", title: "Gagal!", text: errorMsg, confirmButtonColor: "#ef4444" });
             try { grecaptcha.reset(document.querySelector('#modalReset .g-recaptcha')); } catch(e) {}
             resetCaptchaDone = false;
             document.getElementById('btnResetModal').disabled = true;
@@ -522,7 +528,7 @@ async function submitResetPassword() {
         
     } catch (error) {
         setResetButtonLoading(false);
-        showResetError('Gagal menghubungkan ke server!');
+        Swal.fire({ icon: "error", title: "Error!", text: "Gagal menghubungkan ke server!", confirmButtonColor: "#ef4444" });
         try { grecaptcha.reset(document.querySelector('#modalReset .g-recaptcha')); } catch(e) {}
         resetCaptchaDone = false;
         document.getElementById('btnResetModal').disabled = true;
@@ -746,7 +752,7 @@ async function submitRegister() {
         var captchaResponse = '';
         try { captchaResponse = grecaptcha.getResponse(document.querySelector('#modalRegister .g-recaptcha')); } catch(e) {}
         if (!captchaResponse || captchaResponse.length === 0) {
-            showRegisterError('Centang "I\'m not a robot" dulu ya!');
+            Swal.fire({ icon: "warning", title: "reCAPTCHA Diperlukan!", text: "Centang \"I'm not a robot\" dulu ya!", confirmButtonColor: "#00BFFF" });
             registerInProgress = false;
             return;
         }
@@ -775,11 +781,12 @@ async function submitRegister() {
             });
         } else {
             recordRegisterAttempt();
-            if (result && result.error === 'ip_limit') { showRegisterError('IP sudah mendaftar hari ini!'); }
-            else if (result && result.error === 'fp_limit') { showRegisterError('Perangkat sudah mendaftar hari ini!'); }
-            else if (result && result.error === 'username_exists') { showRegisterError('Username sudah terdaftar!'); }
-            else if (result && result.error === 'email_exists') { showRegisterError('Email sudah terdaftar!'); }
-            else { showRegisterError('Gagal mendaftar! Coba lagi.'); }
+            var errMsg = 'Gagal mendaftar! Coba lagi.';
+            if (result && result.error === 'ip_limit') { errMsg = 'IP sudah mendaftar hari ini!'; }
+            else if (result && result.error === 'fp_limit') { errMsg = 'Perangkat sudah mendaftar hari ini!'; }
+            else if (result && result.error === 'username_exists') { errMsg = 'Username sudah terdaftar!'; }
+            else if (result && result.error === 'email_exists') { errMsg = 'Email sudah terdaftar!'; }
+            Swal.fire({ icon: "error", title: "Gagal!", text: errMsg, confirmButtonColor: "#ef4444" });
             try { grecaptcha.reset(document.querySelector('#modalRegister .g-recaptcha')); } catch(e) {}
             registerCaptchaDone = false;
             document.getElementById('btnRegisterModal').disabled = true;
@@ -787,7 +794,7 @@ async function submitRegister() {
 
     } catch (error) {
         setRegisterButtonLoading(false);
-        showRegisterError('Gagal menghubungkan ke server!');
+        Swal.fire({ icon: "error", title: "Error!", text: "Gagal menghubungkan ke server!", confirmButtonColor: "#ef4444" });
         try { grecaptcha.reset(document.querySelector('#modalRegister .g-recaptcha')); } catch(e) {}
         registerCaptchaDone = false;
         document.getElementById('btnRegisterModal').disabled = true;
