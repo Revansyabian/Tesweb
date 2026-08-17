@@ -1,4 +1,5 @@
 var API_REVANSTORE = '/api/revanstoreV2';
+var API_RESET = '/api/reset-pw';
 var WHATSAPP_NUMBER = "6285199120995";
 var MAX_PASSWORD_LENGTH = 20;
 var API_SECRET = '1417-1426-1527-1517';
@@ -14,6 +15,18 @@ var alertTimeout = null;
 var isBlocked = false;
 var blockedChecked = false;
 var loginInProgress = false;
+var resetInProgress = false;
+var registerInProgress = false;
+var selectedPaket = '';
+var selectedHarga = 0;
+var sessionFingerprint = CryptoJS.MD5(Date.now() + Math.random() + navigator.userAgent).toString();
+var FORBIDDEN_USERNAMES = ['admin', 'administrator', 'root', 'system', 'owner', 'moderator', 'staff', 'support', 'ceo', 'boss'];
+var THROWAWAY_DOMAINS = ['mailinator.com', 'tempmail.com', 'guerrillamail.com', '10minutemail.com', 'yopmail.com', 'tempmail.net', 'dispostable.com'];
+var COMMON_PASSWORDS = ['password', 'password123', '12345678', 'qwerty123', 'admin123', 'bismillah', 'sayang', 'cinta'];
+var KEYBOARD_PATTERNS = ['asdf', 'qwer', 'zxcv', 'tyui', 'ghjk', 'bnm', 'poiuy', 'lkjh', 'mnbv'];
+var SEQUENTIAL_PATTERNS = ['123456', '654321', 'abcdef', 'qwerty', '111111', '222222', '333333'];
+var resetCaptchaDone = false;
+var registerCaptchaDone = false;
 
 var STORAGE_KEY = 'app_data';
 var STORAGE_SECRET = 'session_local_secret';
@@ -76,7 +89,18 @@ function saveBlockData(username, data) {
 
 function sanitize(str) {
     if (!str) return '';
-    return String(str).replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#x27;');
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#x27;')
+        .replace(/`/g, '&#96;')
+        .replace(/=/g, '&#61;')
+        .replace(/javascript:/gi, '')
+        .replace(/on\w+=/gi, '')
+        .replace(/<script/gi, '')
+        .replace(/<\/script/gi, '');
 }
 
 async function getFingerprint() {
@@ -372,6 +396,465 @@ function checkAccountExpiry(user) {
     return { expired: expired, daysLeft: daysLeft, daysLeftText: getDaysLeftText(daysLeft), daysLeftClass: getDaysLeftClass(daysLeft) };
 }
 
+// ==================== MODAL FUNCTIONS ====================
+function openModal(id) {
+    document.getElementById(id).classList.add('show');
+    document.body.style.overflow = 'hidden';
+    if (id === 'modalReset') {
+        grecaptcha.render(document.querySelector('#modalReset .g-recaptcha'), {
+            sitekey: '6LfYOH4tAAAAAO48ez84cjF25XOYz3cN0OOjZ9pc',
+            callback: 'onResetCaptcha'
+        });
+    }
+    if (id === 'modalRegister') {
+        grecaptcha.render(document.querySelector('#modalRegister .g-recaptcha'), {
+            sitekey: '6LfYOH4tAAAAAO48ez84cjF25XOYz3cN0OOjZ9pc',
+            callback: 'onRegisterCaptcha'
+        });
+    }
+}
+
+function closeModal(id) {
+    document.getElementById(id).classList.remove('show');
+    document.body.style.overflow = '';
+    if (id === 'modalReset') {
+        document.getElementById('resetError').classList.remove('show');
+        document.getElementById('resetSuccess').classList.remove('show');
+        document.getElementById('resetUsername').value = '';
+        document.getElementById('btnResetModal').disabled = true;
+        resetCaptchaDone = false;
+        try { grecaptcha.reset(document.querySelector('#modalReset .g-recaptcha')); } catch(e) {}
+    }
+    if (id === 'modalRegister') {
+        document.getElementById('registerError').classList.remove('show');
+        document.getElementById('regUsername').value = '';
+        document.getElementById('regPassword').value = '';
+        document.getElementById('regConfirmPassword').value = '';
+        document.getElementById('regPhone').value = '';
+        document.getElementById('regEmail').value = '';
+        document.getElementById('regVerificationCheck').checked = false;
+        document.getElementById('btnRegisterModal').disabled = true;
+        document.getElementById('regPaketPlaceholder').textContent = 'Klik untuk pilih paket...';
+        document.getElementById('regPaketPlaceholder').className = 'placeholder';
+        document.querySelectorAll('.paket-option').forEach(function(o) { o.classList.remove('selected'); });
+        selectedPaket = '';
+        selectedHarga = 0;
+        registerCaptchaDone = false;
+        try { grecaptcha.reset(document.querySelector('#modalRegister .g-recaptcha')); } catch(e) {}
+    }
+}
+
+function onResetCaptcha() {
+    resetCaptchaDone = true;
+    document.getElementById('btnResetModal').disabled = false;
+}
+
+function onRegisterCaptcha() {
+    registerCaptchaDone = true;
+    toggleRegSubmit();
+}
+
+// ==================== RESET PASSWORD MODAL ====================
+function validateResetUsername() {
+    var input = document.getElementById('resetUsername');
+    var value = input.value;
+    var cleaned = value.replace(/[^a-zA-Z0-9_.]/g, '');
+    if (value !== cleaned) {
+        input.value = cleaned;
+    }
+}
+
+function showResetError(msg) {
+    document.getElementById('resetErrorText').textContent = msg;
+    document.getElementById('resetError').classList.add('show');
+    document.getElementById('resetSuccess').classList.remove('show');
+}
+
+function showResetSuccess(msg) {
+    document.getElementById('resetSuccessText').textContent = msg;
+    document.getElementById('resetSuccess').classList.add('show');
+    document.getElementById('resetError').classList.remove('show');
+}
+
+function setResetButtonLoading(loading) {
+    var btn = document.getElementById('btnResetModal');
+    btn.disabled = loading;
+    btn.innerHTML = loading ? '<i class="fas fa-spinner fa-spin"></i> MENGIRIM...' : '<i class="fas fa-paper-plane"></i> KIRIM LINK RESET';
+}
+
+async function submitResetPassword() {
+    if (resetInProgress) return;
+    resetInProgress = true;
+    
+    try {
+        var username = sanitize(document.getElementById('resetUsername').value.trim());
+        
+        if (!username || username.length < 3) {
+            showResetError('Username minimal 3 karakter!');
+            resetInProgress = false;
+            return;
+        }
+        
+        var usernameRegex = /^[a-zA-Z0-9_.]+$/;
+        if (!usernameRegex.test(username)) {
+            showResetError('Username hanya boleh huruf, angka, underscore (_), dan titik (.)');
+            resetInProgress = false;
+            return;
+        }
+        
+        var captchaResponse = '';
+        try { captchaResponse = grecaptcha.getResponse(document.querySelector('#modalReset .g-recaptcha')); } catch(e) {}
+        if (!captchaResponse || captchaResponse.length === 0) {
+            showResetError('Centang "I\'m not a robot" dulu ya!');
+            resetInProgress = false;
+            return;
+        }
+        
+        setResetButtonLoading(true);
+        
+        var payload = {
+            action: 'request_reset',
+            username: username,
+            captchaToken: captchaResponse,
+            timestamp: Date.now()
+        };
+        
+        var encryptedPayload = CryptoJS.AES.encrypt(JSON.stringify(payload), API_SECRET).toString();
+        
+        var res = await fetch(API_RESET, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Fingerprint': fingerprint
+            },
+            body: JSON.stringify({ data: encryptedPayload })
+        });
+        
+        var result = await res.json();
+        
+        if (result.data) {
+            var dec = CryptoJS.AES.decrypt(result.data, API_SECRET).toString(CryptoJS.enc.Utf8);
+            if (dec) {
+                result = JSON.parse(dec);
+            }
+        }
+        
+        setResetButtonLoading(false);
+        
+        if (result && result.success) {
+            try { grecaptcha.reset(document.querySelector('#modalReset .g-recaptcha')); } catch(e) {}
+            resetCaptchaDone = false;
+            document.getElementById('btnResetModal').disabled = true;
+            
+            var maskedEmail = result.maskedEmail || '';
+            var msg = maskedEmail ? 'Link reset telah dikirim ke ' + maskedEmail + '. Link expired dalam 15 menit.' : 'Jika username terdaftar, link reset akan dikirim ke email Anda.';
+            
+            showResetSuccess(msg);
+            document.getElementById('resetUsername').value = '';
+            
+            Swal.fire({
+                icon: "success",
+                title: "Link Terkirim!",
+                text: msg,
+                timer: 4000,
+                showConfirmButton: false
+            });
+        } else {
+            var errorMsg = 'Terjadi kesalahan. Coba lagi nanti.';
+            if (result && result.error === 'rate_limit') {
+                errorMsg = 'Terlalu banyak percobaan. Coba lagi nanti.';
+            } else if (result && result.error === 'user_not_found') {
+                errorMsg = 'Username tidak terdaftar! Periksa kembali username Anda.';
+            } else if (result && result.error === 'email_not_found') {
+                errorMsg = 'Akun ini tidak memiliki email terdaftar! Hubungi admin.';
+            } else if (result && result.error === 'account_banned') {
+                errorMsg = 'Akun Anda dibanned! Hubungi admin.';
+            } else if (result && result.error === 'account_suspended') {
+                errorMsg = 'Akun Anda ditangguhkan! Hubungi admin.';
+            } else if (result && result.error === 'email_error') {
+                errorMsg = 'Gagal mengirim email! Coba lagi nanti.';
+            } else if (result && result.message) {
+                errorMsg = result.message;
+            }
+            showResetError(errorMsg);
+            try { grecaptcha.reset(document.querySelector('#modalReset .g-recaptcha')); } catch(e) {}
+            resetCaptchaDone = false;
+            document.getElementById('btnResetModal').disabled = true;
+        }
+        
+    } catch (error) {
+        setResetButtonLoading(false);
+        showResetError('Gagal menghubungkan ke server!');
+        try { grecaptcha.reset(document.querySelector('#modalReset .g-recaptcha')); } catch(e) {}
+        resetCaptchaDone = false;
+        document.getElementById('btnResetModal').disabled = true;
+    }
+    
+    resetInProgress = false;
+}
+
+// ==================== REGISTER MODAL ====================
+function validateRegUsername() {
+    var input = document.getElementById('regUsername');
+    var value = input.value;
+    var cleaned = value.replace(/\s/g, '').replace(/[^a-zA-Z0-9_.]/g, '');
+    if (value !== cleaned) {
+        input.value = cleaned;
+    }
+}
+
+function validateRegPhone() {
+    var input = document.getElementById('regPhone');
+    var value = input.value;
+    var cleaned = value.replace(/[^0-9+]/g, '');
+    if (value !== cleaned) {
+        input.value = cleaned;
+    }
+}
+
+function validateRegEmail() {
+    var input = document.getElementById('regEmail');
+    var value = input.value;
+    var cleaned = value.replace(/\s/g, '');
+    if (value !== cleaned) input.value = cleaned;
+}
+
+function updateRegPasswordStrength() {
+    var password = document.getElementById('regPassword').value;
+    var bar = document.getElementById('regPasswordStrengthBar');
+    bar.className = 'password-strength-bar';
+    if (password.length === 0) { bar.style.width = '0%'; }
+    else if (password.length < 6) { bar.classList.add('strength-weak'); }
+    else if (password.length < 10) { bar.classList.add('strength-medium'); }
+    else { bar.classList.add('strength-strong'); }
+}
+
+function toggleRegPaketList() {
+    document.getElementById('regPaketSelect').classList.toggle('active');
+    document.getElementById('regPaketList').classList.toggle('show');
+}
+
+function selectRegPaket(option) {
+    selectedPaket = option.getAttribute('data-paket');
+    selectedHarga = parseInt(option.getAttribute('data-harga'));
+    document.querySelectorAll('#regPaketList .paket-option').forEach(function(o) { o.classList.remove('selected'); });
+    option.classList.add('selected');
+    var placeholder = document.getElementById('regPaketPlaceholder');
+    placeholder.textContent = selectedPaket + ' - Rp ' + selectedHarga.toLocaleString();
+    placeholder.className = 'selected-text';
+    document.getElementById('regPaketSelect').classList.remove('active');
+    document.getElementById('regPaketList').classList.remove('show');
+    toggleRegSubmit();
+}
+
+function toggleRegSubmit() {
+    var check = document.getElementById('regVerificationCheck');
+    var btn = document.getElementById('btnRegisterModal');
+    var hasPaket = selectedPaket !== '';
+    btn.disabled = !(check.checked && hasPaket && registerCaptchaDone);
+}
+
+function showRegisterError(msg) {
+    document.getElementById('registerErrorText').textContent = msg;
+    document.getElementById('registerError').classList.add('show');
+}
+
+function hideRegisterError() {
+    document.getElementById('registerError').classList.remove('show');
+}
+
+function isSequentialPassword(password) {
+    for (var i = 0; i < SEQUENTIAL_PATTERNS.length; i++) {
+        if (password.toLowerCase().includes(SEQUENTIAL_PATTERNS[i])) return true;
+    }
+    return false;
+}
+
+function isCommonPassword(password) {
+    for (var i = 0; i < COMMON_PASSWORDS.length; i++) {
+        if (password.toLowerCase() === COMMON_PASSWORDS[i]) return true;
+    }
+    return false;
+}
+
+function isKeyboardSmash(password) {
+    for (var i = 0; i < KEYBOARD_PATTERNS.length; i++) {
+        if (password.toLowerCase().includes(KEYBOARD_PATTERNS[i])) return true;
+    }
+    return false;
+}
+
+function hasRepeatingChars(password) {
+    for (var i = 0; i < password.length - 2; i++) {
+        if (password[i] === password[i+1] && password[i] === password[i+2]) return true;
+    }
+    return false;
+}
+
+function validatePasswordComplexity(password) {
+    var hasUpperCase = /[A-Z]/.test(password);
+    var hasLowerCase = /[a-z]/.test(password);
+    var hasNumber = /\d/.test(password);
+    return hasUpperCase && hasLowerCase && hasNumber;
+}
+
+function isThrowawayEmail(email) {
+    var parts = email.split('@');
+    if (parts.length !== 2) return false;
+    return THROWAWAY_DOMAINS.includes(parts[1].toLowerCase());
+}
+
+function isValidIndonesianPhone(phone) {
+    var cleaned = phone.replace(/[^0-9]/g, '');
+    if (cleaned.startsWith('0')) return cleaned.length >= 10 && cleaned.length <= 13;
+    if (cleaned.startsWith('62')) return cleaned.length >= 11 && cleaned.length <= 14;
+    return false;
+}
+
+function isValidUserAgent() {
+    var ua = navigator.userAgent;
+    if (ua.includes('Headless') || ua.includes('PhantomJS') || ua.includes('puppeteer') || ua.includes('Playwright')) return false;
+    return true;
+}
+
+function isValidScreenSize() {
+    if (screen.width === 0 || screen.height === 0) return false;
+    if (screen.width < 320 || screen.height < 480) return false;
+    return true;
+}
+
+function checkBrowserRateLimit() {
+    var blockedUntil = localStorage.getItem('register_blocked_until');
+    if (blockedUntil) {
+        var timeLeft = parseInt(blockedUntil) - Date.now();
+        if (timeLeft > 0) {
+            Swal.fire({ icon: "error", title: "Terlalu Banyak Percobaan!", text: "Coba lagi dalam beberapa saat.", confirmButtonColor: "#ef4444" });
+            return false;
+        } else {
+            localStorage.removeItem('register_blocked_until');
+            localStorage.removeItem('register_attempts');
+        }
+    }
+    return true;
+}
+
+function recordRegisterAttempt() {
+    var attempts = parseInt(localStorage.getItem('register_attempts') || '0') + 1;
+    localStorage.setItem('register_attempts', attempts);
+    if (attempts >= 3) {
+        localStorage.setItem('register_blocked_until', Date.now() + 3600000);
+        localStorage.removeItem('register_attempts');
+        Swal.fire({ icon: "error", title: "Diblokir 1 Jam!", text: "Terlalu banyak percobaan gagal.", confirmButtonColor: "#ef4444" });
+    }
+}
+
+function resetRegisterAttempts() {
+    localStorage.removeItem('register_attempts');
+    localStorage.removeItem('register_blocked_until');
+}
+
+function setRegisterButtonLoading(loading) {
+    var btn = document.getElementById('btnRegisterModal');
+    btn.disabled = loading;
+    btn.innerHTML = loading ? '<i class="fas fa-spinner fa-spin"></i> MEMPROSES...' : '<i class="fas fa-user-plus"></i> DAFTAR';
+}
+
+async function submitRegister() {
+    if (registerInProgress) return;
+    registerInProgress = true;
+    hideRegisterError();
+
+    try {
+        if (!isValidUserAgent()) { Swal.fire({ icon: "error", title: "Browser Tidak Valid!", confirmButtonColor: "#ef4444" }); registerInProgress = false; return; }
+        if (!isValidScreenSize()) { Swal.fire({ icon: "error", title: "Browser Tidak Valid!", confirmButtonColor: "#ef4444" }); registerInProgress = false; return; }
+
+        var honeypot = document.getElementById('regWebsite').value;
+        if (honeypot) { Swal.fire({ icon: "error", title: "Bot Detected!", confirmButtonColor: "#ef4444" }); registerInProgress = false; return; }
+
+        if (!checkBrowserRateLimit()) { registerInProgress = false; return; }
+
+        var username = sanitize(document.getElementById('regUsername').value.trim());
+        var password = document.getElementById('regPassword').value.trim();
+        var confirmPassword = document.getElementById('regConfirmPassword').value.trim();
+        var phone = sanitize(document.getElementById('regPhone').value.trim());
+        var email = sanitize(document.getElementById('regEmail').value.trim());
+
+        if (!username || username.length < 3) { showRegisterError('Username minimal 3 karakter!'); registerInProgress = false; return; }
+        var usernameRegex = /^[a-zA-Z0-9_.]+$/;
+        if (!usernameRegex.test(username)) { showRegisterError('Username hanya boleh huruf, angka, underscore (_), dan titik (.)'); registerInProgress = false; return; }
+        var lowerUsername = username.toLowerCase();
+        for (var i = 0; i < FORBIDDEN_USERNAMES.length; i++) { if (lowerUsername.includes(FORBIDDEN_USERNAMES[i])) { showRegisterError('Username tidak diizinkan!'); registerInProgress = false; return; } }
+
+        if (!password || password.length < 6) { showRegisterError('Password minimal 6 karakter!'); registerInProgress = false; return; }
+        if (password.toLowerCase() === username.toLowerCase()) { showRegisterError('Password tidak boleh sama dengan username!'); registerInProgress = false; return; }
+        if (!validatePasswordComplexity(password)) { showRegisterError('Password harus ada huruf BESAR, kecil, dan angka!'); registerInProgress = false; return; }
+        if (isSequentialPassword(password)) { showRegisterError('Password terlalu mudah!'); registerInProgress = false; return; }
+        if (isCommonPassword(password)) { showRegisterError('Password terlalu umum!'); registerInProgress = false; return; }
+        if (isKeyboardSmash(password)) { showRegisterError('Password terlalu mudah!'); registerInProgress = false; return; }
+        if (hasRepeatingChars(password)) { showRegisterError('Password terlalu mudah!'); registerInProgress = false; return; }
+        if (password !== confirmPassword) { showRegisterError('Password tidak cocok!'); registerInProgress = false; return; }
+
+        if (!phone || phone.length < 10) { showRegisterError('Nomor telepon tidak valid!'); registerInProgress = false; return; }
+        if (!isValidIndonesianPhone(phone)) { showRegisterError('Gunakan nomor Indonesia (08xx / +62xx)!'); registerInProgress = false; return; }
+
+        if (!email || !email.includes('@')) { showRegisterError('Email wajib mengandung @!'); registerInProgress = false; return; }
+        var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) { showRegisterError('Email tidak valid!'); registerInProgress = false; return; }
+        if (isThrowawayEmail(email)) { showRegisterError('Gunakan email asli!'); registerInProgress = false; return; }
+
+        if (!selectedPaket) { showRegisterError('Pilih paket terlebih dahulu!'); registerInProgress = false; return; }
+        if (!document.getElementById('regVerificationCheck').checked) { showRegisterError('Centang verifikasi aktivasi!'); registerInProgress = false; return; }
+
+        var captchaResponse = '';
+        try { captchaResponse = grecaptcha.getResponse(document.querySelector('#modalRegister .g-recaptcha')); } catch(e) {}
+        if (!captchaResponse || captchaResponse.length === 0) { showRegisterError('Centang "I\'m not a robot" dulu ya!'); registerInProgress = false; return; }
+
+        setRegisterButtonLoading(true);
+        if (!fingerprint) fingerprint = await getFingerprint();
+
+        var userIP = 'unknown';
+        try { var ipRes = await fetch('https://api.ipify.org?format=json'); var ipData = await ipRes.json(); userIP = ipData.ip || 'unknown'; } catch (e) {}
+
+        var result = await callRevanstore('register', 'POST', {
+            username: username, password: password, phone: phone, email: email,
+            paket: selectedPaket, harga: selectedHarga, ip: userIP, fingerprint: fingerprint,
+            sessionFingerprint: sessionFingerprint, captchaToken: captchaResponse,
+            status: 'pending', isActive: false, needsActivation: true, activationStatus: 'pending', role: 'User', createdAt: Date.now()
+        });
+
+        setRegisterButtonLoading(false);
+
+        if (result && result.success) {
+            resetRegisterAttempts();
+            var waMessage = 'Assalamualaikum min, tolong aktivasi akun saya%0A%0AUsername: ' + encodeURIComponent(username) + '%0APaket: ' + encodeURIComponent(selectedPaket) + '%0AHarga: Rp ' + selectedHarga.toLocaleString() + '%0AEmail: ' + encodeURIComponent(email) + '%0ANo. HP: ' + encodeURIComponent(phone);
+            Swal.fire({ icon: "success", title: "Pendaftaran Berhasil!", text: "Hubungi admin untuk aktivasi.", confirmButtonColor: "#25D366", confirmButtonText: '<i class="fab fa-whatsapp"></i> Hubungi Admin' }).then(function() {
+                window.open('https://wa.me/' + WHATSAPP_NUMBER + '?text=' + waMessage, '_blank');
+                closeModal('modalRegister');
+            });
+        } else {
+            recordRegisterAttempt();
+            if (result && result.error === 'ip_limit') { showRegisterError('IP sudah mendaftar hari ini!'); }
+            else if (result && result.error === 'fp_limit') { showRegisterError('Perangkat sudah mendaftar hari ini!'); }
+            else if (result && result.error === 'username_exists') { showRegisterError('Username sudah terdaftar!'); }
+            else if (result && result.error === 'email_exists') { showRegisterError('Email sudah terdaftar!'); }
+            else { showRegisterError('Gagal mendaftar! Coba lagi.'); }
+            try { grecaptcha.reset(document.querySelector('#modalRegister .g-recaptcha')); } catch(e) {}
+            registerCaptchaDone = false;
+            document.getElementById('btnRegisterModal').disabled = true;
+        }
+
+    } catch (error) {
+        setRegisterButtonLoading(false);
+        showRegisterError('Gagal menghubungkan ke server!');
+        try { grecaptcha.reset(document.querySelector('#modalRegister .g-recaptcha')); } catch(e) {}
+        registerCaptchaDone = false;
+        document.getElementById('btnRegisterModal').disabled = true;
+    }
+
+    registerInProgress = false;
+}
+
+// ==================== MAIN LOGIN ====================
 async function login() {
     if (loginInProgress) return;
     loginInProgress = true;
@@ -541,6 +1024,26 @@ document.addEventListener('DOMContentLoaded', async function() {
         return;
     }
 
+    // CLOSE MODAL ON OVERLAY CLICK
+    document.querySelectorAll('.modal-overlay').forEach(function(modal) {
+        modal.addEventListener('click', function(e) {
+            if (e.target === this) {
+                var id = this.id;
+                if (id === 'modalReset') closeModal('modalReset');
+                if (id === 'modalRegister') closeModal('modalRegister');
+            }
+        });
+    });
+
+    // CLOSE PAKET LIST ON OUTSIDE CLICK
+    document.addEventListener('click', function(e) {
+        var dropdown = document.querySelector('#modalRegister .paket-dropdown');
+        if (dropdown && !dropdown.contains(e.target)) {
+            document.getElementById('regPaketSelect').classList.remove('active');
+            document.getElementById('regPaketList').classList.remove('show');
+        }
+    });
+
     updatePasswordCounter();
     document.getElementById('password').addEventListener('input', updatePasswordCounter);
     document.getElementById('username').addEventListener('keypress', function(e) {
@@ -548,5 +1051,15 @@ document.addEventListener('DOMContentLoaded', async function() {
     });
     document.getElementById('password').addEventListener('keypress', function(e) {
         if (e.key === 'Enter') login();
+    });
+
+    // RESET MODAL ENTER KEY
+    document.getElementById('resetUsername').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') submitResetPassword();
+    });
+
+    // REGISTER MODAL ENTER KEY
+    document.getElementById('regEmail').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') submitRegister();
     });
 });
