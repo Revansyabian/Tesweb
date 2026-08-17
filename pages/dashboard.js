@@ -539,7 +539,7 @@ function showSuspendedPopup() {
 function checkAuth() {
     var saved = storageGet('sesi_pengguna');
     if (!saved) {
-        window.location.href = '/pages/login';
+        window.location.href = '/';
         return false;
     }
     try {
