@@ -306,29 +306,6 @@ async function callRevanstore(path, method, data) {
     return result;
 }
 
-function showAlert(message, type, duration) {
-    type = type || 'info';
-    duration = duration || 2500;
-    var alertDiv = document.getElementById('alert');
-    if (alertDiv) {
-        var icons = {
-            success: 'fa-check-circle',
-            error: 'fa-exclamation-circle',
-            warning: 'fa-exclamation-triangle',
-            info: 'fa-info-circle',
-            loading: 'fa-spinner fa-spin'
-        };
-        alertDiv.innerHTML = '<div class="alert-content"><div class="alert-icon"><i class="fas ' + (icons[type] || 'fa-info-circle') + '"></i></div><span>' + sanitize(message) + '</span></div>';
-        alertDiv.className = 'alert ' + type + ' show';
-        if (alertTimeout) clearTimeout(alertTimeout);
-        if (type !== 'loading') {
-            alertTimeout = setTimeout(function() {
-                alertDiv.classList.remove('show');
-            }, duration);
-        }
-    }
-}
-
 function showLoading(message) {
     var overlay = document.getElementById('loadingOverlay');
     var msg = document.getElementById('loadingMessage');
@@ -349,74 +326,35 @@ function updatePasswordCounter() {
     if (input && counter) counter.textContent = input.value.length + '/' + MAX_PASSWORD_LENGTH;
 }
 
-function parseDate(dateStr) {
-    if (!dateStr) return null;
-    var parts = dateStr.split('/');
-    if (parts.length !== 3) return null;
-    var month = parseInt(parts[0], 10) - 1;
-    var day = parseInt(parts[1], 10);
-    var year = parseInt(parts[2], 10);
-    if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
-    if (month < 0 || month > 11 || day < 1 || day > 31 || year < 2000) return null;
-    var date = new Date(year, month, day);
-    if (date.getMonth() !== month || date.getDate() !== day) return null;
-    return date;
-}
-
-function calculateRemainingDays(expiryDate) {
-    if (!expiryDate) return -999;
-    if (expiryDate.includes('9999')) return 999999;
-    var expiry = parseDate(expiryDate);
-    if (!expiry) return -999;
-    var now = new Date();
-    now.setHours(0, 0, 0, 0);
-    return Math.ceil((expiry - now) / (1000 * 60 * 60 * 24));
-}
-
-function getDaysLeftClass(daysLeft) {
-    if (daysLeft === 999999) return 'days-permanent';
-    if (daysLeft <= 0) return 'days-red';
-    if (daysLeft <= 3) return 'days-yellow';
-    return 'days-green';
-}
-
-function getDaysLeftText(daysLeft) {
-    if (daysLeft === 999999) return 'Permanen';
-    if (daysLeft === -999) return 'Tidak ada';
-    if (daysLeft < 0) return 'Habis ' + Math.abs(daysLeft) + ' hari';
-    if (daysLeft === 0) return 'Hari ini';
-    if (daysLeft === 1) return '1 hari';
-    return daysLeft + ' hari';
-}
-
-function checkAccountExpiry(user) {
-    if (!user || !user.expiry_date) return { expired: true, daysLeft: -999, daysLeftText: 'Tidak ada', daysLeftClass: 'days-red' };
-    var daysLeft = calculateRemainingDays(user.expiry_date);
-    var expired = daysLeft <= 0 && daysLeft !== 999999;
-    return { expired: expired, daysLeft: daysLeft, daysLeftText: getDaysLeftText(daysLeft), daysLeftClass: getDaysLeftClass(daysLeft) };
-}
-
 // ==================== MODAL FUNCTIONS ====================
 function openModal(id) {
     document.getElementById(id).classList.add('show');
     document.body.style.overflow = 'hidden';
-    if (id === 'modalReset') {
-        grecaptcha.render(document.querySelector('#modalReset .g-recaptcha'), {
-            sitekey: '6LfYOH4tAAAAAO48ez84cjF25XOYz3cN0OOjZ9pc',
-            callback: 'onResetCaptcha'
-        });
-    }
-    if (id === 'modalRegister') {
-        grecaptcha.render(document.querySelector('#modalRegister .g-recaptcha'), {
-            sitekey: '6LfYOH4tAAAAAO48ez84cjF25XOYz3cN0OOjZ9pc',
-            callback: 'onRegisterCaptcha'
-        });
-    }
+    // Reset captcha di modal
+    try {
+        if (id === 'modalReset') {
+            var resetCaptcha = document.querySelector('#modalReset .g-recaptcha');
+            if (resetCaptcha && grecaptcha) {
+                grecaptcha.reset(resetCaptcha);
+                resetCaptchaDone = false;
+                document.getElementById('btnResetModal').disabled = true;
+            }
+        }
+        if (id === 'modalRegister') {
+            var registerCaptcha = document.querySelector('#modalRegister .g-recaptcha');
+            if (registerCaptcha && grecaptcha) {
+                grecaptcha.reset(registerCaptcha);
+                registerCaptchaDone = false;
+                document.getElementById('btnRegisterModal').disabled = true;
+            }
+        }
+    } catch(e) {}
 }
 
 function closeModal(id) {
     document.getElementById(id).classList.remove('show');
     document.body.style.overflow = '';
+    // Reset form
     if (id === 'modalReset') {
         document.getElementById('resetError').classList.remove('show');
         document.getElementById('resetSuccess').classList.remove('show');
@@ -454,7 +392,7 @@ function onRegisterCaptcha() {
     toggleRegSubmit();
 }
 
-// ==================== RESET PASSWORD MODAL ====================
+// ==================== RESET PASSWORD ====================
 function validateResetUsername() {
     var input = document.getElementById('resetUsername');
     var value = input.value;
@@ -593,7 +531,7 @@ async function submitResetPassword() {
     resetInProgress = false;
 }
 
-// ==================== REGISTER MODAL ====================
+// ==================== REGISTER ====================
 function validateRegUsername() {
     var input = document.getElementById('regUsername');
     var value = input.value;
@@ -807,7 +745,11 @@ async function submitRegister() {
 
         var captchaResponse = '';
         try { captchaResponse = grecaptcha.getResponse(document.querySelector('#modalRegister .g-recaptcha')); } catch(e) {}
-        if (!captchaResponse || captchaResponse.length === 0) { showRegisterError('Centang "I\'m not a robot" dulu ya!'); registerInProgress = false; return; }
+        if (!captchaResponse || captchaResponse.length === 0) {
+            showRegisterError('Centang "I\'m not a robot" dulu ya!');
+            registerInProgress = false;
+            return;
+        }
 
         setRegisterButtonLoading(true);
         if (!fingerprint) fingerprint = await getFingerprint();
@@ -1053,12 +995,10 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (e.key === 'Enter') login();
     });
 
-    // RESET MODAL ENTER KEY
     document.getElementById('resetUsername').addEventListener('keypress', function(e) {
         if (e.key === 'Enter') submitResetPassword();
     });
 
-    // REGISTER MODAL ENTER KEY
     document.getElementById('regEmail').addEventListener('keypress', function(e) {
         if (e.key === 'Enter') submitRegister();
     });
