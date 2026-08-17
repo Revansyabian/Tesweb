@@ -9,153 +9,247 @@
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="icon-192.png">
     <style>
-        :root {
-            --sky: #00BFFF;
-            --sky-dark: #0099CC;
-            --sky-soft: #E6F9FF;
-            --white: #fff;
-            --red: #E63946;
-            --red-soft: #FDE8E8;
-            --black: #111;
-            --gray: #555;
-        }
-
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            background: #00BFFF;
-            color: var(--black);
             font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-            min-height: 100vh;
-            -webkit-font-smoothing: antialiased;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        /* ==================== BLOCKED SCREEN FULL CENTER ==================== */
-        #blockedScreen {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100vh;
             background: #00BFFF;
-            z-index: 9999;
+            min-height: 100vh;
+            display: flex;
             align-items: center;
             justify-content: center;
             padding: 20px;
         }
-        #blockedScreen.show {
-            display: flex;
-        }
 
-        .blocked {
-            background: var(--white);
-            border: 2px solid var(--red);
-            border-radius: 12px;
-            padding: 28px 20px;
-            max-width: 340px;
+        .container {
+            background: #ffffff;
+            border-radius: 24px;
+            padding: 48px 36px;
+            max-width: 420px;
             width: 100%;
             text-align: center;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+            border: 1px solid rgba(0, 191, 255, 0.1);
+            animation: fadeIn 0.5s ease;
         }
-        .blocked__title {
-            font-size: 16px;
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .logo {
+            width: 100px;
+            height: 100px;
+            border-radius: 20px;
+            object-fit: cover;
+            background: #f0f9ff;
+            padding: 6px;
+            margin: 0 auto 20px;
+            display: block;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+        }
+
+        .logo i {
+            font-size: 60px;
+            color: #00BFFF;
+            line-height: 88px;
+        }
+
+        .title {
+            font-size: 22px;
             font-weight: 700;
-            color: var(--red);
-            background: var(--red-soft);
-            display: inline-block;
-            padding: 4px 12px;
-            border-radius: 6px;
+            color: #1e293b;
+            margin-bottom: 8px;
         }
-        .blocked__msg {
-            font-size: 13px;
-            color: var(--gray);
-            margin: 12px 0;
-            background: #f8f8f8;
-            padding: 8px;
-            border-radius: 6px;
+
+        .title span {
+            color: #00BFFF;
+        }
+
+        .subtitle {
+            font-size: 14px;
+            color: #64748b;
+            margin-bottom: 24px;
+            line-height: 1.6;
+        }
+
+        .alert-box {
+            background: #E6F9FF;
+            border: 1px solid #bae6fd;
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin-bottom: 20px;
+        }
+
+        .alert-box i {
+            color: #00BFFF;
+            font-size: 20px;
+            margin-right: 8px;
+        }
+
+        .alert-box .alert-text {
+            font-size: 14px;
+            color: #0c4a6e;
+            font-weight: 500;
         }
 
         .btn {
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            gap: 6px;
-            padding: 12px 20px;
+            gap: 8px;
+            padding: 14px 32px;
             border: none;
-            border-radius: 10px;
-            font-size: 14px;
+            border-radius: 12px;
+            font-size: 15px;
             font-weight: 600;
             cursor: pointer;
-            font-family: inherit;
-            transition: background 0.1s ease;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            transition: 0.2s;
+            width: 100%;
         }
-        .btn--red {
-            background: var(--red);
-            color: var(--white);
-            border: 2px solid var(--white);
-            box-shadow: 0 4px 14px rgba(0,0,0,0.2);
+
+        .btn-primary {
+            background: #00BFFF;
+            color: #fff;
+            box-shadow: 0 4px 16px rgba(0, 191, 255, 0.3);
         }
-        .btn--red:hover { opacity: 0.85; }
-        .btn--blue {
-            background: var(--sky);
-            color: var(--white);
-            border: 2px solid var(--white);
-            box-shadow: 0 4px 14px rgba(0,0,0,0.2);
+        .btn-primary:hover {
+            background: #0099CC;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 24px rgba(0, 191, 255, 0.4);
         }
-        .btn--blue:hover { opacity: 0.85; }
+
+        .footer-text {
+            margin-top: 20px;
+            font-size: 13px;
+            color: #94a3b8;
+        }
+
+        .footer-text a {
+            color: #00BFFF;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .footer-text a:hover {
+            text-decoration: underline;
+        }
+
+        .divider {
+            height: 1px;
+            background: #e2e8f0;
+            margin: 16px 0;
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 32px 20px;
+            }
+            .title {
+                font-size: 18px;
+            }
+        }
     </style>
     <script src="https://www.google.com/recaptcha/api.js?render=6LcVBn4tAAAAAINTTIleUbUZr1ZykvyB6WA-oOfT"></script>
 </head>
 <body>
 
-    <!-- LANDING / LOADING -->
-    <div id="landingPage" style="position: fixed; top: 0; left: 0; width: 100%; height: 100vh; background: #00BFFF; display: flex; justify-content: center; align-items: center; flex-direction: column; z-index: 9999; overflow: hidden;">
-        <div style="position: absolute; top: 10%; left: 10%; width: 100px; height: 100px; border-radius: 50%; background: rgba(255,255,255,0.1);"></div>
-        <div style="position: absolute; bottom: 20%; right: 15%; width: 150px; height: 150px; border-radius: 50%; background: rgba(255,255,255,0.1);"></div>
-        <div style="position: absolute; top: 60%; left: 5%; width: 80px; height: 80px; border-radius: 50%; background: rgba(255,255,255,0.1);"></div>
-        <div style="position: absolute; bottom: 10%; left: 20%; width: 120px; height: 120px; border-radius: 50%; background: rgba(255,255,255,0.1);"></div>
-        <div style="position: absolute; top: 20%; right: 5%; width: 90px; height: 90px; border-radius: 50%; background: rgba(255,255,255,0.1);"></div>
-        <div style="text-align: center; color: white; padding: 20px; z-index: 2;">
-            <img src="tes.jpeg" alt="Logo" style="width: 100px; height: 100px; border-radius: 20px; object-fit: cover; background: #fff; padding: 6px; box-shadow: 0 6px 24px rgba(0,0,0,0.25);" onerror="this.style.display='none'">
-            <h1 style="font-size: 1.6rem; margin: 15px 0; font-weight: bold; font-family: Arial, sans-serif; text-shadow: 0 2px 4px rgba(0,0,0,0.2);">SELAMAT DATANG DI WEB TOP UP BUSSID</h1>
-            <p style="font-size: 0.95rem; margin-bottom: 30px; max-width: 500px; line-height: 1.5; font-weight: 500; font-family: Arial, sans-serif;">Mengalihkan ke dashboard...</p>
-            <div style="margin: 25px 0;">
-                <div style="width: 40px; height: 40px; border: 3px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: white; margin: 0 auto 10px; animation: spin 1s linear infinite;"></div>
-                <p style="font-size: 0.9rem; color: white; font-weight: 500; font-family: Arial, sans-serif;">Sedang memuat...</p>
-            </div>
+    <!-- MAIN CONTAINER -->
+    <div class="container" id="mainContainer">
+        <div class="logo">
+            <i class="fas fa-cube"></i>
         </div>
-    </div>
 
-    <!-- BLOCKED SCREEN - FULL CENTER, TANPA BUTTON WHATSAPP -->
-    <div id="blockedScreen">
-        <div class="blocked">
-            <div class="blocked__title">AKSES DITOLAK</div>
-            <p class="blocked__msg">Akses ditolak, jika ingin dibuka silakan hubungi admin.</p>
-            <div style="margin-top:16px;">
-                <button class="btn btn--blue" onclick="location.reload()"><i class="fas fa-sync-alt"></i> Coba Lagi</button>
-            </div>
+        <h1 class="title">Revan<span>Store</span></h1>
+        <p class="subtitle">Top Up BUSSID Terpercaya</p>
+
+        <div class="alert-box">
+            <span class="alert-text">Hai! Selamat datang di Web Top Up BUSSID</span>
         </div>
+
+        <button class="btn btn-primary" onclick="goToDashboard()">
+            <i class="fas fa-arrow-right"></i> Masuk Dashboard
+        </button>
+
+        <div class="divider"></div>
+
+        <p class="footer-text">
+            Belum punya akun? <a href="/pages/register">Silakan daftar</a>
+        </p>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
     <script>
         var API_REVANSTORE = '/api/revanstoreV2';
         var WHATSAPP_NUMBER = '6285199120995';
-        var STORAGE_KEY = 'app_data';
-        var STORAGE_SECRET = 'session';
         var API_SECRET = '1417-1426-1527-1517';
         var RECAPTCHA_V3_SITE_KEY = '6LcVBn4tAAAAAINTTIleUbUZr1ZykvyB6WA-oOfT';
         var fingerprint = '';
         var isBlocked = false;
         var blockedChecked = false;
 
+        function safeSetHTML(element, html) {
+            if (!element) return;
+            if (window.DOMPurify) {
+                element.innerHTML = DOMPurify.sanitize(html, {
+                    ALLOWED_TAGS: ['div', 'span', 'p', 'h1', 'h2', 'h3', 'button', 'i', 'b', 'br'],
+                    ALLOWED_ATTR: ['class', 'style', 'onclick', 'id']
+                });
+            } else {
+                element.textContent = html;
+            }
+        }
+
+        function sanitize(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#x27;')
+                .replace(/`/g, '&#96;')
+                .replace(/javascript:/gi, '')
+                .replace(/on\w+=/gi, '')
+                .replace(/<script/gi, '')
+                .replace(/<\/script/gi, '');
+        }
+
+        function goToDashboard() {
+            window.location.href = '/pages/dashboard';
+        }
+
         function showBlockedScreen() {
-            document.getElementById('landingPage').style.display = 'none';
-            document.getElementById('blockedScreen').classList.add('show');
+            var html = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#f0f9ff 0%,#bae6fd 50%,#7dd3fc 100%);padding:20px;font-family:\'Segoe UI\',sans-serif;">' +
+                '<div style="background:#ffffff;border-radius:24px;padding:48px 36px;width:100%;max-width:420px;text-align:center;box-shadow:0 20px 60px rgba(0,191,255,0.15);border:1px solid rgba(0,191,255,0.1);">' +
+                '<div style="font-size:72px;color:#f59e0b;margin-bottom:12px;">🚫</div>' +
+                '<h2 style="font-size:24px;font-weight:700;color:#0c4a6e;margin-bottom:8px;">AKSES DITOLAK</h2>' +
+                '<p style="font-size:14px;color:#64748b;margin-bottom:6px;">Akses ditolak, jika ingin dibuka silakan hubungi admin.</p>' +
+                '<div style="background:#fef3c7;color:#92400e;padding:12px 16px;border-radius:12px;font-weight:600;font-size:14px;margin:16px 0 24px;">Durasi: PERMANEN</div>' +
+                '<button onclick="window.open(\'https://wa.me/' + WHATSAPP_NUMBER + '?text=Assalamualaikum%20admin%2C%20akses%20saya%20diblokir\',\'_blank\')" style="display:inline-flex;align-items:center;gap:10px;padding:12px 32px;background:#25D366;color:#fff;border:none;border-radius:30px;font-weight:600;font-size:15px;cursor:pointer;transition:0.2s;font-family:\'Segoe UI\',sans-serif;">' +
+                '<i class="fab fa-whatsapp"></i> Hubungi Admin</button></div></div>';
+
+            safeSetHTML(document.body, html);
+        }
+
+        function tampilkanMaintenance(data) {
+            var judul = (data && (data.title || data.judul)) ? sanitize(data.title || data.judul) : 'SEDANG PERBAIKAN';
+            var pesan = (data && (data.message || data.pesan)) ? sanitize(data.message || data.pesan) : 'Website sedang dalam perbaikan oleh admin. Silakan kembali beberapa saat lagi.';
+            var sampai = (data && (data.until || data.sampai)) ? (data.until || data.sampai) : null;
+            var teksEstimasi = sampai ? sanitize('Estimasi selesai: ' + new Date(sampai).toLocaleString('id-ID')) : 'Mohon maaf atas ketidaknyamanan ini.';
+
+            var html = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#e0f2fe 0%,#bae6fd 50%,#7dd3fc 100%);padding:20px;font-family:\'Segoe UI\',sans-serif;">' +
+                '<div style="background:#ffffff;border-radius:24px;padding:48px 36px;width:100%;max-width:440px;text-align:center;box-shadow:0 25px 60px rgba(0,0,0,0.1);">' +
+                '<div style="width:90px;height:90px;background:#fef3c7;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;">' +
+                '<i class="fas fa-tools" style="font-size:40px;color:#f59e0b;"></i>' +
+                '</div>' +
+                '<h1 style="color:#0c4a6e;font-size:24px;font-weight:700;margin-bottom:8px;">' + judul + '</h1>' +
+                '<p style="color:#64748b;font-size:14px;margin-bottom:6px;line-height:1.6;">' + pesan + '</p>' +
+                '<div style="background:#fef3c7;color:#92400e;padding:12px 16px;border-radius:12px;font-weight:600;font-size:13px;margin:16px 0 24px;">' + teksEstimasi + '</div>' +
+                '<button onclick="window.open(\'https://wa.me/' + WHATSAPP_NUMBER + '?text=Assalamualaikum%20admin%2C%20info%20perbaikan\',\'_blank\')" style="display:inline-flex;align-items:center;gap:10px;padding:12px 32px;background:#25D366;color:#fff;border:none;border-radius:30px;font-weight:600;font-size:15px;cursor:pointer;transition:0.2s;font-family:\'Segoe UI\',sans-serif;">' +
+                '<i class="fab fa-whatsapp"></i> Masih Maintenance?</button></div></div>';
+
+            safeSetHTML(document.body, html);
         }
 
         async function getFingerprint() {
@@ -211,20 +305,6 @@
             } catch (e) {
                 return null;
             }
-        }
-
-        function tampilkanMaintenance(data) {
-            var judul = (data && (data.title || data.judul)) ? (data.title || data.judul) : 'SEDANG PERBAIKAN';
-            var pesan = (data && (data.message || data.pesan)) ? (data.message || data.pesan) : 'Silakan kembali beberapa saat lagi.';
-            var sampai = (data && (data.until || data.sampai)) ? (data.until || data.sampai) : null;
-            var estimasi = sampai ? 'Estimasi selesai: ' + new Date(sampai).toLocaleString('id-ID') : 'Mohon maaf atas ketidaknyamanan ini.';
-
-            document.body.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#00BFFF;padding:20px;font-family:\'Segoe UI\',sans-serif;">' +
-                '<div style="background:#fff;border-radius:12px;padding:28px 20px;max-width:340px;width:100%;text-align:center;border:2px solid #E63946;box-shadow:0 4px 20px rgba(0,0,0,0.15);">' +
-                '<div style="font-size:16px;font-weight:700;color:#E63946;background:#FDE8E8;display:inline-block;padding:4px 12px;border-radius:6px;">' + judul + '</div>' +
-                '<p style="font-size:13px;color:#555;margin:12px 0;background:#f8f8f8;padding:8px;border-radius:6px;">' + pesan + '</p>' +
-                '<div style="background:#FDE8E8;color:#E63946;padding:6px 10px;border-radius:6px;font-weight:600;font-size:12px;margin-bottom:16px;">' + estimasi + '</div>' +
-                '<button onclick="window.open(\'https://wa.me/' + WHATSAPP_NUMBER + '?text=Assalamualaikum%20admin%2C%20info%20perbaikan\',\'_blank\')" style="display:inline-flex;align-items:center;padding:10px 16px;background:#E63946;color:#fff;border:none;border-radius:8px;font-weight:600;font-size:13px;cursor:pointer;">Hubungi Admin</button></div></div>';
         }
 
         async function checkBlocked() {
@@ -290,8 +370,6 @@
                 if (blocked) {
                     return;
                 }
-
-                window.location.href = '/pages/dashboard';
             });
         })();
     </script>
