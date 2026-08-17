@@ -154,7 +154,7 @@ function showMaintenancePage(dataMaintenance) {
     safeSetHTML(document.body, html);
 }
 
-// ==================== PERIKSA MAINTENANCE (PAKE FUNGSI DARI DASHBOARD) ====================
+// ==================== PERIKSA MAINTENANCE ====================
 async function periksaMaintenance() {
     try {
         var payload = {
@@ -186,7 +186,7 @@ async function periksaMaintenance() {
     }
 }
 
-// ==================== CHECK IF BLOCKED (PAKE FUNGSI DARI DASHBOARD) ====================
+// ==================== CHECK IF BLOCKED ====================
 async function checkIfBlocked() {
     if (blockedChecked) return isBlocked;
     if (!fingerprint) fingerprint = await getFingerprint();
@@ -226,7 +226,7 @@ async function checkIfBlocked() {
     return isBlocked;
 }
 
-// ==================== TAMPILKAN HALAMAN MAINTENANCE (PAKE DARI DASHBOARD) ====================
+// ==================== TAMPILKAN HALAMAN MAINTENANCE ====================
 function tampilkanHalamanMaintenance(dataMaintenance) {
     var judul = sanitize((dataMaintenance && (dataMaintenance.title || dataMaintenance.judul)) ? (dataMaintenance.title || dataMaintenance.judul) : 'SEDANG PERBAIKAN SISTEM');
     var pesan = sanitize((dataMaintenance && (dataMaintenance.message || dataMaintenance.pesan)) ? (dataMaintenance.message || dataMaintenance.pesan) : 'Website sedang dalam perbaikan oleh admin. Silakan kembali beberapa saat lagi.');
@@ -245,11 +245,12 @@ function tampilkanHalamanMaintenance(dataMaintenance) {
         '<i class="fab fa-whatsapp"></i> Hubungi Admin</button></div></div>';
 }
 
-// ==================== TAMPILKAN HALAMAN BLOKIR (PAKE DARI DASHBOARD) ====================
+// ==================== TAMPILKAN HALAMAN BLOKIR ====================
 function tampilkanHalamanBlokir() {
     document.body.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#f0f9ff,#bae6fd,#7dd3fc);padding:20px;font-family:\'Segoe UI\',sans-serif;"><div style="background:#fff;border-radius:20px;padding:40px 30px;max-width:420px;width:100%;text-align:center;box-shadow:0 25px 60px rgba(0,0,0,0.1);"><div style="font-size:70px;color:#ef4444;margin-bottom:20px;">🔒</div><h1 style="color:#0c4a6e;font-size:24px;margin-bottom:10px;">AKSES DITOLAK</h1><p style="color:#64748b;font-size:14px;">Maaf, akses Anda telah ditolak.</p></div></div>';
 }
 
+// ==================== RESET PASSWORD (FIX) ====================
 async function resetPassword() {
     if (resetInProgress) return;
     resetInProgress = true;
@@ -299,12 +300,22 @@ async function resetPassword() {
         
         setButtonLoading(true);
         
+        // ==================== FIX: KIRIM PAYLOAD YANG BENAR ====================
+        // Payload harus sesuai dengan yang diharapkan API reset-pw
         var payload = {
             action: 'request_reset',
+            data: {
+                username: username
+            },
             username: username,
             captchaToken: captchaResponse,
             timestamp: Date.now()
         };
+        
+        // Tambahkan juga di root level untuk kompatibilitas
+        if (!payload.data) {
+            payload.data = { username: username };
+        }
         
         var encryptedPayload = CryptoJS.AES.encrypt(JSON.stringify(payload), API_SECRET).toString();
         
@@ -319,17 +330,25 @@ async function resetPassword() {
         
         var result = await res.json();
         
-        if (result.data) {
-            var dec = CryptoJS.AES.decrypt(result.data, API_SECRET).toString(CryptoJS.enc.Utf8);
-            if (dec) {
-                result = JSON.parse(dec);
+        // DECRYPT RESPONSE
+        if (result && result.data) {
+            try {
+                var dec = CryptoJS.AES.decrypt(result.data, API_SECRET).toString(CryptoJS.enc.Utf8);
+                if (dec) {
+                    result = JSON.parse(dec);
+                }
+            } catch (e) {
+                console.log('Decrypt error:', e);
             }
         }
         
         setButtonLoading(false);
         
+        // ==================== HANDLE RESPONSE ====================
         if (result && result.success) {
-            if (typeof grecaptcha !== 'undefined') grecaptcha.reset();
+            if (typeof grecaptcha !== 'undefined') {
+                grecaptcha.reset();
+            }
             
             var maskedEmail = result.maskedEmail || '';
             var msg = maskedEmail ? 'Link reset telah dikirim ke ' + maskedEmail + '. Link expired dalam 15 menit.' : 'Jika username terdaftar, link reset akan dikirim ke email Anda.';
@@ -345,41 +364,71 @@ async function resetPassword() {
             });
             
             document.getElementById('username').value = '';
+            
         } else {
             var errorMsg = 'Terjadi kesalahan. Coba lagi nanti.';
             
-            if (result && result.error === 'rate_limit') {
-                errorMsg = 'Terlalu banyak percobaan. Coba lagi nanti.';
-            } else if (result && result.error === 'no_data') {
-                errorMsg = 'Data tidak ditemukan!';
-            } else if (result && result.error === 'access_denied') {
-                errorMsg = 'Akses ditolak!';
-            } else if (result && result.error === 'invalid_username') {
-                errorMsg = 'Username minimal 3 karakter!';
-            } else if (result && result.error === 'invalid_captcha') {
-                errorMsg = 'reCAPTCHA tidak valid! Silakan coba lagi.';
-            } else if (result && result.error === 'user_not_found') {
-                errorMsg = 'Username tidak terdaftar! Periksa kembali username Anda.';
-            } else if (result && result.error === 'email_not_found') {
-                errorMsg = 'Akun ini tidak memiliki email terdaftar! Hubungi admin.';
-            } else if (result && result.error === 'account_banned') {
-                errorMsg = 'Akun Anda dibanned! Hubungi admin.';
-            } else if (result && result.error === 'account_suspended') {
-                errorMsg = 'Akun Anda ditangguhkan! Hubungi admin.';
-            } else if (result && result.error === 'email_error') {
-                errorMsg = 'Gagal mengirim email! Coba lagi nanti.';
-            } else if (result && result.message) {
-                errorMsg = result.message;
+            if (result && result.error) {
+                switch(result.error) {
+                    case 'rate_limit':
+                        errorMsg = 'Terlalu banyak percobaan. Coba lagi nanti.';
+                        break;
+                    case 'no_data':
+                        errorMsg = 'Data tidak ditemukan!';
+                        break;
+                    case 'access_denied':
+                        errorMsg = 'Akses ditolak!';
+                        break;
+                    case 'invalid_username':
+                        errorMsg = 'Username minimal 3 karakter!';
+                        break;
+                    case 'invalid_captcha':
+                        errorMsg = 'reCAPTCHA tidak valid! Silakan coba lagi.';
+                        break;
+                    case 'user_not_found':
+                        errorMsg = 'Username tidak terdaftar! Periksa kembali username Anda.';
+                        break;
+                    case 'email_not_found':
+                        errorMsg = 'Akun ini tidak memiliki email terdaftar! Hubungi admin.';
+                        break;
+                    case 'account_banned':
+                        errorMsg = 'Akun Anda dibanned! Hubungi admin.';
+                        break;
+                    case 'account_suspended':
+                        errorMsg = 'Akun Anda ditangguhkan! Hubungi admin.';
+                        break;
+                    case 'email_error':
+                        errorMsg = 'Gagal mengirim email! Coba lagi nanti.';
+                        break;
+                    default:
+                        errorMsg = result.message || 'Terjadi kesalahan. Coba lagi nanti.';
+                }
             }
             
-            Swal.fire({ icon: "error", title: "Gagal!", text: errorMsg, confirmButtonColor: "#ef4444" });
-            if (typeof grecaptcha !== 'undefined') grecaptcha.reset();
+            Swal.fire({ 
+                icon: "error", 
+                title: "Gagal!", 
+                text: errorMsg, 
+                confirmButtonColor: "#ef4444" 
+            });
+            
+            if (typeof grecaptcha !== 'undefined') {
+                grecaptcha.reset();
+            }
         }
         
     } catch (error) {
         setButtonLoading(false);
-        Swal.fire({ icon: "error", title: "Error!", text: "Gagal menghubungkan ke server!", confirmButtonColor: "#ef4444" });
-        if (typeof grecaptcha !== 'undefined') grecaptcha.reset();
+        console.error('Reset password error:', error);
+        Swal.fire({ 
+            icon: "error", 
+            title: "Error!", 
+            text: "Gagal menghubungkan ke server: " + error.message, 
+            confirmButtonColor: "#ef4444" 
+        });
+        if (typeof grecaptcha !== 'undefined') {
+            grecaptcha.reset();
+        }
     }
     
     resetInProgress = false;
