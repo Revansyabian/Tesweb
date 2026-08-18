@@ -432,7 +432,6 @@ async function register() {
     registerInProgress = false;
 }
 
-// ==================== CEK MAINTENANCE & BLOCK SETIAP LOAD ====================
 document.addEventListener('DOMContentLoaded', async function() {
     if (!fingerprint) fingerprint = await getFingerprint();
     
