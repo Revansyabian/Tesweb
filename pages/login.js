@@ -531,10 +531,20 @@ function autoCheckSession() {
     }
 }
 
+// ==================== CEK MAINTENANCE & BLOCK SAAT LOAD ====================
 document.addEventListener('DOMContentLoaded', async function() {
     autoCheckSession();
 
     if (!fingerprint) fingerprint = await getFingerprint();
+    
+    // CEK MAINTENANCE DULU (SEBELUM APAPUN)
+    var maintenance = await periksaMaintenance();
+    if (maintenance) { 
+        tampilkanHalamanMaintenance(maintenance); 
+        return; 
+    }
+    
+    // CEK BLOCKED
     var blocked = await checkIfBlocked();
     if (blocked) {
         tampilkanHalamanBlokir();
