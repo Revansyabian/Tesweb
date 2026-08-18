@@ -138,7 +138,6 @@ async function checkIfBlocked() {
     return isBlocked;
 }
 
-// ==================== PERIKSA MAINTENANCE (FIX) ====================
 async function periksaMaintenance() {
     try {
         var payload = {
@@ -157,29 +156,15 @@ async function periksaMaintenance() {
             body: JSON.stringify({ data: encryptedPayload })
         });
         var result = await res.json();
-        
-        // ==================== CEK RESPONSE MAINTENANCE ====================
-        // Response dari API revanstoreV2 sekarang langsung return encrypted
-        // Di dalamnya ada data maintenance
         if (result.encrypted && result.data) {
             var dec = CryptoJS.AES.decrypt(result.data, API_SECRET).toString(CryptoJS.enc.Utf8);
-            if (dec) {
-                result = JSON.parse(dec);
-                // Jika result langsung punya maintenance: true
-                if (result && (result.maintenance === true || result.title || result.message)) {
-                    return result;
-                }
-            }
+            if (dec) result = JSON.parse(dec);
         }
-        
-        // Cek juga jika result langsung punya maintenance (tanpa encrypted wrapper)
         if (result && (result.maintenance === true || result.title || result.message)) {
             return result;
         }
-        
         return null;
     } catch (e) {
-        console.error('[MAINTENANCE] Error:', e);
         return null;
     }
 }
