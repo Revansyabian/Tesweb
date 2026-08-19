@@ -249,20 +249,39 @@ async function callRegisterApi(data) {
 
 async function callRevanstore(path, method, data) {
     if (!fingerprint) fingerprint = await getFingerprint();
-    var payload = { path: path, method: method || 'POST', data: data || null, timestamp: Date.now() };
+    
+    // ==================== FIX: PAKAI FORMAT YANG BENAR ====================
+    var payload = {
+        path: path,
+        method: method || 'GET',
+        data: data || {},
+        timestamp: Date.now()
+    };
+    
     var encryptedPayload = CryptoJS.AES.encrypt(JSON.stringify(payload), API_SECRET).toString();
+    
     var res = await fetch(API_REVANSTORE, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Fingerprint': fingerprint },
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Fingerprint': fingerprint
+        },
         body: JSON.stringify({ data: encryptedPayload })
     });
+    
     if (res.status === 429) throw new Error('Terlalu banyak percobaan');
     var text = await res.text();
     if (!text || text === 'null') return null;
     var result = JSON.parse(text);
+    
+    // ==================== DECRYPT RESPONSE ====================
     if (result.encrypted && result.data) {
-        var dec = CryptoJS.AES.decrypt(result.data, API_SECRET).toString(CryptoJS.enc.Utf8);
-        if (dec) return JSON.parse(dec);
+        try {
+            var dec = CryptoJS.AES.decrypt(result.data, API_SECRET).toString(CryptoJS.enc.Utf8);
+            if (dec) return JSON.parse(dec);
+        } catch (e) {
+            return null;
+        }
     }
     return result;
 }
@@ -302,6 +321,7 @@ async function periksaMaintenance() {
         }
         return null;
     } catch (e) {
+        console.log('[MAINTENANCE] Error:', e);
         return null;
     }
 }
@@ -317,27 +337,24 @@ async function checkIfBlocked() {
         }
         blockedChecked = true;
     } catch (e) {
+        console.log('[BLOCKED] Error:', e);
         isBlocked = false;
         blockedChecked = true;
     }
     return isBlocked;
 }
 
-// ==================== FUNCTION CEK MAINTENANCE & BLOCK (PRIORITAS BAN AKSES) ====================
+// ==================== FUNCTION CEK MAINTENANCE & BLOCK ====================
 async function cekMaintenanceDanBlokir() {
-    // CEK MAINTENANCE DULU
-    var maintenance = await periksaMaintenance();
-    
-    // CEK BLOCKED
+    // CEK BLOCKED (PRIORITAS TERTINGGI)
     var blocked = await checkIfBlocked();
-    
-    // JIKA BAN AKSES AKTIF → TAMPILKAN BAN AKSES (PRIORITAS TERTINGGI)
     if (blocked) {
         tampilkanHalamanBlokir();
         return true;
     }
     
-    // JIKA MAINTENANCE AKTIF → TAMPILKAN MAINTENANCE
+    // CEK MAINTENANCE
+    var maintenance = await periksaMaintenance();
     if (maintenance) {
         tampilkanHalamanMaintenance(maintenance);
         return true;
@@ -448,15 +465,20 @@ async function register() {
     registerInProgress = false;
 }
 
-// ==================== LOADING CHECK (PRIORITAS BAN AKSES) ====================
+// ==================== LOADING CHECK ====================
 document.addEventListener('DOMContentLoaded', async function() {
     if (!fingerprint) fingerprint = await getFingerprint();
     
-    // ==================== CEK MAINTENANCE & BLOCK (PRIORITAS BAN AKSES) ====================
+    console.log('[REGISTER] Page loaded, checking maintenance & block...');
+    
+    // ==================== CEK MAINTENANCE & BLOCK ====================
     var isBlockedOrMaintenance = await cekMaintenanceDanBlokir();
     if (isBlockedOrMaintenance) {
+        console.log('[REGISTER] Blocked or maintenance, stopping...');
         return;
     }
+    
+    console.log('[REGISTER] No block, no maintenance. Setting up form...');
     
     document.getElementById('password').addEventListener('input', updatePasswordStrength);
     document.getElementById('username').addEventListener('input', updatePasswordStrength);
