@@ -1,4 +1,4 @@
-// confirm-password.js
+
 var API_RESET = '/api/reset-pw';
 var API_REVANSTORE = '/api/revanstoreV2';
 var API_SECRET = '1417-1426-1527-1517';
@@ -88,16 +88,14 @@ function tampilkanHalamanMaintenance(dataMaintenance) {
     safeSetHTML(document.body, html);
 }
 
-function tampilkanHalamanBanAkses(until) {
-    var untilText = sanitize((until || 0) === 0 ? 'PERMANEN' : ('sampai ' + new Date(until).toLocaleString('id-ID')));
-    var html = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#f0f9ff 0%,#bae6fd 50%,#7dd3fc 100%);padding:20px;font-family:\'Segoe UI\',sans-serif;">' +
-        '<div style="background:#ffffff;border-radius:24px;padding:48px 36px;width:100%;max-width:420px;text-align:center;box-shadow:0 20px 60px rgba(0,191,255,0.15);border:1px solid rgba(0,191,255,0.1);">' +
-        '<div style="font-size:72px;color:#f59e0b;margin-bottom:12px;">🚫</div>' +
-        '<h2 style="font-size:24px;font-weight:700;color:#0c4a6e;margin-bottom:8px;">AKSES DIBLOKIR</h2>' +
-        '<p style="font-size:14px;color:#64748b;margin-bottom:6px;">Maaf, akses Anda diblokir oleh admin.</p>' +
-        '<div style="background:#fef3c7;color:#92400e;padding:12px 16px;border-radius:12px;font-weight:600;font-size:14px;margin:16px 0 24px;">Durasi: ' + untilText + '</div></div></div>';
-
-    safeSetHTML(document.body, html);
+function tampilkanHalamanBlokir() {
+    document.body.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;font-family:\'Segoe UI\',sans-serif;">' +
+        '<div style="background:#ffffff;border-radius:24px;padding:48px 36px;max-width:420px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.08);border:1px solid #e2e8f0;">' +
+        '<i class="fas fa-lock" style="font-size:64px;color:#ef4444;margin-bottom:16px;display:block;"></i>' +
+        '<span style="display:inline-block;background:#fef2f2;color:#dc2626;padding:4px 16px;border-radius:20px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;border:1px solid #fecaca;margin-bottom:12px;"><i class="fas fa-exclamation-circle"></i> DIBLOKIR</span>' +
+        '<h1 style="font-size:24px;font-weight:700;color:#1e293b;margin-bottom:8px;">AKSES DITOLAK</h1>' +
+        '<p style="font-size:14px;color:#64748b;line-height:1.6;">Akses ditolak, jika ingin dibuka silakan hubungi admin.</p>' +
+        '</div></div>';
 }
 
 async function periksaMaintenance() {
@@ -183,7 +181,7 @@ async function checkTokenOnLoad() {
 
     var blocked = await checkIfBlocked();
     if (blocked) {
-        tampilkanHalamanBanAkses(0);
+        tampilkanHalamanBlokir();
         return;
     }
 
