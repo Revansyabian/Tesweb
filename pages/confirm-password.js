@@ -1,9 +1,11 @@
-
+// confirm-password.js
 var API_RESET = '/api/reset-pw';
 var API_REVANSTORE = '/api/revanstoreV2';
 var API_SECRET = '1417-1426-1527-1517';
 var fingerprint = '';
 var resetToken = '';
+var maintenanceChecked = false;
+var blockedChecked = false;
 
 async function getFingerprint() {
     var fp = '';
@@ -41,12 +43,13 @@ function safeSetHTML(element, html) {
 }
 
 function showPage(pageId) {
-    document.getElementById('loadingPage').classList.remove('show');
-    document.getElementById('expiredPage').classList.remove('show');
-    document.getElementById('invalidPage').classList.remove('show');
-    document.getElementById('formSection').classList.remove('show');
-    document.getElementById('successPage').classList.remove('show');
-    document.getElementById(pageId).classList.add('show');
+    var pages = ['loadingPage', 'expiredPage', 'invalidPage', 'formSection', 'successPage'];
+    pages.forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.classList.remove('show');
+    });
+    var target = document.getElementById(pageId);
+    if (target) target.classList.add('show');
 }
 
 function updatePasswordStrength() {
@@ -160,6 +163,7 @@ async function checkIfBlocked() {
     }
 }
 
+// ==================== CEK TOKEN (URUTAN: MAINTENANCE -> BLOCK -> TOKEN) ====================
 async function checkTokenOnLoad() {
     resetToken = getUrlParam('token');
 
@@ -173,18 +177,21 @@ async function checkTokenOnLoad() {
 
     if (!fingerprint) fingerprint = await getFingerprint();
 
+    // ==================== 1. CEK MAINTENANCE DULU ====================
     var maintenance = await periksaMaintenance();
     if (maintenance) {
         tampilkanHalamanMaintenance(maintenance);
         return;
     }
 
+    // ==================== 2. CEK BLOCKED ====================
     var blocked = await checkIfBlocked();
     if (blocked) {
         tampilkanHalamanBlokir();
         return;
     }
 
+    // ==================== 3. CEK VALIDITAS TOKEN ====================
     var payload = {
         action: 'verify_token',
         token: resetToken,
@@ -227,6 +234,7 @@ async function checkTokenOnLoad() {
     }
 }
 
+// ==================== KONFIRMASI RESET ====================
 async function confirmReset() {
     var newPassword = document.getElementById('newPassword').value.trim();
     var confirmPassword = document.getElementById('confirmPassword').value.trim();
