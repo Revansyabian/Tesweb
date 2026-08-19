@@ -4,8 +4,6 @@ var API_REVANSTORE = '/api/revanstoreV2';
 var API_SECRET = '1417-1426-1527-1517';
 var fingerprint = '';
 var resetToken = '';
-var maintenanceChecked = false;
-var blockedChecked = false;
 
 async function getFingerprint() {
     var fp = '';
@@ -163,35 +161,7 @@ async function checkIfBlocked() {
     }
 }
 
-// ==================== CEK TOKEN (URUTAN: MAINTENANCE -> BLOCK -> TOKEN) ====================
-async function checkTokenOnLoad() {
-    resetToken = getUrlParam('token');
-
-    if (!resetToken || resetToken.length < 10) {
-        document.getElementById('headerSubtitle').textContent = 'Link Tidak Valid';
-        showPage('invalidPage');
-        return;
-    }
-
-    showPage('loadingPage');
-
-    if (!fingerprint) fingerprint = await getFingerprint();
-
-    // ==================== 1. CEK MAINTENANCE DULU ====================
-    var maintenance = await periksaMaintenance();
-    if (maintenance) {
-        tampilkanHalamanMaintenance(maintenance);
-        return;
-    }
-
-    // ==================== 2. CEK BLOCKED ====================
-    var blocked = await checkIfBlocked();
-    if (blocked) {
-        tampilkanHalamanBlokir();
-        return;
-    }
-
-    // ==================== 3. CEK VALIDITAS TOKEN ====================
+async function verifyToken() {
     var payload = {
         action: 'verify_token',
         token: resetToken,
@@ -217,24 +187,56 @@ async function checkTokenOnLoad() {
             result = JSON.parse(dec);
         }
 
-        if (result && result.valid) {
-            document.getElementById('headerSubtitle').textContent = 'Masukkan password baru Anda';
-            showPage('formSection');
-        } else if (result && result.error === 'token_expired') {
-            document.getElementById('headerSubtitle').textContent = 'Link Expired';
-            showPage('expiredPage');
-        } else {
-            document.getElementById('headerSubtitle').textContent = 'Link Tidak Valid';
-            showPage('invalidPage');
-        }
-
+        return result;
     } catch (e) {
+        return null;
+    }
+}
+
+// ==================== URUTAN: MAINTENANCE -> BLOCK -> TOKEN ====================
+async function checkTokenOnLoad() {
+    resetToken = getUrlParam('token');
+
+    if (!resetToken || resetToken.length < 10) {
+        document.getElementById('headerSubtitle').textContent = 'Link Tidak Valid';
+        showPage('invalidPage');
+        return;
+    }
+
+    // ==================== TAMPILKAN LOADING ====================
+    showPage('loadingPage');
+
+    if (!fingerprint) fingerprint = await getFingerprint();
+
+    // ==================== 1. CEK MAINTENANCE ====================
+    var maintenance = await periksaMaintenance();
+    if (maintenance) {
+        tampilkanHalamanMaintenance(maintenance);
+        return;
+    }
+
+    // ==================== 2. CEK BLOCKED ====================
+    var blocked = await checkIfBlocked();
+    if (blocked) {
+        tampilkanHalamanBlokir();
+        return;
+    }
+
+    // ==================== 3. CEK TOKEN ====================
+    var result = await verifyToken();
+
+    if (result && result.valid) {
+        document.getElementById('headerSubtitle').textContent = 'Masukkan password baru Anda';
+        showPage('formSection');
+    } else if (result && result.error === 'token_expired') {
+        document.getElementById('headerSubtitle').textContent = 'Link Expired';
+        showPage('expiredPage');
+    } else {
         document.getElementById('headerSubtitle').textContent = 'Link Tidak Valid';
         showPage('invalidPage');
     }
 }
 
-// ==================== KONFIRMASI RESET ====================
 async function confirmReset() {
     var newPassword = document.getElementById('newPassword').value.trim();
     var confirmPassword = document.getElementById('confirmPassword').value.trim();
