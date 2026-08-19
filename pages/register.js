@@ -386,7 +386,7 @@ async function register() {
             var waMessage = 'Assalamualaikum min, tolong aktivasi akun saya%0A%0AUsername: ' + encodeURIComponent(username) + '%0APaket: ' + encodeURIComponent(selectedPaket) + '%0AHarga: Rp ' + selectedHarga.toLocaleString() + '%0AEmail: ' + encodeURIComponent(email) + '%0ANo. HP: ' + encodeURIComponent(phone);
             Swal.fire({ icon: "success", title: "Pendaftaran Berhasil!", timer: 3000, showConfirmButton: false }).then(function() {
                 window.open('https://wa.me/' + WHATSAPP_NUMBER + '?text=' + waMessage, '_blank');
-                window.location.href = '/';
+                window.location.href = '/pages/login';
             });
         } else {
             recordRegisterAttempt();
@@ -411,12 +411,10 @@ async function register() {
 
 document.addEventListener('DOMContentLoaded', async function() {
     if (!fingerprint) fingerprint = await getFingerprint();
-    
     var blockedOrMaintenance = await checkMaintenanceAndBlock();
     if (blockedOrMaintenance) {
         return;
     }
-    
     document.getElementById('password').addEventListener('input', updatePasswordStrength);
     document.getElementById('username').addEventListener('input', updatePasswordStrength);
     document.getElementById('confirmPassword').addEventListener('paste', function(e) { e.preventDefault(); Swal.fire({ icon: "warning", title: "Paste Tidak Diizinkan!", timer: 2000, showConfirmButton: false }); });
