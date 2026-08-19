@@ -193,36 +193,42 @@ async function verifyToken() {
     }
 }
 
-// ==================== URUTAN: MAINTENANCE -> BLOCK -> TOKEN ====================
+// ==================== URUTAN YANG BENAR ====================
+// 1. TAMPILKAN LOADING
+// 2. CEK MAINTENANCE
+// 3. CEK BLOCKED
+// 4. CEK TOKEN
+
 async function checkTokenOnLoad() {
     resetToken = getUrlParam('token');
 
+    // CEK TOKEN ADA APA GA
     if (!resetToken || resetToken.length < 10) {
         document.getElementById('headerSubtitle').textContent = 'Link Tidak Valid';
         showPage('invalidPage');
         return;
     }
 
-    // ==================== TAMPILKAN LOADING ====================
+    // ==================== 1. TAMPILKAN LOADING ====================
     showPage('loadingPage');
 
     if (!fingerprint) fingerprint = await getFingerprint();
 
-    // ==================== 1. CEK MAINTENANCE ====================
+    // ==================== 2. CEK MAINTENANCE ====================
     var maintenance = await periksaMaintenance();
     if (maintenance) {
         tampilkanHalamanMaintenance(maintenance);
         return;
     }
 
-    // ==================== 2. CEK BLOCKED ====================
+    // ==================== 3. CEK BLOCKED ====================
     var blocked = await checkIfBlocked();
     if (blocked) {
         tampilkanHalamanBlokir();
         return;
     }
 
-    // ==================== 3. CEK TOKEN ====================
+    // ==================== 4. CEK TOKEN ====================
     var result = await verifyToken();
 
     if (result && result.valid) {
