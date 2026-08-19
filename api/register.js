@@ -63,7 +63,6 @@ function decryptData(raw) {
     } catch (e) { return raw; }
 }
 
-// ==================== FIX: SANITIZE INPUT TANPA STRIP KARAKTER VALID ====================
 function sanitizeInput(str) {
     if (!str) return '';
     return String(str)
@@ -76,29 +75,6 @@ function sanitizeInput(str) {
         .replace(/=/g, '&#61;')
         .replace(/javascript:/gi, '')
         .replace(/on\w+=/gi, '');
-}
-
-// ==================== FIX: VALIDASI USERNAME KHUSUS ====================
-function validateUsername(username) {
-    if (!username || typeof username !== 'string') {
-        return { valid: false, message: 'Username tidak valid!' };
-    }
-    
-    const trimmed = username.trim();
-    if (trimmed.length < 3) {
-        return { valid: false, message: 'Username minimal 3 karakter!' };
-    }
-    
-    if (trimmed.length > 30) {
-        return { valid: false, message: 'Username maksimal 30 karakter!' };
-    }
-    
-    const usernameRegex = /^[a-zA-Z0-9_.]+$/;
-    if (!usernameRegex.test(trimmed)) {
-        return { valid: false, message: 'Username hanya boleh huruf, angka, underscore (_), dan titik (.)!' };
-    }
-    
-    return { valid: true, username: trimmed };
 }
 
 async function hashPassword(password) {
@@ -152,6 +128,90 @@ function getClientIP(req) {
         return ips[0].trim();
     }
     return req.socket.remoteAddress || 'unknown';
+}
+
+// ==================== FUNGSI CEK MAINTENANCE & BLOCK ====================
+async function isIPBlocked(ip) {
+    if (!ip || ip === 'unknown' || ip === '::1' || ip === '127.0.0.1') return false;
+    
+    const keys = [
+        ip.replace(/\./g, '_'),
+        ip,
+        ip.replace(/:/g, '_')
+    ];
+    
+    for (const key of keys) {
+        const snap = await db.ref('blocked_ips/' + key).once('value');
+        const raw = snap.val();
+        if (raw && raw.data) {
+            try {
+                const data = decryptData(raw.data);
+                if (data && data.blocked === true) {
+                    return true;
+                }
+            } catch (e) {}
+        }
+    }
+    return false;
+}
+
+async function isFPBlocked(fp) {
+    if (!fp) return false;
+    const snap = await db.ref('blocked_fp/' + fp).once('value');
+    const raw = snap.val();
+    if (raw && raw.data) {
+        try {
+            const data = decryptData(raw.data);
+            if (data && data.blocked === true) {
+                return true;
+            }
+        } catch (e) {}
+    }
+    return false;
+}
+
+async function checkMaintenance() {
+    try {
+        const snap = await db.ref('maintenance_status').once('value');
+        const raw = snap.val();
+        if (raw && raw.data) {
+            const data = decryptData(raw.data);
+            if (data && data.maintenance === true) {
+                return {
+                    maintenance: true,
+                    title: data.title || 'SEDANG PERBAIKAN SISTEM',
+                    message: data.message || 'Website sedang dalam perbaikan oleh admin. Silakan kembali beberapa saat lagi.',
+                    until: data.until || null
+                };
+            }
+        }
+        return null;
+    } catch (e) {
+        return null;
+    }
+}
+
+// ==================== VALIDASI USERNAME ====================
+function isValidUsername(username) {
+    if (!username || typeof username !== 'string') {
+        return { valid: false, message: 'Username tidak valid!' };
+    }
+    
+    const trimmed = username.trim();
+    if (trimmed.length < 3) {
+        return { valid: false, message: 'Username minimal 3 karakter!' };
+    }
+    
+    if (trimmed.length > 30) {
+        return { valid: false, message: 'Username maksimal 30 karakter!' };
+    }
+    
+    const usernameRegex = /^[a-zA-Z0-9_.]+$/;
+    if (!usernameRegex.test(trimmed)) {
+        return { valid: false, message: 'Username hanya boleh huruf, angka, underscore (_), dan titik (.)!' };
+    }
+    
+    return { valid: true, username: trimmed };
 }
 
 export default async function handler(req, res) {
@@ -221,9 +281,9 @@ export default async function handler(req, res) {
         }
 
         if (action === 'register') {
-            // ==================== FIX: VALIDASI USERNAME PAKAI FUNGSI KHUSUS ====================
+            // ==================== VALIDASI USERNAME ====================
             const rawUsername = decrypted.username || '';
-            const usernameValidation = validateUsername(rawUsername);
+            const usernameValidation = isValidUsername(rawUsername);
             
             if (!usernameValidation.valid) {
                 return res.status(200).json({ 
