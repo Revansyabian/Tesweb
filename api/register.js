@@ -127,6 +127,66 @@ async function verifyRecaptcha(token) {
     }
 }
 
+async function isIPBlocked(ip) {
+    if (!ip || ip === 'unknown' || ip === '::1' || ip === '127.0.0.1') return false;
+    
+    const keys = [
+        ip.replace(/\./g, '_'),
+        ip,
+        ip.replace(/:/g, '_')
+    ];
+    
+    for (const key of keys) {
+        const snap = await db.ref('blocked_ips/' + key).once('value');
+        const raw = snap.val();
+        if (raw && raw.data) {
+            try {
+                const data = decryptData(raw.data);
+                if (data && data.blocked === true) {
+                    return true;
+                }
+            } catch (e) {}
+        }
+    }
+    return false;
+}
+
+async function isFPBlocked(fp) {
+    if (!fp) return false;
+    const snap = await db.ref('blocked_fp/' + fp).once('value');
+    const raw = snap.val();
+    if (raw && raw.data) {
+        try {
+            const data = decryptData(raw.data);
+            if (data && data.blocked === true) {
+                return true;
+            }
+        } catch (e) {}
+    }
+    return false;
+}
+
+async function checkMaintenance() {
+    try {
+        const snap = await db.ref('maintenance_status').once('value');
+        const raw = snap.val();
+        if (raw && raw.data) {
+            const data = decryptData(raw.data);
+            if (data && data.maintenance === true) {
+                return {
+                    maintenance: true,
+                    title: data.title || 'SEDANG PERBAIKAN SISTEM',
+                    message: data.message || 'Website sedang dalam perbaikan oleh admin. Silakan kembali beberapa saat lagi.',
+                    until: data.until || null
+                };
+            }
+        }
+        return null;
+    } catch (e) {
+        return null;
+    }
+}
+
 export default async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -140,6 +200,34 @@ export default async function handler(req, res) {
 
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
     const fp = req.headers['x-fingerprint'] || '';
+
+    const maintenance = await checkMaintenance();
+    if (maintenance) {
+        return res.status(200).json({ 
+            data: encryptResponse({ 
+                success: false,
+                error: 'maintenance',
+                maintenance: true,
+                title: maintenance.title,
+                message: maintenance.message,
+                until: maintenance.until
+            }) 
+        });
+    }
+
+    const ipBlocked = await isIPBlocked(ip);
+    const fpBlocked = fp ? await isFPBlocked(fp) : false;
+    
+    if (ipBlocked || fpBlocked) {
+        return res.status(200).json({ 
+            data: encryptResponse({ 
+                success: false,
+                error: 'access_denied',
+                blocked: true,
+                message: 'Akses ditolak, jika ingin dibuka silakan hubungi admin.'
+            }) 
+        });
+    }
 
     if (!await checkRateLimit(ip)) {
         return res.status(429).json({ data: encryptResponse({ success: false, error: 'rate_limit', message: 'Terlalu banyak percobaan.' }) });
