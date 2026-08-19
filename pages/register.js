@@ -1,5 +1,4 @@
 // pages/register.js
-var API_URL = '/api/revanstoreV2';
 var API_REGISTER = '/api/register';
 var API_SECRET = '1417-1426-1527-1517';
 var WHATSAPP_NUMBER = '6285199120995';
@@ -308,42 +307,6 @@ async function callRegisterApi(action, data) {
     return result;
 }
 
-async function callMainApi(path, method, data) {
-    var payload = {
-        path: path,
-        method: method || 'GET',
-        data: data || {},
-        timestamp: Date.now()
-    };
-
-    var encryptedPayload = encryptData(payload);
-    if (!encryptedPayload) throw new Error('Gagal mengenkripsi');
-
-    var res = await fetch(API_URL, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-Fingerprint': fingerprint
-        },
-        body: JSON.stringify({ data: encryptedPayload })
-    });
-
-    if (res.status === 429) throw new Error('Terlalu banyak percobaan');
-    var text = await res.text();
-    if (!text || text === 'null') return null;
-    var result = JSON.parse(text);
-
-    if (result.encrypted && result.data) {
-        try {
-            var dec = decryptData(result.data);
-            if (dec) return dec;
-        } catch (e) {
-            return null;
-        }
-    }
-    return result;
-}
-
 function tampilkanHalamanMaintenance(dataMaintenance) {
     var judul = sanitize((dataMaintenance && (dataMaintenance.title || dataMaintenance.judul)) ? (dataMaintenance.title || dataMaintenance.judul) : 'SEDANG PERBAIKAN SISTEM');
     var pesan = sanitize((dataMaintenance && (dataMaintenance.message || dataMaintenance.pesan)) ? (dataMaintenance.message || dataMaintenance.pesan) : 'Website sedang dalam perbaikan oleh admin. Silakan kembali beberapa saat lagi.');
@@ -373,15 +336,19 @@ function tampilkanHalamanBlokir() {
 
 async function checkMaintenanceAndBlock() {
     try {
-        var result = await callMainApi('check_blocked', 'POST', { fingerprint: fingerprint });
+        // Cek ban akses & maintenance lewat /api/register (action: check_status).
+        // Backend sudah gabungkan dua cek ini jadi satu, dan ban akses SELALU
+        // menang kalau maintenance juga aktif (blocked: true, maintenance: false
+        // dibalikin duluan oleh backend sebelum sempat cek maintenance).
+        var result = await callRegisterApi('check_status', {});
+
         if (result && result.blocked === true) {
             tampilkanHalamanBlokir();
             return true;
         }
 
-        var mainResult = await callMainApi('maintenance_status', 'GET', {});
-        if (mainResult && mainResult.maintenance === true) {
-            tampilkanHalamanMaintenance(mainResult);
+        if (result && result.maintenance === true) {
+            tampilkanHalamanMaintenance(result);
             return true;
         }
 
@@ -587,7 +554,7 @@ async function register() {
             var waMessage = 'Assalamualaikum min, tolong aktivasi akun saya%0A%0AUsername: ' + encodeURIComponent(username) + '%0APaket: ' + encodeURIComponent(selectedPaket) + '%0AHarga: Rp ' + selectedHarga.toLocaleString() + '%0AEmail: ' + encodeURIComponent(email) + '%0ANo. HP: ' + encodeURIComponent(phone);
             Swal.fire({ icon: "success", title: "Pendaftaran Berhasil!", timer: 3000, showConfirmButton: false }).then(function() {
                 window.open('https://wa.me/' + WHATSAPP_NUMBER + '?text=' + waMessage, '_blank');
-                window.location.href = '/pages/login';
+                window.location.href = '/';
             });
         } else {
             recordRegisterAttempt();
