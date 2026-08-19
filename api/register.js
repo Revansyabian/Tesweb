@@ -1,7 +1,6 @@
 import CryptoJS from 'crypto-js';
 import admin from 'firebase-admin';
 import bcrypt from 'bcryptjs';
-import crypto from 'crypto';
 
 const ADMIN_KEY = process.env.ADMIN_KEY;
 if (!ADMIN_KEY) {
@@ -218,13 +217,11 @@ export default async function handler(req, res) {
 
         const action = decrypted.action;
 
-        // ==================== CHECK STATUS (MAINTENANCE & BLOCK) ====================
         if (action === 'check_status') {
             const maintenance = await checkMaintenance();
             const ipBlocked = await isIPBlocked(ip);
             const fpBlocked = fp ? await isFPBlocked(fp) : false;
             
-            // PRIORITAS BAN AKSES > MAINTENANCE
             if (ipBlocked || fpBlocked) {
                 return res.status(200).json({ 
                     data: encryptResponse({ 
@@ -255,7 +252,6 @@ export default async function handler(req, res) {
             });
         }
 
-        // ==================== REGISTER ====================
         if (action === 'register') {
             const username = sanitizeInput(decrypted.username || '');
             const password = decrypted.password || '';
