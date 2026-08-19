@@ -434,6 +434,11 @@ async function register() {
             registerInProgress = false;
             return;
         }
+        if (usernameClean.length > 20) {
+            Swal.fire({ icon: "warning", title: "Username Tidak Valid!", text: "Username maksimal 20 karakter!", confirmButtonColor: "#0ea5e9" });
+            registerInProgress = false;
+            return;
+        }
         var usernameRegex = /^[a-zA-Z0-9_.]+$/;
         if (!usernameRegex.test(usernameClean)) {
             Swal.fire({ icon: "error", title: "Simbol Tidak Diizinkan!", text: "Username hanya boleh huruf, angka, underscore (_), dan titik (.)", confirmButtonColor: "#ef4444" });
