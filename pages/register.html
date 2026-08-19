@@ -96,7 +96,7 @@
 
             <div class="form-group">
                 <label for="password"><i class="fas fa-lock"></i> Password</label>
-                <input type="password" id="password" placeholder="Minimal 6 karakter" class="form-input" maxlength="20">
+                <input type="password" id="password" placeholder="Minimal 6 karakter" class="form-input" maxlength="20" oninput="updatePasswordStrength()">
                 <div class="password-strength"><div class="password-strength-bar" id="passwordStrengthBar"></div></div>
             </div>
 
@@ -117,18 +117,36 @@
 
             <div class="form-group">
                 <label><i class="fas fa-box"></i> Pilih Paket</label>
-                <div class="paket-dropdown">
+                <div class="paket-dropdown" id="paketDropdown">
                     <div class="paket-select" id="paketSelect" onclick="togglePaketList()">
                         <span class="placeholder" id="paketPlaceholder">Klik untuk pilih paket...</span>
                         <i class="fas fa-chevron-down"></i>
                     </div>
                     <div class="paket-list" id="paketList">
-                        <div class="paket-option" data-paket="1 Minggu" data-harga="15000" onclick="selectPaketOption(this)"><span class="paket-name">1 Minggu</span><span class="paket-price">Rp 15.000</span></div>
-                        <div class="paket-option" data-paket="2 Minggu" data-harga="25000" onclick="selectPaketOption(this)"><span class="paket-name">2 Minggu</span><span class="paket-price">Rp 25.000</span></div>
-                        <div class="paket-option" data-paket="1 Bulan" data-harga="40000" onclick="selectPaketOption(this)"><span class="paket-name">1 Bulan</span><span class="paket-price">Rp 40.000</span></div>
-                        <div class="paket-option" data-paket="2 Bulan" data-harga="50000" onclick="selectPaketOption(this)"><span class="paket-name">2 Bulan</span><span class="paket-price">Rp 50.000</span></div>
-                        <div class="paket-option" data-paket="3 Bulan" data-harga="55000" onclick="selectPaketOption(this)"><span class="paket-name">3 Bulan</span><span class="paket-price">Rp 55.000</span></div>
-                        <div class="paket-option" data-paket="Permanen" data-harga="100000" onclick="selectPaketOption(this)"><span class="paket-name">Permanen</span><span class="paket-price">Rp 100.000</span></div>
+                        <div class="paket-option" data-paket="1 Minggu" data-harga="15000" onclick="selectPaketOption(this)">
+                            <span class="paket-name">1 Minggu</span>
+                            <span class="paket-price">Rp 15.000</span>
+                        </div>
+                        <div class="paket-option" data-paket="2 Minggu" data-harga="25000" onclick="selectPaketOption(this)">
+                            <span class="paket-name">2 Minggu</span>
+                            <span class="paket-price">Rp 25.000</span>
+                        </div>
+                        <div class="paket-option" data-paket="1 Bulan" data-harga="40000" onclick="selectPaketOption(this)">
+                            <span class="paket-name">1 Bulan</span>
+                            <span class="paket-price">Rp 40.000</span>
+                        </div>
+                        <div class="paket-option" data-paket="2 Bulan" data-harga="50000" onclick="selectPaketOption(this)">
+                            <span class="paket-name">2 Bulan</span>
+                            <span class="paket-price">Rp 50.000</span>
+                        </div>
+                        <div class="paket-option" data-paket="3 Bulan" data-harga="55000" onclick="selectPaketOption(this)">
+                            <span class="paket-name">3 Bulan</span>
+                            <span class="paket-price">Rp 55.000</span>
+                        </div>
+                        <div class="paket-option" data-paket="Permanen" data-harga="100000" onclick="selectPaketOption(this)">
+                            <span class="paket-name">Permanen</span>
+                            <span class="paket-price">Rp 100.000</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -147,7 +165,7 @@
             </button>
 
             <div class="register-footer">
-                <p>Sudah punya akun? <a href="/">Login di sini</a></p>
+                <p>Sudah punya akun? <a href="/pages/login">Login di sini</a></p>
             </div>
 
         </div>
@@ -155,6 +173,6 @@
 
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
-    <script src="pages/register.js"></script>
+    <script src="/js/register.js"></script>
 </body>
 </html>
