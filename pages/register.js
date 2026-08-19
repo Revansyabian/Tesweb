@@ -1,4 +1,4 @@
-// pages/register.js
+
 var API_URL = '/api/revanstoreV2';
 var API_REGISTER = '/api/register';
 var API_SECRET = '1417-1426-1527-1517';
@@ -144,14 +144,14 @@ function updatePasswordStrength() {
     var username = document.getElementById('username').value.trim();
     var bar = document.getElementById('passwordStrengthBar');
     bar.className = 'password-strength-bar';
-    if (password.length === 0) { 
-        bar.style.width = '0%'; 
-    } else if (password.length < 6 || password.toLowerCase() === username.toLowerCase()) { 
-        bar.className = 'password-strength-bar strength-weak'; 
-    } else if (password.length < 10) { 
-        bar.className = 'password-strength-bar strength-medium'; 
-    } else { 
-        bar.className = 'password-strength-bar strength-strong'; 
+    if (password.length === 0) {
+        bar.style.width = '0%';
+    } else if (password.length < 6 || password.toLowerCase() === username.toLowerCase()) {
+        bar.className = 'password-strength-bar strength-weak';
+    } else if (password.length < 10) {
+        bar.className = 'password-strength-bar strength-medium';
+    } else {
+        bar.className = 'password-strength-bar strength-strong';
     }
 }
 
@@ -167,7 +167,8 @@ function hideError() {
 function toggleSubmitButton() {
     var check = document.getElementById('verificationCheck');
     var btn = document.getElementById('btnRegister');
-    btn.disabled = !check.checked;
+    var hasPaket = selectedPaket !== '';
+    btn.disabled = !(check.checked && hasPaket);
 }
 
 function togglePaketList() {
@@ -264,10 +265,10 @@ async function callRegisterApi(action, data) {
     var payload = { action: action };
     if (data) payload.data = data;
     payload.timestamp = Date.now();
-    
+
     var encryptedPayload = encryptData(payload);
     if (!encryptedPayload) throw new Error('Gagal mengenkripsi');
-    
+
     var res = await fetch(API_REGISTER, {
         method: 'POST',
         headers: {
@@ -276,12 +277,12 @@ async function callRegisterApi(action, data) {
         },
         body: JSON.stringify({ data: encryptedPayload })
     });
-    
+
     if (res.status === 429) throw new Error('Terlalu banyak percobaan');
     var text = await res.text();
     if (!text || text === 'null') return null;
     var result = JSON.parse(text);
-    
+
     if (result && result.data) {
         try {
             var dec = decryptData(result.data);
@@ -293,14 +294,17 @@ async function callRegisterApi(action, data) {
     return result;
 }
 
-async function callMainApi(action, data) {
-    var payload = { action: action };
-    if (data) payload.data = data;
-    payload.timestamp = Date.now();
-    
+async function callMainApi(path, method, data) {
+    var payload = {
+        path: path,
+        method: method || 'GET',
+        data: data || {},
+        timestamp: Date.now()
+    };
+
     var encryptedPayload = encryptData(payload);
     if (!encryptedPayload) throw new Error('Gagal mengenkripsi');
-    
+
     var res = await fetch(API_URL, {
         method: 'POST',
         headers: {
@@ -309,13 +313,13 @@ async function callMainApi(action, data) {
         },
         body: JSON.stringify({ data: encryptedPayload })
     });
-    
+
     if (res.status === 429) throw new Error('Terlalu banyak percobaan');
     var text = await res.text();
     if (!text || text === 'null') return null;
     var result = JSON.parse(text);
-    
-    if (result && result.data) {
+
+    if (result.encrypted && result.data) {
         try {
             var dec = decryptData(result.data);
             if (dec) return dec;
@@ -355,27 +359,18 @@ function tampilkanHalamanBlokir() {
 
 async function checkMaintenanceAndBlock() {
     try {
-        var ip = 'unknown';
-        try { 
-            var ipRes = await fetch('https://api.ipify.org?format=json'); 
-            var ipData = await ipRes.json(); 
-            ip = ipData.ip || 'unknown'; 
-        } catch (e) {}
-        
-        var result = await callMainApi('check_blocked', { ip: ip, fp: fingerprint });
-        
+        var result = await callMainApi('check_blocked', 'POST', { fingerprint: fingerprint });
         if (result && result.blocked === true) {
             tampilkanHalamanBlokir();
             return true;
         }
-        
-        var mainResult = await callMainApi('maintenance_status');
-        
+
+        var mainResult = await callMainApi('maintenance_status', 'GET', {});
         if (mainResult && mainResult.maintenance === true) {
             tampilkanHalamanMaintenance(mainResult);
             return true;
         }
-        
+
         return false;
     } catch (e) {
         console.error('Error checking maintenance/block:', e);
@@ -389,35 +384,35 @@ async function register() {
     hideError();
 
     try {
-        if (!isValidUserAgent()) { 
-            Swal.fire({ icon: "error", title: "Browser Tidak Valid!", confirmButtonColor: "#ef4444" }); 
-            registerInProgress = false; 
-            return; 
+        if (!isValidUserAgent()) {
+            Swal.fire({ icon: "error", title: "Browser Tidak Valid!", confirmButtonColor: "#ef4444" });
+            registerInProgress = false;
+            return;
         }
-        if (!isValidScreenSize()) { 
-            Swal.fire({ icon: "error", title: "Browser Tidak Valid!", confirmButtonColor: "#ef4444" }); 
-            registerInProgress = false; 
-            return; 
+        if (!isValidScreenSize()) {
+            Swal.fire({ icon: "error", title: "Browser Tidak Valid!", confirmButtonColor: "#ef4444" });
+            registerInProgress = false;
+            return;
         }
 
         var now = Date.now();
-        if (now - lastSubmitTime < SUBMIT_COOLDOWN) { 
-            Swal.fire({ icon: "warning", title: "Terlalu Cepat!", text: "Tunggu 3 detik.", confirmButtonColor: "#0ea5e9" }); 
-            registerInProgress = false; 
-            return; 
+        if (now - lastSubmitTime < SUBMIT_COOLDOWN) {
+            Swal.fire({ icon: "warning", title: "Terlalu Cepat!", text: "Tunggu 3 detik.", confirmButtonColor: "#0ea5e9" });
+            registerInProgress = false;
+            return;
         }
         lastSubmitTime = now;
 
         var honeypot = document.getElementById('website').value;
-        if (honeypot) { 
-            Swal.fire({ icon: "error", title: "Bot Detected!", confirmButtonColor: "#ef4444" }); 
-            registerInProgress = false; 
-            return; 
+        if (honeypot) {
+            Swal.fire({ icon: "error", title: "Bot Detected!", confirmButtonColor: "#ef4444" });
+            registerInProgress = false;
+            return;
         }
 
-        if (!checkBrowserRateLimit()) { 
-            registerInProgress = false; 
-            return; 
+        if (!checkBrowserRateLimit()) {
+            registerInProgress = false;
+            return;
         }
 
         var blockedOrMaintenance = await checkMaintenanceAndBlock();
@@ -432,109 +427,109 @@ async function register() {
         var phone = sanitize(document.getElementById('phone').value.trim());
         var email = sanitize(document.getElementById('email').value.trim());
 
-        if (!username || username.length < 3) { 
-            Swal.fire({ icon: "warning", title: "Username Tidak Valid!", text: "Username minimal 3 karakter!", confirmButtonColor: "#0ea5e9" }); 
-            registerInProgress = false; 
-            return; 
+        if (!username || username.length < 3) {
+            Swal.fire({ icon: "warning", title: "Username Tidak Valid!", text: "Username minimal 3 karakter!", confirmButtonColor: "#0ea5e9" });
+            registerInProgress = false;
+            return;
         }
         var usernameRegex = /^[a-zA-Z0-9_.]+$/;
-        if (!usernameRegex.test(username)) { 
-            Swal.fire({ icon: "error", title: "Simbol Tidak Diizinkan!", confirmButtonColor: "#ef4444" }); 
-            registerInProgress = false; 
-            return; 
+        if (!usernameRegex.test(username)) {
+            Swal.fire({ icon: "error", title: "Simbol Tidak Diizinkan!", confirmButtonColor: "#ef4444" });
+            registerInProgress = false;
+            return;
         }
         var lowerUsername = username.toLowerCase();
-        for (var i = 0; i < FORBIDDEN_USERNAMES.length; i++) { 
-            if (lowerUsername.includes(FORBIDDEN_USERNAMES[i])) { 
-                Swal.fire({ icon: "error", title: "Username Tidak Diizinkan!", confirmButtonColor: "#ef4444" }); 
-                registerInProgress = false; 
-                return; 
-            } 
+        for (var i = 0; i < FORBIDDEN_USERNAMES.length; i++) {
+            if (lowerUsername.includes(FORBIDDEN_USERNAMES[i])) {
+                Swal.fire({ icon: "error", title: "Username Tidak Diizinkan!", confirmButtonColor: "#ef4444" });
+                registerInProgress = false;
+                return;
+            }
         }
 
-        if (!password || password.length < 6) { 
-            Swal.fire({ icon: "warning", title: "Password Terlalu Pendek!", confirmButtonColor: "#0ea5e9" }); 
-            registerInProgress = false; 
-            return; 
+        if (!password || password.length < 6) {
+            Swal.fire({ icon: "warning", title: "Password Terlalu Pendek!", confirmButtonColor: "#0ea5e9" });
+            registerInProgress = false;
+            return;
         }
-        if (password.toLowerCase() === username.toLowerCase()) { 
-            Swal.fire({ icon: "error", title: "Password Lemah!", text: "Password tidak boleh sama dengan username!", confirmButtonColor: "#ef4444" }); 
-            registerInProgress = false; 
-            return; 
+        if (password.toLowerCase() === username.toLowerCase()) {
+            Swal.fire({ icon: "error", title: "Password Lemah!", text: "Password tidak boleh sama dengan username!", confirmButtonColor: "#ef4444" });
+            registerInProgress = false;
+            return;
         }
-        if (!validatePasswordComplexity(password)) { 
-            Swal.fire({ icon: "error", title: "Password Lemah!", text: "Password harus ada huruf BESAR, kecil, dan angka!", confirmButtonColor: "#ef4444" }); 
-            registerInProgress = false; 
-            return; 
+        if (!validatePasswordComplexity(password)) {
+            Swal.fire({ icon: "error", title: "Password Lemah!", text: "Password harus ada huruf BESAR, kecil, dan angka!", confirmButtonColor: "#ef4444" });
+            registerInProgress = false;
+            return;
         }
-        if (isSequentialPassword(password)) { 
-            Swal.fire({ icon: "error", title: "Password Terlalu Mudah!", confirmButtonColor: "#ef4444" }); 
-            registerInProgress = false; 
-            return; 
+        if (isSequentialPassword(password)) {
+            Swal.fire({ icon: "error", title: "Password Terlalu Mudah!", confirmButtonColor: "#ef4444" });
+            registerInProgress = false;
+            return;
         }
-        if (isCommonPassword(password)) { 
-            Swal.fire({ icon: "error", title: "Password Terlalu Umum!", confirmButtonColor: "#ef4444" }); 
-            registerInProgress = false; 
-            return; 
+        if (isCommonPassword(password)) {
+            Swal.fire({ icon: "error", title: "Password Terlalu Umum!", confirmButtonColor: "#ef4444" });
+            registerInProgress = false;
+            return;
         }
-        if (isKeyboardSmash(password)) { 
-            Swal.fire({ icon: "error", title: "Password Terlalu Mudah!", confirmButtonColor: "#ef4444" }); 
-            registerInProgress = false; 
-            return; 
+        if (isKeyboardSmash(password)) {
+            Swal.fire({ icon: "error", title: "Password Terlalu Mudah!", confirmButtonColor: "#ef4444" });
+            registerInProgress = false;
+            return;
         }
-        if (hasRepeatingChars(password)) { 
-            Swal.fire({ icon: "error", title: "Password Terlalu Mudah!", confirmButtonColor: "#ef4444" }); 
-            registerInProgress = false; 
-            return; 
+        if (hasRepeatingChars(password)) {
+            Swal.fire({ icon: "error", title: "Password Terlalu Mudah!", confirmButtonColor: "#ef4444" });
+            registerInProgress = false;
+            return;
         }
-        if (password !== confirmPassword) { 
-            Swal.fire({ icon: "error", title: "Password Tidak Cocok!", confirmButtonColor: "#ef4444" }); 
-            registerInProgress = false; 
-            return; 
-        }
-
-        if (!phone || phone.length < 10) { 
-            Swal.fire({ icon: "warning", title: "Nomor Tidak Valid!", confirmButtonColor: "#0ea5e9" }); 
-            registerInProgress = false; 
-            return; 
-        }
-        if (!isValidIndonesianPhone(phone)) { 
-            Swal.fire({ icon: "error", title: "Nomor Tidak Valid!", text: "Gunakan nomor Indonesia (08xx / +62xx)!", confirmButtonColor: "#ef4444" }); 
-            registerInProgress = false; 
-            return; 
+        if (password !== confirmPassword) {
+            Swal.fire({ icon: "error", title: "Password Tidak Cocok!", confirmButtonColor: "#ef4444" });
+            registerInProgress = false;
+            return;
         }
 
-        if (!email || !email.includes('@')) { 
-            Swal.fire({ icon: "error", title: "Email Tidak Valid!", text: "Email wajib mengandung @", confirmButtonColor: "#ef4444" }); 
-            registerInProgress = false; 
-            return; 
+        if (!phone || phone.length < 10) {
+            Swal.fire({ icon: "warning", title: "Nomor Tidak Valid!", confirmButtonColor: "#0ea5e9" });
+            registerInProgress = false;
+            return;
+        }
+        if (!isValidIndonesianPhone(phone)) {
+            Swal.fire({ icon: "error", title: "Nomor Tidak Valid!", text: "Gunakan nomor Indonesia (08xx / +62xx)!", confirmButtonColor: "#ef4444" });
+            registerInProgress = false;
+            return;
+        }
+
+        if (!email || !email.includes('@')) {
+            Swal.fire({ icon: "error", title: "Email Tidak Valid!", text: "Email wajib mengandung @", confirmButtonColor: "#ef4444" });
+            registerInProgress = false;
+            return;
         }
         var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) { 
-            Swal.fire({ icon: "error", title: "Email Tidak Valid!", confirmButtonColor: "#ef4444" }); 
-            registerInProgress = false; 
-            return; 
+        if (!emailRegex.test(email)) {
+            Swal.fire({ icon: "error", title: "Email Tidak Valid!", confirmButtonColor: "#ef4444" });
+            registerInProgress = false;
+            return;
         }
-        if (isThrowawayEmail(email)) { 
-            Swal.fire({ icon: "error", title: "Email Tidak Diizinkan!", text: "Gunakan email asli!", confirmButtonColor: "#ef4444" }); 
-            registerInProgress = false; 
-            return; 
+        if (isThrowawayEmail(email)) {
+            Swal.fire({ icon: "error", title: "Email Tidak Diizinkan!", text: "Gunakan email asli!", confirmButtonColor: "#ef4444" });
+            registerInProgress = false;
+            return;
         }
 
-        if (!selectedPaket) { 
-            Swal.fire({ icon: "warning", title: "Paket Belum Dipilih!", confirmButtonColor: "#0ea5e9" }); 
-            registerInProgress = false; 
-            return; 
+        if (!selectedPaket) {
+            Swal.fire({ icon: "warning", title: "Paket Belum Dipilih!", confirmButtonColor: "#0ea5e9" });
+            registerInProgress = false;
+            return;
         }
-        if (!document.getElementById('verificationCheck').checked) { 
-            Swal.fire({ icon: "warning", title: "Verifikasi Diperlukan!", confirmButtonColor: "#0ea5e9" }); 
-            registerInProgress = false; 
-            return; 
+        if (!document.getElementById('verificationCheck').checked) {
+            Swal.fire({ icon: "warning", title: "Verifikasi Diperlukan!", confirmButtonColor: "#0ea5e9" });
+            registerInProgress = false;
+            return;
         }
 
         var captchaResponse = '';
-        if (typeof grecaptcha !== 'undefined') { 
-            captchaResponse = grecaptcha.getResponse(); 
+        if (typeof grecaptcha !== 'undefined') {
+            captchaResponse = grecaptcha.getResponse();
         }
         if (!captchaResponse || captchaResponse.length === 0) {
             Swal.fire({ icon: "warning", title: "reCAPTCHA Diperlukan!", text: "Centang \"I'm not a robot\" dulu ya!", confirmButtonColor: "#0ea5e9" });
@@ -546,10 +541,10 @@ async function register() {
         if (!fingerprint) fingerprint = await getFingerprint();
 
         var userIP = 'unknown';
-        try { 
-            var ipRes = await fetch('https://api.ipify.org?format=json'); 
-            var ipData = await ipRes.json(); 
-            userIP = ipData.ip || 'unknown'; 
+        try {
+            var ipRes = await fetch('https://api.ipify.org?format=json');
+            var ipData = await ipRes.json();
+            userIP = ipData.ip || 'unknown';
         } catch (e) {}
 
         var result = await callRegisterApi('register', {
@@ -577,20 +572,22 @@ async function register() {
             });
         } else {
             recordRegisterAttempt();
-            if (result && result.error === 'ip_limit') { 
-                Swal.fire({ icon: "error", title: "Batas Pendaftaran!", text: "Maaf, kamu sudah mendaftar sebelumnya.", confirmButtonColor: "#ef4444" }); 
-            } else if (result && result.error === 'fp_limit') { 
-                Swal.fire({ icon: "error", title: "Batas Pendaftaran!", text: "Maaf, kamu sudah mendaftar sebelumnya.", confirmButtonColor: "#ef4444" }); 
-            } else if (result && result.error === 'username_exists') { 
-                Swal.fire({ icon: "error", title: "Username Sudah Terdaftar!", confirmButtonColor: "#ef4444" }); 
-            } else if (result && result.error === 'email_exists') { 
-                Swal.fire({ icon: "error", title: "Email Sudah Terdaftar!", confirmButtonColor: "#ef4444" }); 
-            } else if (result && result.error === 'maintenance') { 
-                Swal.fire({ icon: "error", title: "Sedang Maintenance!", text: "Website sedang dalam perbaikan.", confirmButtonColor: "#ef4444" }); 
-            } else if (result && result.error === 'access_denied') { 
-                Swal.fire({ icon: "error", title: "Akses Ditolak!", text: "Akses Anda diblokir.", confirmButtonColor: "#ef4444" }); 
-            } else { 
-                Swal.fire({ icon: "error", title: "Gagal Mendaftar!", text: "Terjadi kesalahan. Coba lagi.", confirmButtonColor: "#ef4444" }); 
+            if (result && result.error === 'ip_limit') {
+                Swal.fire({ icon: "error", title: "Batas Pendaftaran!", text: "Maaf, kamu sudah mendaftar sebelumnya.", confirmButtonColor: "#ef4444" });
+            } else if (result && result.error === 'fp_limit') {
+                Swal.fire({ icon: "error", title: "Batas Pendaftaran!", text: "Maaf, kamu sudah mendaftar sebelumnya.", confirmButtonColor: "#ef4444" });
+            } else if (result && result.error === 'username_exists') {
+                Swal.fire({ icon: "error", title: "Username Sudah Terdaftar!", confirmButtonColor: "#ef4444" });
+            } else if (result && result.error === 'email_exists') {
+                Swal.fire({ icon: "error", title: "Email Sudah Terdaftar!", confirmButtonColor: "#ef4444" });
+            } else if (result && result.error === 'maintenance') {
+                Swal.fire({ icon: "error", title: "Sedang Maintenance!", text: "Website sedang dalam perbaikan.", confirmButtonColor: "#ef4444" });
+            } else if (result && result.error === 'access_denied') {
+                Swal.fire({ icon: "error", title: "Akses Ditolak!", text: "Akses Anda diblokir.", confirmButtonColor: "#ef4444" });
+            } else if (result && result.message) {
+                Swal.fire({ icon: "error", title: "Gagal!", text: result.message, confirmButtonColor: "#ef4444" });
+            } else {
+                Swal.fire({ icon: "error", title: "Gagal Mendaftar!", text: "Terjadi kesalahan. Coba lagi.", confirmButtonColor: "#ef4444" });
             }
             if (typeof grecaptcha !== 'undefined') grecaptcha.reset();
         }
@@ -606,12 +603,12 @@ async function register() {
 
 document.addEventListener('DOMContentLoaded', async function() {
     if (!fingerprint) fingerprint = await getFingerprint();
-    
+
     var blockedOrMaintenance = await checkMaintenanceAndBlock();
     if (blockedOrMaintenance) {
         return;
     }
-    
+
     document.getElementById('password').addEventListener('input', updatePasswordStrength);
     document.getElementById('username').addEventListener('input', updatePasswordStrength);
     document.getElementById('confirmPassword').addEventListener('paste', function(e) { e.preventDefault(); Swal.fire({ icon: "warning", title: "Paste Tidak Diizinkan!", timer: 2000, showConfirmButton: false }); });
