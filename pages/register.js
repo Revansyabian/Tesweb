@@ -141,17 +141,19 @@ function resetRegisterAttempts() {
 
 function updatePasswordStrength() {
     var password = document.getElementById('password').value;
-    var username = document.getElementById('username').value.trim();
     var bar = document.getElementById('passwordStrengthBar');
     bar.className = 'password-strength-bar';
     if (password.length === 0) {
         bar.style.width = '0%';
-    } else if (password.length < 6 || password.toLowerCase() === username.toLowerCase()) {
+    } else if (password.length < 6) {
         bar.className = 'password-strength-bar strength-weak';
+        bar.style.width = '33%';
     } else if (password.length < 10) {
         bar.className = 'password-strength-bar strength-medium';
+        bar.style.width = '66%';
     } else {
         bar.className = 'password-strength-bar strength-strong';
+        bar.style.width = '100%';
     }
 }
 
@@ -421,31 +423,29 @@ async function register() {
             return;
         }
 
-        var username = sanitize(document.getElementById('username').value.trim());
-        var password = document.getElementById('password').value.trim();
+        var username = document.getElementById('username').value.trim();
+        var password = document.getElementById('password').value;
         var confirmPassword = document.getElementById('confirmPassword').value.trim();
-        var phone = sanitize(document.getElementById('phone').value.trim());
-        var email = sanitize(document.getElementById('email').value.trim());
+        var phone = document.getElementById('phone').value.trim();
+        var email = document.getElementById('email').value.trim();
 
-        // ==================== VALIDASI USERNAME ====================
-        var usernameClean = username.replace(/\s/g, '');
-        if (!usernameClean || usernameClean.length < 3) {
+        if (!username || username.length < 3) {
             Swal.fire({ icon: "warning", title: "Username Tidak Valid!", text: "Username minimal 3 karakter!", confirmButtonColor: "#0ea5e9" });
             registerInProgress = false;
             return;
         }
-        if (usernameClean.length > 20) {
+        if (username.length > 20) {
             Swal.fire({ icon: "warning", title: "Username Tidak Valid!", text: "Username maksimal 20 karakter!", confirmButtonColor: "#0ea5e9" });
             registerInProgress = false;
             return;
         }
         var usernameRegex = /^[a-zA-Z0-9_.]+$/;
-        if (!usernameRegex.test(usernameClean)) {
+        if (!usernameRegex.test(username)) {
             Swal.fire({ icon: "error", title: "Simbol Tidak Diizinkan!", text: "Username hanya boleh huruf, angka, underscore (_), dan titik (.)", confirmButtonColor: "#ef4444" });
             registerInProgress = false;
             return;
         }
-        var lowerUsername = usernameClean.toLowerCase();
+        var lowerUsername = username.toLowerCase();
         for (var i = 0; i < FORBIDDEN_USERNAMES.length; i++) {
             if (lowerUsername.includes(FORBIDDEN_USERNAMES[i])) {
                 Swal.fire({ icon: "error", title: "Username Tidak Diizinkan!", text: "Username mengandung kata terlarang!", confirmButtonColor: "#ef4444" });
@@ -454,13 +454,12 @@ async function register() {
             }
         }
 
-        // ==================== VALIDASI PASSWORD ====================
         if (!password || password.length < 6) {
             Swal.fire({ icon: "warning", title: "Password Terlalu Pendek!", text: "Password minimal 6 karakter!", confirmButtonColor: "#0ea5e9" });
             registerInProgress = false;
             return;
         }
-        if (password.toLowerCase() === usernameClean.toLowerCase()) {
+        if (password.toLowerCase() === username.toLowerCase()) {
             Swal.fire({ icon: "error", title: "Password Lemah!", text: "Password tidak boleh sama dengan username!", confirmButtonColor: "#ef4444" });
             registerInProgress = false;
             return;
@@ -496,7 +495,6 @@ async function register() {
             return;
         }
 
-        // ==================== VALIDASI PHONE ====================
         if (!phone || phone.length < 10) {
             Swal.fire({ icon: "warning", title: "Nomor Tidak Valid!", text: "Nomor telepon minimal 10 digit!", confirmButtonColor: "#0ea5e9" });
             registerInProgress = false;
@@ -508,7 +506,6 @@ async function register() {
             return;
         }
 
-        // ==================== VALIDASI EMAIL ====================
         if (!email || !email.includes('@')) {
             Swal.fire({ icon: "error", title: "Email Tidak Valid!", text: "Email wajib mengandung @!", confirmButtonColor: "#ef4444" });
             registerInProgress = false;
@@ -526,7 +523,6 @@ async function register() {
             return;
         }
 
-        // ==================== VALIDASI PAKET ====================
         if (!selectedPaket) {
             Swal.fire({ icon: "warning", title: "Paket Belum Dipilih!", text: "Pilih paket terlebih dahulu!", confirmButtonColor: "#0ea5e9" });
             registerInProgress = false;
@@ -538,7 +534,6 @@ async function register() {
             return;
         }
 
-        // ==================== reCAPTCHA ====================
         var captchaResponse = '';
         if (typeof grecaptcha !== 'undefined') {
             captchaResponse = grecaptcha.getResponse();
@@ -559,9 +554,8 @@ async function register() {
             userIP = ipData.ip || 'unknown';
         } catch (e) {}
 
-        // ==================== KIRIM KE API REGISTER ====================
         var result = await callRegisterApi('register', {
-            username: usernameClean,
+            username: username,
             password: password,
             confirmPassword: confirmPassword,
             phone: phone,
@@ -578,7 +572,7 @@ async function register() {
 
         if (result && result.success) {
             resetRegisterAttempts();
-            var waMessage = 'Assalamualaikum min, tolong aktivasi akun saya%0A%0AUsername: ' + encodeURIComponent(usernameClean) + '%0APaket: ' + encodeURIComponent(selectedPaket) + '%0AHarga: Rp ' + selectedHarga.toLocaleString() + '%0AEmail: ' + encodeURIComponent(email) + '%0ANo. HP: ' + encodeURIComponent(phone);
+            var waMessage = 'Assalamualaikum min, tolong aktivasi akun saya%0A%0AUsername: ' + encodeURIComponent(username) + '%0APaket: ' + encodeURIComponent(selectedPaket) + '%0AHarga: Rp ' + selectedHarga.toLocaleString() + '%0AEmail: ' + encodeURIComponent(email) + '%0ANo. HP: ' + encodeURIComponent(phone);
             Swal.fire({ icon: "success", title: "Pendaftaran Berhasil!", timer: 3000, showConfirmButton: false }).then(function() {
                 window.open('https://wa.me/' + WHATSAPP_NUMBER + '?text=' + waMessage, '_blank');
                 window.location.href = '/pages/login';
@@ -623,7 +617,15 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
 
     document.getElementById('password').addEventListener('input', updatePasswordStrength);
-    document.getElementById('username').addEventListener('input', updatePasswordStrength);
+    document.getElementById('username').addEventListener('input', function() {
+        var input = document.getElementById('username');
+        var value = input.value;
+        var cleaned = value.replace(/\s/g, '').replace(/[^a-zA-Z0-9_.]/g, '');
+        if (value !== cleaned) {
+            input.value = cleaned;
+        }
+    });
+    document.getElementById('password').addEventListener('input', updatePasswordStrength);
     document.getElementById('confirmPassword').addEventListener('paste', function(e) { e.preventDefault(); Swal.fire({ icon: "warning", title: "Paste Tidak Diizinkan!", timer: 2000, showConfirmButton: false }); });
     document.getElementById('password').addEventListener('copy', function(e) { e.preventDefault(); Swal.fire({ icon: "warning", title: "Copy Tidak Diizinkan!", timer: 2000, showConfirmButton: false }); });
     document.getElementById('password').addEventListener('keypress', function(e) { if (e.key === 'Enter') document.getElementById('confirmPassword').focus(); });
