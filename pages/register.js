@@ -356,8 +356,14 @@ async function register() {
         if (!document.getElementById('verificationCheck').checked) { Swal.fire({ icon: "warning", title: "Verifikasi Diperlukan!", confirmButtonColor: "#0ea5e9" }); registerInProgress = false; return; }
 
         var captchaResponse = '';
-        if (typeof grecaptcha !== 'undefined') { captchaResponse = grecaptcha.getResponse(); }
-        if (!captchaResponse || captchaResponse.length === 0) { Swal.fire({ icon: "warning", title: "reCAPTCHA Diperlukan!", confirmButtonColor: "#0ea5e9" }); registerInProgress = false; return; }
+        if (typeof grecaptcha !== 'undefined') { 
+            captchaResponse = grecaptcha.getResponse(); 
+        }
+        if (!captchaResponse || captchaResponse.length === 0) {
+            Swal.fire({ icon: "warning", title: "reCAPTCHA Diperlukan!", text: "Centang \"I'm not a robot\" dulu ya!", confirmButtonColor: "#0ea5e9" });
+            registerInProgress = false;
+            return;
+        }
 
         setButtonLoading(true);
         if (!fingerprint) fingerprint = await getFingerprint();
@@ -396,7 +402,7 @@ async function register() {
             else if (result && result.error === 'email_exists') { Swal.fire({ icon: "error", title: "Email Sudah Terdaftar!", confirmButtonColor: "#ef4444" }); }
             else if (result && result.error === 'maintenance') { Swal.fire({ icon: "error", title: "Sedang Maintenance!", text: "Website sedang dalam perbaikan.", confirmButtonColor: "#ef4444" }); }
             else if (result && result.error === 'access_denied') { Swal.fire({ icon: "error", title: "Akses Ditolak!", text: "Akses Anda diblokir.", confirmButtonColor: "#ef4444" }); }
-            else { Swal.fire({ icon: "error", title: "Gagal Mendaftar!", confirmButtonColor: "#ef4444" }); }
+            else { Swal.fire({ icon: "error", title: "Gagal Mendaftar!", text: "Terjadi kesalahan. Coba lagi.", confirmButtonColor: "#ef4444" }); }
             if (typeof grecaptcha !== 'undefined') grecaptcha.reset();
         }
 
@@ -411,10 +417,12 @@ async function register() {
 
 document.addEventListener('DOMContentLoaded', async function() {
     if (!fingerprint) fingerprint = await getFingerprint();
+    
     var blockedOrMaintenance = await checkMaintenanceAndBlock();
     if (blockedOrMaintenance) {
         return;
     }
+    
     document.getElementById('password').addEventListener('input', updatePasswordStrength);
     document.getElementById('username').addEventListener('input', updatePasswordStrength);
     document.getElementById('confirmPassword').addEventListener('paste', function(e) { e.preventDefault(); Swal.fire({ icon: "warning", title: "Paste Tidak Diizinkan!", timer: 2000, showConfirmButton: false }); });
