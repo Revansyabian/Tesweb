@@ -186,6 +186,15 @@ async function checkMaintenance() {
     }
 }
 
+function getClientIP(req) {
+    const forwarded = req.headers['x-forwarded-for'];
+    if (forwarded) {
+        const ips = forwarded.split(',');
+        return ips[0].trim();
+    }
+    return req.socket.remoteAddress || 'unknown';
+}
+
 export default async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -197,7 +206,7 @@ export default async function handler(req, res) {
     if (req.method === 'OPTIONS') return res.status(200).end();
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
+    const ip = getClientIP(req);
     const fp = req.headers['x-fingerprint'] || '';
 
     if (!await checkRateLimit(ip)) {
