@@ -201,34 +201,6 @@ export default async function handler(req, res) {
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
     const fp = req.headers['x-fingerprint'] || '';
 
-    const maintenance = await checkMaintenance();
-    if (maintenance) {
-        return res.status(200).json({ 
-            data: encryptResponse({ 
-                success: false,
-                error: 'maintenance',
-                maintenance: true,
-                title: maintenance.title,
-                message: maintenance.message,
-                until: maintenance.until
-            }) 
-        });
-    }
-
-    const ipBlocked = await isIPBlocked(ip);
-    const fpBlocked = fp ? await isFPBlocked(fp) : false;
-    
-    if (ipBlocked || fpBlocked) {
-        return res.status(200).json({ 
-            data: encryptResponse({ 
-                success: false,
-                error: 'access_denied',
-                blocked: true,
-                message: 'Akses ditolak, jika ingin dibuka silakan hubungi admin.'
-            }) 
-        });
-    }
-
     if (!await checkRateLimit(ip)) {
         return res.status(429).json({ data: encryptResponse({ success: false, error: 'rate_limit', message: 'Terlalu banyak percobaan.' }) });
     }
@@ -246,6 +218,44 @@ export default async function handler(req, res) {
 
         const action = decrypted.action;
 
+        // ==================== CHECK STATUS (MAINTENANCE & BLOCK) ====================
+        if (action === 'check_status') {
+            const maintenance = await checkMaintenance();
+            const ipBlocked = await isIPBlocked(ip);
+            const fpBlocked = fp ? await isFPBlocked(fp) : false;
+            
+            // PRIORITAS BAN AKSES > MAINTENANCE
+            if (ipBlocked || fpBlocked) {
+                return res.status(200).json({ 
+                    data: encryptResponse({ 
+                        blocked: true,
+                        maintenance: false,
+                        message: 'Akses ditolak, jika ingin dibuka silakan hubungi admin.'
+                    }) 
+                });
+            }
+            
+            if (maintenance) {
+                return res.status(200).json({ 
+                    data: encryptResponse({ 
+                        blocked: false,
+                        maintenance: true,
+                        title: maintenance.title,
+                        message: maintenance.message,
+                        until: maintenance.until
+                    }) 
+                });
+            }
+            
+            return res.status(200).json({ 
+                data: encryptResponse({ 
+                    blocked: false,
+                    maintenance: false
+                }) 
+            });
+        }
+
+        // ==================== REGISTER ====================
         if (action === 'register') {
             const username = sanitizeInput(decrypted.username || '');
             const password = decrypted.password || '';
