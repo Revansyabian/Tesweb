@@ -1,3 +1,4 @@
+
 import CryptoJS from 'crypto-js';
 import admin from 'firebase-admin';
 import bcrypt from 'bcryptjs';
@@ -93,7 +94,7 @@ async function checkRateLimit(ip) {
     const snap = await ref.once('value');
     const raw = snap.val();
     const now = Date.now();
-    
+
     if (raw && raw.data) {
         try {
             const data = decryptData(raw.data);
@@ -105,14 +106,14 @@ async function checkRateLimit(ip) {
             }
         } catch (e) {}
     }
-    
+
     await ref.set({ data: encryptData({ count: 1, timestamp: now }) });
     return true;
 }
 
 async function verifyRecaptcha(token) {
     if (!token || !RECAPTCHA_V2_SECRET_KEY) return false;
-    
+
     try {
         const res = await fetch('https://www.google.com/recaptcha/api/siteverify', {
             method: 'POST',
@@ -123,66 +124,6 @@ async function verifyRecaptcha(token) {
         return data.success === true;
     } catch (e) {
         return false;
-    }
-}
-
-async function isIPBlocked(ip) {
-    if (!ip || ip === 'unknown' || ip === '::1' || ip === '127.0.0.1') return false;
-    
-    const keys = [
-        ip.replace(/\./g, '_'),
-        ip,
-        ip.replace(/:/g, '_')
-    ];
-    
-    for (const key of keys) {
-        const snap = await db.ref('blocked_ips/' + key).once('value');
-        const raw = snap.val();
-        if (raw && raw.data) {
-            try {
-                const data = decryptData(raw.data);
-                if (data && data.blocked === true) {
-                    return true;
-                }
-            } catch (e) {}
-        }
-    }
-    return false;
-}
-
-async function isFPBlocked(fp) {
-    if (!fp) return false;
-    const snap = await db.ref('blocked_fp/' + fp).once('value');
-    const raw = snap.val();
-    if (raw && raw.data) {
-        try {
-            const data = decryptData(raw.data);
-            if (data && data.blocked === true) {
-                return true;
-            }
-        } catch (e) {}
-    }
-    return false;
-}
-
-async function checkMaintenance() {
-    try {
-        const snap = await db.ref('maintenance_status').once('value');
-        const raw = snap.val();
-        if (raw && raw.data) {
-            const data = decryptData(raw.data);
-            if (data && data.maintenance === true) {
-                return {
-                    maintenance: true,
-                    title: data.title || 'SEDANG PERBAIKAN SISTEM',
-                    message: data.message || 'Website sedang dalam perbaikan oleh admin. Silakan kembali beberapa saat lagi.',
-                    until: data.until || null
-                };
-            }
-        }
-        return null;
-    } catch (e) {
-        return null;
     }
 }
 
@@ -230,34 +171,34 @@ export default async function handler(req, res) {
             const maintenance = await checkMaintenance();
             const ipBlocked = await isIPBlocked(ip);
             const fpBlocked = fp ? await isFPBlocked(fp) : false;
-            
+
             if (ipBlocked || fpBlocked) {
-                return res.status(200).json({ 
-                    data: encryptResponse({ 
+                return res.status(200).json({
+                    data: encryptResponse({
                         blocked: true,
                         maintenance: false,
                         message: 'Akses ditolak, jika ingin dibuka silakan hubungi admin.'
-                    }) 
+                    })
                 });
             }
-            
+
             if (maintenance) {
-                return res.status(200).json({ 
-                    data: encryptResponse({ 
+                return res.status(200).json({
+                    data: encryptResponse({
                         blocked: false,
                         maintenance: true,
                         title: maintenance.title,
                         message: maintenance.message,
                         until: maintenance.until
-                    }) 
+                    })
                 });
             }
-            
-            return res.status(200).json({ 
-                data: encryptResponse({ 
+
+            return res.status(200).json({
+                data: encryptResponse({
                     blocked: false,
                     maintenance: false
-                }) 
+                })
             });
         }
 
@@ -307,7 +248,7 @@ export default async function handler(req, res) {
             const ipRef = db.ref('register_limits/' + ipKey);
             const ipSnap = await ipRef.once('value');
             const ipRaw = ipSnap.val();
-            
+
             if (ipRaw && ipRaw.data) {
                 try {
                     const ipData = decryptData(ipRaw.data);
@@ -316,13 +257,13 @@ export default async function handler(req, res) {
                     }
                 } catch (e) {}
             }
-            
+
             if (userFP) {
                 const fpKey = 'register_fp_' + userFP;
                 const fpRef = db.ref('register_limits/' + fpKey);
                 const fpSnap = await fpRef.once('value');
                 const fpRaw = fpSnap.val();
-                
+
                 if (fpRaw && fpRaw.data) {
                     try {
                         const fpData = decryptData(fpRaw.data);
@@ -335,7 +276,7 @@ export default async function handler(req, res) {
 
             const usersSnap = await db.ref('users').once('value');
             const users = usersSnap.val();
-            
+
             if (users) {
                 for (const key in users) {
                     const userData = decryptData(users[key].data);
