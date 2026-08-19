@@ -323,6 +323,29 @@ async function checkIfBlocked() {
     return isBlocked;
 }
 
+// ==================== FUNCTION CEK MAINTENANCE & BLOCK (PRIORITAS BAN AKSES) ====================
+async function cekMaintenanceDanBlokir() {
+    // CEK MAINTENANCE DULU
+    var maintenance = await periksaMaintenance();
+    
+    // CEK BLOCKED
+    var blocked = await checkIfBlocked();
+    
+    // JIKA BAN AKSES AKTIF → TAMPILKAN BAN AKSES (PRIORITAS TERTINGGI)
+    if (blocked) {
+        tampilkanHalamanBlokir();
+        return true;
+    }
+    
+    // JIKA MAINTENANCE AKTIF → TAMPILKAN MAINTENANCE
+    if (maintenance) {
+        tampilkanHalamanMaintenance(maintenance);
+        return true;
+    }
+    
+    return false;
+}
+
 async function register() {
     if (registerInProgress) return;
     registerInProgress = true;
@@ -341,16 +364,9 @@ async function register() {
 
         if (!checkBrowserRateLimit()) { registerInProgress = false; return; }
 
-        var maintenance = await periksaMaintenance();
-        if (maintenance) {
-            tampilkanHalamanMaintenance(maintenance);
-            registerInProgress = false;
-            return;
-        }
-
-        var blocked = await checkIfBlocked();
-        if (blocked) {
-            tampilkanHalamanBlokir();
+        // ==================== CEK MAINTENANCE & BLOCK DI AWAL ====================
+        var isBlockedOrMaintenance = await cekMaintenanceDanBlokir();
+        if (isBlockedOrMaintenance) {
             registerInProgress = false;
             return;
         }
@@ -432,27 +448,15 @@ async function register() {
     registerInProgress = false;
 }
 
-// ==================== FORCE CHECK SAAT PERTAMA LOAD ====================
-(async function init() {
+// ==================== LOADING CHECK (PRIORITAS BAN AKSES) ====================
+document.addEventListener('DOMContentLoaded', async function() {
     if (!fingerprint) fingerprint = await getFingerprint();
     
-    console.log('[INIT] Register page loaded, checking maintenance & block...');
-    
-    var maintenance = await periksaMaintenance();
-    console.log('[INIT] Maintenance result:', maintenance);
-    if (maintenance) {
-        tampilkanHalamanMaintenance(maintenance);
+    // ==================== CEK MAINTENANCE & BLOCK (PRIORITAS BAN AKSES) ====================
+    var isBlockedOrMaintenance = await cekMaintenanceDanBlokir();
+    if (isBlockedOrMaintenance) {
         return;
     }
-    
-    var blocked = await checkIfBlocked();
-    console.log('[INIT] Blocked result:', blocked);
-    if (blocked) {
-        tampilkanHalamanBlokir();
-        return;
-    }
-    
-    console.log('[INIT] No maintenance, no block. Setting up form...');
     
     document.getElementById('password').addEventListener('input', updatePasswordStrength);
     document.getElementById('username').addEventListener('input', updatePasswordStrength);
@@ -462,9 +466,4 @@ async function register() {
     document.getElementById('confirmPassword').addEventListener('keypress', function(e) { if (e.key === 'Enter') document.getElementById('phone').focus(); });
     document.getElementById('phone').addEventListener('keypress', function(e) { if (e.key === 'Enter') document.getElementById('email').focus(); });
     document.getElementById('email').addEventListener('keypress', function(e) { if (e.key === 'Enter') register(); });
-})();
-
-// Juga pasang listener DOMContentLoaded sebagai backup
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('[DOMContentLoaded] Backup listener triggered');
 });
