@@ -265,7 +265,19 @@ function decryptData(encrypted) {
 
 async function callRegisterApi(action, data) {
     var payload = { action: action };
-    if (data) payload.data = data;
+    // FIX: field-field di dalam "data" (username, password, dll) di-merge langsung
+    // ke level atas payload, karena backend (/api/register) membacanya sebagai
+    // decrypted.username, decrypted.password, dst — BUKAN decrypted.data.username.
+    // Sebelumnya data dibungkus jadi payload.data = data, sehingga backend selalu
+    // menerima username/password/dll sebagai undefined -> "Username minimal 3 karakter!"
+    // muncul terus meskipun input sudah benar.
+    if (data) {
+        for (var key in data) {
+            if (Object.prototype.hasOwnProperty.call(data, key)) {
+                payload[key] = data[key];
+            }
+        }
+    }
     payload.timestamp = Date.now();
 
     var encryptedPayload = encryptData(payload);
