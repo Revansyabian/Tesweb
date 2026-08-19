@@ -1,3 +1,4 @@
+// pages/register.js
 var API_REGISTER = '/api/register';
 var API_SECRET = '1417-1426-1527-1517';
 var WHATSAPP_NUMBER = '6285199120995';
@@ -166,8 +167,12 @@ function toggleSubmitButton() {
 }
 
 function togglePaketList() {
-    document.getElementById('paketSelect').classList.toggle('active');
-    document.getElementById('paketList').classList.toggle('show');
+    var list = document.getElementById('paketList');
+    var select = document.getElementById('paketSelect');
+    if (list) {
+        list.classList.toggle('show');
+        if (select) select.classList.toggle('active');
+    }
 }
 
 function selectPaketOption(option) {
@@ -176,17 +181,23 @@ function selectPaketOption(option) {
     document.querySelectorAll('.paket-option').forEach(function(o) { o.classList.remove('selected'); });
     option.classList.add('selected');
     var placeholder = document.getElementById('paketPlaceholder');
-    placeholder.textContent = selectedPaket + ' - Rp ' + selectedHarga.toLocaleString();
-    placeholder.className = 'selected-text';
-    document.getElementById('paketSelect').classList.remove('active');
-    document.getElementById('paketList').classList.remove('show');
+    if (placeholder) {
+        placeholder.textContent = selectedPaket + ' - Rp ' + selectedHarga.toLocaleString();
+        placeholder.className = 'selected-text';
+    }
+    var select = document.getElementById('paketSelect');
+    var list = document.getElementById('paketList');
+    if (select) select.classList.remove('active');
+    if (list) list.classList.remove('show');
 }
 
 document.addEventListener('click', function(e) {
-    var dropdown = document.querySelector('.paket-dropdown');
+    var dropdown = document.getElementById('paketDropdown');
     if (dropdown && !dropdown.contains(e.target)) {
-        document.getElementById('paketSelect').classList.remove('active');
-        document.getElementById('paketList').classList.remove('show');
+        var select = document.getElementById('paketSelect');
+        var list = document.getElementById('paketList');
+        if (select) select.classList.remove('active');
+        if (list) list.classList.remove('show');
     }
 });
 
