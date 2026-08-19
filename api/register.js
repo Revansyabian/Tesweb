@@ -281,6 +281,36 @@ export default async function handler(req, res) {
         }
 
         if (action === 'register') {
+            // ==================== CEK MAINTENANCE & BAN AKSES ====================
+            // Ditambahkan supaya request register yang langsung nembak API ini
+            // (skip frontend/tanpa lewat checkMaintenanceAndBlock di browser)
+            // tetap ketolak kalau maintenance aktif atau IP/Fingerprint diban.
+            // Urutan cek: ban akses DULU baru maintenance, jadi kalau dua-duanya
+            // aktif bersamaan, ban akses yang menang (sama seperti action check_status).
+            const ipBlockedRegister = await isIPBlocked(ip);
+            const fpBlockedRegister = fp ? await isFPBlocked(fp) : false;
+
+            if (ipBlockedRegister || fpBlockedRegister) {
+                return res.status(200).json({
+                    data: encryptResponse({
+                        success: false,
+                        error: 'access_denied',
+                        message: 'Akses ditolak, jika ingin dibuka silakan hubungi admin.'
+                    })
+                });
+            }
+
+            const maintenanceRegister = await checkMaintenance();
+            if (maintenanceRegister) {
+                return res.status(200).json({
+                    data: encryptResponse({
+                        success: false,
+                        error: 'maintenance',
+                        message: maintenanceRegister.message
+                    })
+                });
+            }
+
             // ==================== VALIDASI USERNAME ====================
             const rawUsername = decrypted.username || '';
             const usernameValidation = isValidUsername(rawUsername);
