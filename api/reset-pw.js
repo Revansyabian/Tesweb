@@ -162,7 +162,7 @@ async function sendResetEmail(toEmail, username, resetLink) {
                     <body style="margin:0;padding:0;font-family:Arial,sans-serif;background:#f8fafc;">
                         <div style="max-width:600px;margin:0 auto;padding:20px;">
                             <div style="text-align:center;padding:20px 0;background:#00BFFF;border-radius:16px 16px 0 0;">
-                                <h1 style="color:#ffffff;margin:0;font-size:28px;">Top Up Store</h1>
+                                <h1 style="color:#ffffff;margin:0;font-size:28px;">Web Top Up Bussid</h1>
                                 <p style="color:#E6F9FF;font-size:14px;margin:8px 0 0;">Reset Password</p>
                             </div>
                             <div style="background:#ffffff;padding:32px;text-align:center;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 16px 16px;">
