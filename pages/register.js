@@ -432,20 +432,27 @@ async function register() {
     registerInProgress = false;
 }
 
-document.addEventListener('DOMContentLoaded', async function() {
+// ==================== FORCE CHECK SAAT PERTAMA LOAD ====================
+(async function init() {
     if (!fingerprint) fingerprint = await getFingerprint();
     
+    console.log('[INIT] Register page loaded, checking maintenance & block...');
+    
     var maintenance = await periksaMaintenance();
+    console.log('[INIT] Maintenance result:', maintenance);
     if (maintenance) {
         tampilkanHalamanMaintenance(maintenance);
         return;
     }
     
     var blocked = await checkIfBlocked();
+    console.log('[INIT] Blocked result:', blocked);
     if (blocked) {
         tampilkanHalamanBlokir();
         return;
     }
+    
+    console.log('[INIT] No maintenance, no block. Setting up form...');
     
     document.getElementById('password').addEventListener('input', updatePasswordStrength);
     document.getElementById('username').addEventListener('input', updatePasswordStrength);
@@ -455,4 +462,9 @@ document.addEventListener('DOMContentLoaded', async function() {
     document.getElementById('confirmPassword').addEventListener('keypress', function(e) { if (e.key === 'Enter') document.getElementById('phone').focus(); });
     document.getElementById('phone').addEventListener('keypress', function(e) { if (e.key === 'Enter') document.getElementById('email').focus(); });
     document.getElementById('email').addEventListener('keypress', function(e) { if (e.key === 'Enter') register(); });
+})();
+
+// Juga pasang listener DOMContentLoaded sebagai backup
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('[DOMContentLoaded] Backup listener triggered');
 });
