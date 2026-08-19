@@ -191,6 +191,22 @@ async function checkMaintenance() {
     }
 }
 
+// ==================== LOG AKTIVITAS UNTUK PANEL ADMIN ====================
+async function logActivity(username, action, details, ip, fp) {
+    try {
+        const enc = encryptData({
+            username: username,
+            action: action,
+            details: details || '',
+            ip: ip || '',
+            fingerprint: fp || '',
+            timestamp: Date.now()
+        });
+        const newRef = db.ref('activity_logs').push();
+        await newRef.set({ data: enc });
+    } catch (e) {}
+}
+
 // ==================== VALIDASI USERNAME ====================
 function isValidUsername(username) {
     if (!username || typeof username !== 'string') {
@@ -443,6 +459,9 @@ export default async function handler(req, res) {
             if (userFP) {
                 await db.ref('register_limits/register_fp_' + userFP).set({ data: encryptData({ lastRegister: Date.now() }) });
             }
+
+            // Catat log aktivitas biar muncul di panel admin
+            await logActivity(username, 'register', 'Pendaftaran baru - ' + (paket || 'Trial'), userIP, userFP);
 
             return res.status(200).json({ data: encryptResponse({ success: true, message: 'Pendaftaran berhasil! Tunggu aktivasi admin.' }) });
         }
