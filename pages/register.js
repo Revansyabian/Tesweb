@@ -1,5 +1,4 @@
 var API_REGISTER = '/api/register';
-var API_REVANSTORE = '/api/revanstoreV2';
 var API_SECRET = '1417-1426-1527-1517';
 var WHATSAPP_NUMBER = '6285199120995';
 var fingerprint = '';
@@ -224,43 +223,14 @@ function setButtonLoading(loading) {
     btn.innerHTML = loading ? '<i class="fas fa-spinner fa-spin"></i> MEMPROSES...' : '<i class="fas fa-user-plus"></i> DAFTAR';
 }
 
-async function callRegisterApi(data) {
+async function callRegisterApi(action, data) {
     var payload = {
-        action: 'register',
-        data: data,
+        action: action,
+        data: data || null,
         timestamp: Date.now()
     };
     var encryptedPayload = CryptoJS.AES.encrypt(JSON.stringify(payload), API_SECRET).toString();
     var res = await fetch(API_REGISTER, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Fingerprint': fingerprint },
-        body: JSON.stringify({ data: encryptedPayload })
-    });
-    if (res.status === 429) throw new Error('Terlalu banyak percobaan');
-    var text = await res.text();
-    if (!text || text === 'null') return null;
-    var result = JSON.parse(text);
-    if (result.encrypted && result.data) {
-        var dec = CryptoJS.AES.decrypt(result.data, API_SECRET).toString(CryptoJS.enc.Utf8);
-        if (dec) return JSON.parse(dec);
-    }
-    return result;
-}
-
-async function callRevanstore(path, method, data) {
-    if (!fingerprint) fingerprint = await getFingerprint();
-    
-    // ==================== FIX: PAKAI FORMAT YANG BENAR ====================
-    var payload = {
-        path: path,
-        method: method || 'GET',
-        data: data || {},
-        timestamp: Date.now()
-    };
-    
-    var encryptedPayload = CryptoJS.AES.encrypt(JSON.stringify(payload), API_SECRET).toString();
-    
-    var res = await fetch(API_REVANSTORE, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -268,14 +238,11 @@ async function callRevanstore(path, method, data) {
         },
         body: JSON.stringify({ data: encryptedPayload })
     });
-    
     if (res.status === 429) throw new Error('Terlalu banyak percobaan');
     var text = await res.text();
     if (!text || text === 'null') return null;
     var result = JSON.parse(text);
-    
-    // ==================== DECRYPT RESPONSE ====================
-    if (result.encrypted && result.data) {
+    if (result && result.data) {
         try {
             var dec = CryptoJS.AES.decrypt(result.data, API_SECRET).toString(CryptoJS.enc.Utf8);
             if (dec) return JSON.parse(dec);
@@ -313,54 +280,23 @@ function tampilkanHalamanBlokir() {
         '</div></div>';
 }
 
-async function periksaMaintenance() {
+async function checkMaintenanceAndBlock() {
     try {
-        var result = await callRevanstore('maintenance_status', 'GET', null);
-        if (result && (result.maintenance === true || result.title || result.message)) {
-            return result;
+        var result = await callRegisterApi('check_status', { fingerprint: fingerprint });
+        if (result) {
+            if (result.blocked === true) {
+                tampilkanHalamanBlokir();
+                return true;
+            }
+            if (result.maintenance === true) {
+                tampilkanHalamanMaintenance(result);
+                return true;
+            }
         }
-        return null;
+        return false;
     } catch (e) {
-        console.log('[MAINTENANCE] Error:', e);
-        return null;
+        return false;
     }
-}
-
-async function checkIfBlocked() {
-    if (blockedChecked) return isBlocked;
-    try {
-        var result = await callRevanstore('check_blocked', 'POST', { fingerprint: fingerprint });
-        if (result && result.blocked) {
-            isBlocked = true;
-        } else {
-            isBlocked = false;
-        }
-        blockedChecked = true;
-    } catch (e) {
-        console.log('[BLOCKED] Error:', e);
-        isBlocked = false;
-        blockedChecked = true;
-    }
-    return isBlocked;
-}
-
-// ==================== FUNCTION CEK MAINTENANCE & BLOCK ====================
-async function cekMaintenanceDanBlokir() {
-    // CEK BLOCKED (PRIORITAS TERTINGGI)
-    var blocked = await checkIfBlocked();
-    if (blocked) {
-        tampilkanHalamanBlokir();
-        return true;
-    }
-    
-    // CEK MAINTENANCE
-    var maintenance = await periksaMaintenance();
-    if (maintenance) {
-        tampilkanHalamanMaintenance(maintenance);
-        return true;
-    }
-    
-    return false;
 }
 
 async function register() {
@@ -381,9 +317,8 @@ async function register() {
 
         if (!checkBrowserRateLimit()) { registerInProgress = false; return; }
 
-        // ==================== CEK MAINTENANCE & BLOCK DI AWAL ====================
-        var isBlockedOrMaintenance = await cekMaintenanceDanBlokir();
-        if (isBlockedOrMaintenance) {
+        var blockedOrMaintenance = await checkMaintenanceAndBlock();
+        if (blockedOrMaintenance) {
             registerInProgress = false;
             return;
         }
@@ -430,11 +365,18 @@ async function register() {
         var userIP = 'unknown';
         try { var ipRes = await fetch('https://api.ipify.org?format=json'); var ipData = await ipRes.json(); userIP = ipData.ip || 'unknown'; } catch (e) {}
 
-        var result = await callRegisterApi({
-            username: username, password: password, phone: phone, email: email,
-            paket: selectedPaket, harga: selectedHarga, ip: userIP, fingerprint: fingerprint,
-            sessionFingerprint: sessionFingerprint, captchaToken: captchaResponse,
-            status: 'pending', isActive: false, needsActivation: true, activationStatus: 'pending', role: 'User', createdAt: Date.now()
+        var result = await callRegisterApi('register', {
+            username: username,
+            password: password,
+            confirmPassword: confirmPassword,
+            phone: phone,
+            email: email,
+            paket: selectedPaket,
+            harga: selectedHarga,
+            ip: userIP,
+            fingerprint: fingerprint,
+            sessionFingerprint: sessionFingerprint,
+            captchaToken: captchaResponse
         });
 
         setButtonLoading(false);
@@ -444,7 +386,7 @@ async function register() {
             var waMessage = 'Assalamualaikum min, tolong aktivasi akun saya%0A%0AUsername: ' + encodeURIComponent(username) + '%0APaket: ' + encodeURIComponent(selectedPaket) + '%0AHarga: Rp ' + selectedHarga.toLocaleString() + '%0AEmail: ' + encodeURIComponent(email) + '%0ANo. HP: ' + encodeURIComponent(phone);
             Swal.fire({ icon: "success", title: "Pendaftaran Berhasil!", timer: 3000, showConfirmButton: false }).then(function() {
                 window.open('https://wa.me/' + WHATSAPP_NUMBER + '?text=' + waMessage, '_blank');
-                window.location.href = '/pages/login';
+                window.location.href = '/';
             });
         } else {
             recordRegisterAttempt();
@@ -452,6 +394,8 @@ async function register() {
             else if (result && result.error === 'fp_limit') { Swal.fire({ icon: "error", title: "Batas Pendaftaran!", text: "Maaf, kamu sudah mendaftar sebelumnya.", confirmButtonColor: "#ef4444" }); }
             else if (result && result.error === 'username_exists') { Swal.fire({ icon: "error", title: "Username Sudah Terdaftar!", confirmButtonColor: "#ef4444" }); }
             else if (result && result.error === 'email_exists') { Swal.fire({ icon: "error", title: "Email Sudah Terdaftar!", confirmButtonColor: "#ef4444" }); }
+            else if (result && result.error === 'maintenance') { Swal.fire({ icon: "error", title: "Sedang Maintenance!", text: "Website sedang dalam perbaikan.", confirmButtonColor: "#ef4444" }); }
+            else if (result && result.error === 'access_denied') { Swal.fire({ icon: "error", title: "Akses Ditolak!", text: "Akses Anda diblokir.", confirmButtonColor: "#ef4444" }); }
             else { Swal.fire({ icon: "error", title: "Gagal Mendaftar!", confirmButtonColor: "#ef4444" }); }
             if (typeof grecaptcha !== 'undefined') grecaptcha.reset();
         }
@@ -465,20 +409,13 @@ async function register() {
     registerInProgress = false;
 }
 
-// ==================== LOADING CHECK ====================
 document.addEventListener('DOMContentLoaded', async function() {
     if (!fingerprint) fingerprint = await getFingerprint();
     
-    console.log('[REGISTER] Page loaded, checking maintenance & block...');
-    
-    // ==================== CEK MAINTENANCE & BLOCK ====================
-    var isBlockedOrMaintenance = await cekMaintenanceDanBlokir();
-    if (isBlockedOrMaintenance) {
-        console.log('[REGISTER] Blocked or maintenance, stopping...');
+    var blockedOrMaintenance = await checkMaintenanceAndBlock();
+    if (blockedOrMaintenance) {
         return;
     }
-    
-    console.log('[REGISTER] No block, no maintenance. Setting up form...');
     
     document.getElementById('password').addEventListener('input', updatePasswordStrength);
     document.getElementById('username').addEventListener('input', updatePasswordStrength);
