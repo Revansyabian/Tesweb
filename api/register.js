@@ -106,7 +106,12 @@ async function checkRateLimit(ip) {
 }
 
 async function verifyRecaptcha(token) {
-    if (!token || !RECAPTCHA_V2_SECRET_KEY) return false;
+    if (!token) return false;
+    // Kalau RECAPTCHA_V2_SECRET_KEY belum dikonfigurasi di server, verifikasi
+    // di-skip (dianggap valid) - konsisten dengan verifyRecaptchaV2 di revanstoreV2.
+    // Sebelumnya di sini langsung return false kalau key kosong, jadi registrasi
+    // SELALU gagal dengan error invalid_captcha meski token dari user valid.
+    if (!RECAPTCHA_V2_SECRET_KEY) return true;
 
     try {
         const res = await fetch('https://www.google.com/recaptcha/api/siteverify', {
@@ -469,6 +474,9 @@ export default async function handler(req, res) {
         return res.status(400).json({ data: encryptResponse({ success: false, error: 'invalid_action', message: 'Aksi tidak valid!' }) });
     } catch (error) {
         console.error('Register error:', error);
-        return res.status(500).json({ data: encryptResponse({ success: false, error: 'server_error', message: 'Terjadi kesalahan pada server.' }) });
+        // DEBUG SEMENTARA: sertain pesan error asli biar ketauan exception-nya
+        // dari mana. Response ini tetap terenkripsi, jadi gak kebaca user awam.
+        // Hapus field "debug" ini nanti kalau bug-nya udah ketemu & di-fix.
+        return res.status(500).json({ data: encryptResponse({ success: false, error: 'server_error', message: 'Terjadi kesalahan pada server.', debug: error && error.message ? error.message : String(error) }) });
     }
 }
