@@ -478,6 +478,7 @@ export default async function handler(req, res) {
         return res.status(400).json({ data: encryptResponse({ success: false, error: 'invalid_action', message: 'Aksi tidak valid!' }) });
     } catch (error) {
         console.error('Register error:', error);
-        return res.status(500).json({ data: encryptResponse({ success: false, error: 'server_error', message: 'Terjadi kesalahan pada server.' }) });
+        // DEBUG SEMENTARA lagi - hapus setelah bug ketemu
+        return res.status(500).json({ data: encryptResponse({ success: false, error: 'server_error', message: 'Terjadi kesalahan pada server.', debug: error && error.message ? error.message : String(error), stack: error && error.stack ? String(error.stack).split('\n').slice(0,5).join(' | ') : '' }) });
     }
 }
