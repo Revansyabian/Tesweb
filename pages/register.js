@@ -156,6 +156,32 @@ function updatePasswordStrength() {
     }
 }
 
+function updateConfirmPasswordStrength() {
+    var confirmPassword = document.getElementById('confirmPassword').value;
+    var bar = document.getElementById('confirmPasswordStrengthBar');
+    bar.className = 'password-strength-bar';
+    if (confirmPassword.length === 0) {
+        bar.style.width = '0%';
+    } else if (confirmPassword.length < 6) {
+        bar.className = 'password-strength-bar strength-weak';
+        bar.style.width = '33%';
+    } else if (confirmPassword.length < 10) {
+        bar.className = 'password-strength-bar strength-medium';
+        bar.style.width = '66%';
+    } else {
+        bar.className = 'password-strength-bar strength-strong';
+        bar.style.width = '100%';
+    }
+}
+
+function validateConfirmPasswordComplexity() {
+    var confirmPassword = document.getElementById('confirmPassword').value;
+    if (confirmPassword.length === 0) return;
+    if (!validatePasswordComplexity(confirmPassword)) {
+        Swal.fire({ icon: "warning", title: "Password Lemah!", text: "Password harus ada huruf BESAR, kecil, dan angka!", confirmButtonColor: "#0ea5e9" });
+    }
+}
+
 function showError(msg) {
     document.getElementById('errorText').textContent = msg;
     document.getElementById('errorMessage').classList.add('show');
@@ -605,6 +631,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
     });
     document.getElementById('password').addEventListener('input', updatePasswordStrength);
+    document.getElementById('confirmPassword').addEventListener('input', updateConfirmPasswordStrength);
+    document.getElementById('confirmPassword').addEventListener('blur', validateConfirmPasswordComplexity);
     document.getElementById('confirmPassword').addEventListener('paste', function(e) { e.preventDefault(); Swal.fire({ icon: "warning", title: "Paste Tidak Diizinkan!", timer: 2000, showConfirmButton: false }); });
     document.getElementById('password').addEventListener('copy', function(e) { e.preventDefault(); Swal.fire({ icon: "warning", title: "Copy Tidak Diizinkan!", timer: 2000, showConfirmButton: false }); });
     document.getElementById('password').addEventListener('keypress', function(e) { if (e.key === 'Enter') document.getElementById('confirmPassword').focus(); });
