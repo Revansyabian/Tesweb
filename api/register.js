@@ -139,9 +139,13 @@ function getClientIP(req) {
 async function isIPBlocked(ip) {
     if (!ip || ip === 'unknown' || ip === '::1' || ip === '127.0.0.1') return false;
     
+    // FIX: sebelumnya ada key "ip" mentah (tanpa di-escape) di array ini, yang
+    // masih mengandung titik untuk IPv4 (mis. "202.56.166.100"). Firebase Realtime
+    // Database MENOLAK path yang mengandung ".", jadi db.ref('blocked_ips/' + ip)
+    // selalu throw exception untuk setiap IPv4 biasa -> bikin action 'register'
+    // DAN 'check_status' selalu gagal dengan server_error, walau IP-nya gak diban.
     const keys = [
         ip.replace(/\./g, '_'),
-        ip,
         ip.replace(/:/g, '_')
     ];
     
@@ -474,9 +478,6 @@ export default async function handler(req, res) {
         return res.status(400).json({ data: encryptResponse({ success: false, error: 'invalid_action', message: 'Aksi tidak valid!' }) });
     } catch (error) {
         console.error('Register error:', error);
-        // DEBUG SEMENTARA: sertain pesan error asli biar ketauan exception-nya
-        // dari mana. Response ini tetap terenkripsi, jadi gak kebaca user awam.
-        // Hapus field "debug" ini nanti kalau bug-nya udah ketemu & di-fix.
-        return res.status(500).json({ data: encryptResponse({ success: false, error: 'server_error', message: 'Terjadi kesalahan pada server.', debug: error && error.message ? error.message : String(error) }) });
+        return res.status(500).json({ data: encryptResponse({ success: false, error: 'server_error', message: 'Terjadi kesalahan pada server.' }) });
     }
 }
