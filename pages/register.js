@@ -1,3 +1,4 @@
+// pages/register.js
 var API_REGISTER = '/api/register';
 var API_SECRET = '1417-1426-1527-1517';
 var WHATSAPP_NUMBER = '6285199120995';
@@ -263,6 +264,12 @@ function decryptData(encrypted) {
 
 async function callRegisterApi(action, data) {
     var payload = { action: action };
+    // FIX: field-field di dalam "data" (username, password, dll) di-merge langsung
+    // ke level atas payload, karena backend (/api/register) membacanya sebagai
+    // decrypted.username, decrypted.password, dst — BUKAN decrypted.data.username.
+    // Sebelumnya data dibungkus jadi payload.data = data, sehingga backend selalu
+    // menerima username/password/dll sebagai undefined -> "Username minimal 3 karakter!"
+    // muncul terus meskipun input sudah benar.
     if (data) {
         for (var key in data) {
             if (Object.prototype.hasOwnProperty.call(data, key)) {
@@ -292,12 +299,7 @@ async function callRegisterApi(action, data) {
     if (result && result.data) {
         try {
             var dec = decryptData(result.data);
-            if (dec) {
-                if (dec.debug) {
-                    console.error('[Backend debug error]', dec.debug);
-                }
-                return dec;
-            }
+            if (dec) return dec;
         } catch (e) {
             return null;
         }
@@ -334,6 +336,10 @@ function tampilkanHalamanBlokir() {
 
 async function checkMaintenanceAndBlock() {
     try {
+        // Cek ban akses & maintenance lewat /api/register (action: check_status).
+        // Backend sudah gabungkan dua cek ini jadi satu, dan ban akses SELALU
+        // menang kalau maintenance juga aktif (blocked: true, maintenance: false
+        // dibalikin duluan oleh backend sebelum sempat cek maintenance).
         var result = await callRegisterApi('check_status', {});
 
         if (result && result.blocked === true) {
