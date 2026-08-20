@@ -12,12 +12,8 @@ const RECAPTCHA_V2_SECRET_KEY = process.env.RECAPTCHA_V2_SECRET_KEY || '';
 const SALT_ROUNDS = 12;
 const RATE_LIMIT_MAX = 5;
 const RATE_LIMIT_WINDOW = 60000;
-const DEBUG_ERRORS = process.env.DEBUG_ERRORS === 'true';
 
 if (!admin.apps.length) {
-    if (!process.env.FIREBASE_PRIVATE_KEY) {
-        throw new Error('FIREBASE_PRIVATE_KEY is required!');
-    }
     const key = process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n');
     admin.initializeApp({
         credential: admin.credential.cert({
@@ -134,15 +130,16 @@ function getClientIP(req) {
     return req.socket.remoteAddress || 'unknown';
 }
 
+// ==================== FUNGSI CEK MAINTENANCE & BLOCK ====================
 async function isIPBlocked(ip) {
     if (!ip || ip === 'unknown' || ip === '::1' || ip === '127.0.0.1') return false;
-
+    
     const keys = [
         ip.replace(/\./g, '_'),
         ip,
         ip.replace(/:/g, '_')
     ];
-
+    
     for (const key of keys) {
         const snap = await db.ref('blocked_ips/' + key).once('value');
         const raw = snap.val();
@@ -194,12 +191,12 @@ async function checkMaintenance() {
     }
 }
 
+// ==================== LOG AKTIVITAS UNTUK PANEL ADMIN ====================
 async function logActivity(username, action, details, ip, fp) {
     try {
         const enc = encryptData({
             username: username,
             action: action,
-            message: details || '',
             details: details || '',
             ip: ip || '',
             fingerprint: fp || '',
@@ -210,25 +207,26 @@ async function logActivity(username, action, details, ip, fp) {
     } catch (e) {}
 }
 
+// ==================== VALIDASI USERNAME ====================
 function isValidUsername(username) {
     if (!username || typeof username !== 'string') {
         return { valid: false, message: 'Username tidak valid!' };
     }
-
+    
     const trimmed = username.trim();
     if (trimmed.length < 3) {
         return { valid: false, message: 'Username minimal 3 karakter!' };
     }
-
+    
     if (trimmed.length > 30) {
         return { valid: false, message: 'Username maksimal 30 karakter!' };
     }
-
+    
     const usernameRegex = /^[a-zA-Z0-9_.]+$/;
     if (!usernameRegex.test(trimmed)) {
         return { valid: false, message: 'Username hanya boleh huruf, angka, underscore (_), dan titik (.)!' };
     }
-
+    
     return { valid: true, username: trimmed };
 }
 
@@ -299,6 +297,12 @@ export default async function handler(req, res) {
         }
 
         if (action === 'register') {
+            // ==================== CEK MAINTENANCE & BAN AKSES ====================
+            // Ditambahkan supaya request register yang langsung nembak API ini
+            // (skip frontend/tanpa lewat checkMaintenanceAndBlock di browser)
+            // tetap ketolak kalau maintenance aktif atau IP/Fingerprint diban.
+            // Urutan cek: ban akses DULU baru maintenance, jadi kalau dua-duanya
+            // aktif bersamaan, ban akses yang menang (sama seperti action check_status).
             const ipBlockedRegister = await isIPBlocked(ip);
             const fpBlockedRegister = fp ? await isFPBlocked(fp) : false;
 
@@ -323,19 +327,20 @@ export default async function handler(req, res) {
                 });
             }
 
+            // ==================== VALIDASI USERNAME ====================
             const rawUsername = decrypted.username || '';
             const usernameValidation = isValidUsername(rawUsername);
-
+            
             if (!usernameValidation.valid) {
-                return res.status(200).json({
-                    data: encryptResponse({
-                        success: false,
-                        error: 'invalid_username',
-                        message: usernameValidation.message
-                    })
+                return res.status(200).json({ 
+                    data: encryptResponse({ 
+                        success: false, 
+                        error: 'invalid_username', 
+                        message: usernameValidation.message 
+                    }) 
                 });
             }
-
+            
             const username = usernameValidation.username;
 
             const password = decrypted.password || '';
@@ -409,13 +414,11 @@ export default async function handler(req, res) {
 
             if (users) {
                 for (const key in users) {
-                    if (!users[key] || !users[key].data) continue;
                     const userData = decryptData(users[key].data);
-                    if (!userData) continue;
-                    if (userData.username === username) {
+                    if (userData && userData.username === username) {
                         return res.status(200).json({ data: encryptResponse({ success: false, error: 'username_exists', message: 'Username sudah terdaftar!' }) });
                     }
-                    if (email && userData.email === email) {
+                    if (userData && email && userData.email === email) {
                         return res.status(200).json({ data: encryptResponse({ success: false, error: 'email_exists', message: 'Email sudah terdaftar!' }) });
                     }
                 }
@@ -457,7 +460,8 @@ export default async function handler(req, res) {
                 await db.ref('register_limits/register_fp_' + userFP).set({ data: encryptData({ lastRegister: Date.now() }) });
             }
 
-            await logActivity(username, 'register', username + ' telah berhasil register (' + (paket || 'Trial') + ')', userIP, userFP);
+            // Catat log aktivitas biar muncul di panel admin
+            await logActivity(username, 'register', 'Pendaftaran baru - ' + (paket || 'Trial'), userIP, userFP);
 
             return res.status(200).json({ data: encryptResponse({ success: true, message: 'Pendaftaran berhasil! Tunggu aktivasi admin.' }) });
         }
@@ -465,13 +469,6 @@ export default async function handler(req, res) {
         return res.status(400).json({ data: encryptResponse({ success: false, error: 'invalid_action', message: 'Aksi tidak valid!' }) });
     } catch (error) {
         console.error('Register error:', error);
-        return res.status(500).json({
-            data: encryptResponse({
-                success: false,
-                error: 'server_error',
-                message: 'Terjadi kesalahan pada server.',
-                debug: DEBUG_ERRORS ? String(error && error.message || error) : undefined
-            })
-        });
+        return res.status(500).json({ data: encryptResponse({ success: false, error: 'server_error', message: 'Terjadi kesalahan pada server.' }) });
     }
 }
