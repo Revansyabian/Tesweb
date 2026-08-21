@@ -1,4 +1,3 @@
-// pages/register.js
 var API_REGISTER = '/api/register';
 var API_SECRET = '1417-1426-1527-1517';
 var WHATSAPP_NUMBER = '6285199120995';
@@ -14,8 +13,6 @@ var THROWAWAY_DOMAINS = ['mailinator.com', 'tempmail.com', 'guerrillamail.com', 
 var COMMON_PASSWORDS = ['password', 'password123', '12345678', 'qwerty123', 'admin123', 'bismillah', 'sayang', 'cinta'];
 var KEYBOARD_PATTERNS = ['asdf', 'qwer', 'zxcv', 'tyui', 'ghjk', 'bnm', 'poiuy', 'lkjh', 'mnbv'];
 var SEQUENTIAL_PATTERNS = ['123456', '654321', 'abcdef', 'qwerty', '111111', '222222', '333333'];
-
-// ==================== FINGERPRINT ====================
 async function getFingerprint() {
     var fp = '';
     fp += navigator.userAgent || '';
@@ -28,8 +25,6 @@ async function getFingerprint() {
     fp += navigator.platform || '';
     return CryptoJS.MD5(fp).toString();
 }
-
-// ==================== SANITASI ====================
 function sanitize(str) {
     if (!str) return '';
     return String(str)
@@ -48,69 +43,57 @@ function sanitize(str) {
         .replace(/<svg/gi, '')
         .replace(/<iframe/gi, '');
 }
-
-// ==================== VALIDASI PASSWORD ====================
 function isSequentialPassword(password) {
     for (var i = 0; i < SEQUENTIAL_PATTERNS.length; i++) {
         if (password.toLowerCase().includes(SEQUENTIAL_PATTERNS[i])) return true;
     }
     return false;
 }
-
 function isCommonPassword(password) {
     for (var i = 0; i < COMMON_PASSWORDS.length; i++) {
         if (password.toLowerCase() === COMMON_PASSWORDS[i]) return true;
     }
     return false;
 }
-
 function isKeyboardSmash(password) {
     for (var i = 0; i < KEYBOARD_PATTERNS.length; i++) {
         if (password.toLowerCase().includes(KEYBOARD_PATTERNS[i])) return true;
     }
     return false;
 }
-
 function hasRepeatingChars(password) {
     for (var i = 0; i < password.length - 2; i++) {
         if (password[i] === password[i + 1] && password[i] === password[i + 2]) return true;
     }
     return false;
 }
-
 function validatePasswordComplexity(password) {
     var hasUpperCase = /[A-Z]/.test(password);
     var hasLowerCase = /[a-z]/.test(password);
     var hasNumber = /\d/.test(password);
     return hasUpperCase && hasLowerCase && hasNumber;
 }
-
 function isThrowawayEmail(email) {
     var parts = email.split('@');
     if (parts.length !== 2) return false;
     return THROWAWAY_DOMAINS.includes(parts[1].toLowerCase());
 }
-
 function isValidIndonesianPhone(phone) {
     var cleaned = phone.replace(/[^0-9]/g, '');
     if (cleaned.startsWith('0')) return cleaned.length >= 10 && cleaned.length <= 13;
     if (cleaned.startsWith('62')) return cleaned.length >= 11 && cleaned.length <= 14;
     return false;
 }
-
-// ==================== ANTI-BOT ====================
 function isValidUserAgent() {
     var ua = navigator.userAgent;
     if (ua.includes('Headless') || ua.includes('PhantomJS') || ua.includes('puppeteer') || ua.includes('Playwright')) return false;
     return true;
 }
-
 function isValidScreenSize() {
     if (screen.width === 0 || screen.height === 0) return false;
     if (screen.width < 320 || screen.height < 480) return false;
     return true;
 }
-
 function checkBrowserRateLimit() {
     var blockedUntil = localStorage.getItem('register_blocked_until');
     if (blockedUntil) {
@@ -126,7 +109,6 @@ function checkBrowserRateLimit() {
     }
     return true;
 }
-
 function recordRegisterAttempt() {
     var attempts = parseInt(localStorage.getItem('register_attempts') || '0') + 1;
     localStorage.setItem('register_attempts', attempts);
@@ -136,13 +118,10 @@ function recordRegisterAttempt() {
         Swal.fire({ icon: "error", title: "Diblokir 1 Jam!", text: "Terlalu banyak percobaan gagal.", confirmButtonColor: "#ef4444" });
     }
 }
-
 function resetRegisterAttempts() {
     localStorage.removeItem('register_attempts');
     localStorage.removeItem('register_blocked_until');
 }
-
-// ==================== UI: PASSWORD STRENGTH ====================
 function updateStrengthBar(inputId, barId) {
     var value = document.getElementById(inputId).value;
     var bar = document.getElementById(barId);
@@ -160,15 +139,12 @@ function updateStrengthBar(inputId, barId) {
         bar.style.width = '100%';
     }
 }
-
 function updatePasswordStrength() {
     updateStrengthBar('password', 'passwordStrengthBar');
 }
-
 function updateConfirmPasswordStrength() {
     updateStrengthBar('confirmPassword', 'confirmPasswordStrengthBar');
 }
-
 function validateConfirmPasswordComplexity() {
     var confirmPassword = document.getElementById('confirmPassword').value;
     if (confirmPassword.length === 0) return;
@@ -176,25 +152,19 @@ function validateConfirmPasswordComplexity() {
         Swal.fire({ icon: "warning", title: "Password Lemah!", text: "Password harus ada huruf BESAR, kecil, dan angka!", confirmButtonColor: "#0ea5e9" });
     }
 }
-
-// ==================== UI: ERROR BOX ====================
 function showError(msg) {
     document.getElementById('errorText').textContent = msg;
     document.getElementById('errorMessage').classList.add('show');
 }
-
 function hideError() {
     document.getElementById('errorMessage').classList.remove('show');
 }
-
-// ==================== UI: FORM STATE ====================
 function toggleSubmitButton() {
     var check = document.getElementById('verificationCheck');
     var btn = document.getElementById('btnRegister');
     var hasPaket = selectedPaket !== '';
     btn.disabled = !(check.checked && hasPaket);
 }
-
 function togglePaketList() {
     var list = document.getElementById('paketList');
     var select = document.getElementById('paketSelect');
@@ -203,7 +173,6 @@ function togglePaketList() {
         if (select) select.classList.toggle('active');
     }
 }
-
 function selectPaketOption(option) {
     selectedPaket = option.getAttribute('data-paket');
     selectedHarga = parseInt(option.getAttribute('data-harga'));
@@ -220,7 +189,6 @@ function selectPaketOption(option) {
     if (list) list.classList.remove('show');
     toggleSubmitButton();
 }
-
 document.addEventListener('click', function (e) {
     var dropdown = document.getElementById('paketDropdown');
     if (dropdown && !dropdown.contains(e.target)) {
@@ -230,8 +198,6 @@ document.addEventListener('click', function (e) {
         if (list) list.classList.remove('show');
     }
 });
-
-// ==================== UI: INPUT FILTER ====================
 function validateUsernameInput() {
     var input = document.getElementById('username');
     var value = input.value;
@@ -241,7 +207,6 @@ function validateUsernameInput() {
         Swal.fire({ icon: "warning", title: "Simbol Tidak Diizinkan!", timer: 2000, showConfirmButton: false });
     }
 }
-
 function validatePhoneInput() {
     var input = document.getElementById('phone');
     var value = input.value;
@@ -251,21 +216,17 @@ function validatePhoneInput() {
         Swal.fire({ icon: "warning", title: "Karakter Tidak Valid!", timer: 2000, showConfirmButton: false });
     }
 }
-
 function validateEmailInput() {
     var input = document.getElementById('email');
     var value = input.value;
     var cleaned = value.replace(/\s/g, '');
     if (value !== cleaned) input.value = cleaned;
 }
-
 function setButtonLoading(loading) {
     var btn = document.getElementById('btnRegister');
     btn.disabled = loading;
     btn.innerHTML = loading ? '<i class="fas fa-spinner fa-spin"></i> MEMPROSES...' : '<i class="fas fa-user-plus"></i> DAFTAR';
 }
-
-// ==================== CRYPTO ====================
 function encryptData(data) {
     try {
         var jsonStr = JSON.stringify(data);
@@ -275,7 +236,6 @@ function encryptData(data) {
         return null;
     }
 }
-
 function decryptData(encrypted) {
     try {
         var bytes = CryptoJS.AES.decrypt(encrypted, API_SECRET);
@@ -286,8 +246,6 @@ function decryptData(encrypted) {
         return null;
     }
 }
-
-// ==================== API CALL ====================
 async function callRegisterApi(action, data) {
     var payload = { action: action };
     if (data) {
@@ -298,10 +256,8 @@ async function callRegisterApi(action, data) {
         }
     }
     payload.timestamp = Date.now();
-
     var encryptedPayload = encryptData(payload);
     if (!encryptedPayload) throw new Error('Gagal mengenkripsi');
-
     var res = await fetch(API_REGISTER, {
         method: 'POST',
         headers: {
@@ -310,12 +266,10 @@ async function callRegisterApi(action, data) {
         },
         body: JSON.stringify({ data: encryptedPayload })
     });
-
     if (res.status === 429) throw new Error('Terlalu banyak percobaan');
     var text = await res.text();
     if (!text || text === 'null') return null;
     var result = JSON.parse(text);
-
     if (result && result.data) {
         try {
             var dec = decryptData(result.data);
@@ -326,14 +280,11 @@ async function callRegisterApi(action, data) {
     }
     return result;
 }
-
-// ==================== UI: MAINTENANCE / BLOKIR ====================
 function tampilkanHalamanMaintenance(dataMaintenance) {
     var judul = sanitize((dataMaintenance && (dataMaintenance.title || dataMaintenance.judul)) ? (dataMaintenance.title || dataMaintenance.judul) : 'SEDANG PERBAIKAN SISTEM');
     var pesan = sanitize((dataMaintenance && (dataMaintenance.message || dataMaintenance.pesan)) ? (dataMaintenance.message || dataMaintenance.pesan) : 'Website sedang dalam perbaikan oleh admin. Silakan kembali beberapa saat lagi.');
     var sampai = (dataMaintenance && (dataMaintenance.until || dataMaintenance.sampai)) ? (dataMaintenance.until || dataMaintenance.sampai) : null;
     var teksEstimasi = sanitize(sampai ? 'Estimasi selesai: ' + new Date(sampai).toLocaleString('id-ID') : 'Mohon maaf atas ketidaknyamanan ini.');
-
     document.body.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;font-family:\'Segoe UI\',sans-serif;">' +
         '<div style="background:#ffffff;border-radius:24px;padding:48px 36px;width:100%;max-width:440px;text-align:center;box-shadow:0 25px 60px rgba(0,0,0,0.08);border:1px solid #e2e8f0;">' +
         '<div style="width:90px;height:90px;background:#fef3c7;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;">' +
@@ -344,7 +295,6 @@ function tampilkanHalamanMaintenance(dataMaintenance) {
         '<div style="background:#fef3c7;color:#92400e;padding:12px 16px;border-radius:12px;font-weight:600;font-size:13px;margin:16px 0 24px;">' + teksEstimasi + '</div>' +
         '</div></div>';
 }
-
 function tampilkanHalamanBlokir() {
     document.body.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;font-family:\'Segoe UI\',sans-serif;">' +
         '<div style="background:#ffffff;border-radius:24px;padding:48px 36px;max-width:420px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.08);border:1px solid #e2e8f0;">' +
@@ -354,44 +304,33 @@ function tampilkanHalamanBlokir() {
         '<p style="font-size:14px;color:#64748b;line-height:1.6;">Akses ditolak, jika ingin dibuka silakan hubungi admin.</p>' +
         '</div></div>';
 }
-
 async function checkMaintenanceAndBlock() {
     try {
-        // Ban akses & maintenance dicek lewat /api/register (action: check_status).
-        // Ban akses SELALU menang kalau maintenance juga aktif bersamaan.
         var result = await callRegisterApi('check_status', {});
-
         if (result && result.blocked === true) {
             tampilkanHalamanBlokir();
             return true;
         }
-
         if (result && result.maintenance === true) {
             tampilkanHalamanMaintenance(result);
             return true;
         }
-
         return false;
     } catch (e) {
         console.error('Error checking maintenance/block:', e);
-        // Kalau gagal cek, jangan blokir user secara gak sengaja - biarkan lanjut.
         return false;
     }
 }
-
-// ==================== REGISTER ====================
 async function register() {
     if (registerInProgress) return;
     registerInProgress = true;
     hideError();
-
     try {
         if (!isValidUserAgent() || !isValidScreenSize()) {
             Swal.fire({ icon: "error", title: "Browser Tidak Valid!", confirmButtonColor: "#ef4444" });
             registerInProgress = false;
             return;
         }
-
         var now = Date.now();
         if (now - lastSubmitTime < SUBMIT_COOLDOWN) {
             Swal.fire({ icon: "warning", title: "Terlalu Cepat!", text: "Tunggu 3 detik.", confirmButtonColor: "#0ea5e9" });
@@ -399,31 +338,26 @@ async function register() {
             return;
         }
         lastSubmitTime = now;
-
         var honeypot = document.getElementById('website').value;
         if (honeypot) {
             Swal.fire({ icon: "error", title: "Bot Detected!", confirmButtonColor: "#ef4444" });
             registerInProgress = false;
             return;
         }
-
         if (!checkBrowserRateLimit()) {
             registerInProgress = false;
             return;
         }
-
         var blockedOrMaintenance = await checkMaintenanceAndBlock();
         if (blockedOrMaintenance) {
             registerInProgress = false;
             return;
         }
-
         var username = document.getElementById('username').value.trim();
         var password = document.getElementById('password').value;
         var confirmPassword = document.getElementById('confirmPassword').value.trim();
         var phone = document.getElementById('phone').value.trim();
         var email = document.getElementById('email').value.trim();
-
         if (!username || username.length < 3) {
             Swal.fire({ icon: "warning", title: "Username Tidak Valid!", text: "Username minimal 3 karakter!", confirmButtonColor: "#0ea5e9" });
             registerInProgress = false;
@@ -447,7 +381,6 @@ async function register() {
                 return;
             }
         }
-
         if (!password || password.length < 6) {
             Swal.fire({ icon: "warning", title: "Password Terlalu Pendek!", text: "Password minimal 6 karakter!", confirmButtonColor: "#0ea5e9" });
             registerInProgress = false;
@@ -488,7 +421,6 @@ async function register() {
             registerInProgress = false;
             return;
         }
-
         if (!phone || phone.length < 10) {
             Swal.fire({ icon: "warning", title: "Nomor Tidak Valid!", text: "Nomor telepon minimal 10 digit!", confirmButtonColor: "#0ea5e9" });
             registerInProgress = false;
@@ -499,7 +431,6 @@ async function register() {
             registerInProgress = false;
             return;
         }
-
         if (!email || !email.includes('@')) {
             Swal.fire({ icon: "error", title: "Email Tidak Valid!", text: "Email wajib mengandung @!", confirmButtonColor: "#ef4444" });
             registerInProgress = false;
@@ -515,7 +446,6 @@ async function register() {
             registerInProgress = false;
             return;
         }
-
         if (!selectedPaket) {
             Swal.fire({ icon: "warning", title: "Paket Belum Dipilih!", text: "Pilih paket terlebih dahulu!", confirmButtonColor: "#0ea5e9" });
             registerInProgress = false;
@@ -526,7 +456,6 @@ async function register() {
             registerInProgress = false;
             return;
         }
-
         var captchaResponse = '';
         if (typeof grecaptcha !== 'undefined') {
             captchaResponse = grecaptcha.getResponse();
@@ -536,17 +465,14 @@ async function register() {
             registerInProgress = false;
             return;
         }
-
         setButtonLoading(true);
         if (!fingerprint) fingerprint = await getFingerprint();
-
         var userIP = 'unknown';
         try {
             var ipRes = await fetch('https://api.ipify.org?format=json');
             var ipData = await ipRes.json();
             userIP = ipData.ip || 'unknown';
         } catch (e) {}
-
         var result = await callRegisterApi('register', {
             username: username,
             password: password,
@@ -560,14 +486,12 @@ async function register() {
             sessionFingerprint: sessionFingerprint,
             captchaToken: captchaResponse
         });
-
         setButtonLoading(false);
-
         if (result && result.success) {
             resetRegisterAttempts();
             var waMessage = 'Assalamualaikum min, tolong aktivasi akun saya%0A%0AUsername: ' + encodeURIComponent(username) + '%0APaket: ' + encodeURIComponent(selectedPaket) + '%0AHarga: Rp ' + selectedHarga.toLocaleString() + '%0AEmail: ' + encodeURIComponent(email) + '%0ANo. HP: ' + encodeURIComponent(phone);
+            window.open('https://wa.me/' + WHATSAPP_NUMBER + '?text=' + waMessage, '_blank');
             Swal.fire({ icon: "success", title: "Pendaftaran Berhasil!", timer: 3000, showConfirmButton: false }).then(function () {
-                window.open('https://wa.me/' + WHATSAPP_NUMBER + '?text=' + waMessage, '_blank');
                 window.location.href = '/';
             });
         } else {
@@ -591,25 +515,19 @@ async function register() {
             Swal.fire({ icon: "error", title: "Gagal!", text: errorMsg, confirmButtonColor: "#ef4444" });
             if (typeof grecaptcha !== 'undefined') grecaptcha.reset();
         }
-
     } catch (error) {
         setButtonLoading(false);
         Swal.fire({ icon: "error", title: "Error!", text: "Gagal menghubungkan ke server!", confirmButtonColor: "#ef4444" });
         if (typeof grecaptcha !== 'undefined') grecaptcha.reset();
     }
-
     registerInProgress = false;
 }
-
-// ==================== INIT ====================
 document.addEventListener('DOMContentLoaded', async function () {
     if (!fingerprint) fingerprint = await getFingerprint();
-
     var blockedOrMaintenance = await checkMaintenanceAndBlock();
     if (blockedOrMaintenance) {
         return;
     }
-
     document.getElementById('password').addEventListener('input', updatePasswordStrength);
     document.getElementById('confirmPassword').addEventListener('input', updateConfirmPasswordStrength);
     document.getElementById('confirmPassword').addEventListener('blur', validateConfirmPasswordComplexity);
