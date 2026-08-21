@@ -15,6 +15,7 @@ var COMMON_PASSWORDS = ['password', 'password123', '12345678', 'qwerty123', 'adm
 var KEYBOARD_PATTERNS = ['asdf', 'qwer', 'zxcv', 'tyui', 'ghjk', 'bnm', 'poiuy', 'lkjh', 'mnbv'];
 var SEQUENTIAL_PATTERNS = ['123456', '654321', 'abcdef', 'qwerty', '111111', '222222', '333333'];
 
+// ==================== FINGERPRINT ====================
 async function getFingerprint() {
     var fp = '';
     fp += navigator.userAgent || '';
@@ -28,6 +29,7 @@ async function getFingerprint() {
     return CryptoJS.MD5(fp).toString();
 }
 
+// ==================== SANITASI ====================
 function sanitize(str) {
     if (!str) return '';
     return String(str)
@@ -47,6 +49,7 @@ function sanitize(str) {
         .replace(/<iframe/gi, '');
 }
 
+// ==================== VALIDASI PASSWORD ====================
 function isSequentialPassword(password) {
     for (var i = 0; i < SEQUENTIAL_PATTERNS.length; i++) {
         if (password.toLowerCase().includes(SEQUENTIAL_PATTERNS[i])) return true;
@@ -70,7 +73,7 @@ function isKeyboardSmash(password) {
 
 function hasRepeatingChars(password) {
     for (var i = 0; i < password.length - 2; i++) {
-        if (password[i] === password[i+1] && password[i] === password[i+2]) return true;
+        if (password[i] === password[i + 1] && password[i] === password[i + 2]) return true;
     }
     return false;
 }
@@ -95,6 +98,7 @@ function isValidIndonesianPhone(phone) {
     return false;
 }
 
+// ==================== ANTI-BOT ====================
 function isValidUserAgent() {
     var ua = navigator.userAgent;
     if (ua.includes('Headless') || ua.includes('PhantomJS') || ua.includes('puppeteer') || ua.includes('Playwright')) return false;
@@ -138,16 +142,17 @@ function resetRegisterAttempts() {
     localStorage.removeItem('register_blocked_until');
 }
 
-function updatePasswordStrength() {
-    var password = document.getElementById('password').value;
-    var bar = document.getElementById('passwordStrengthBar');
+// ==================== UI: PASSWORD STRENGTH ====================
+function updateStrengthBar(inputId, barId) {
+    var value = document.getElementById(inputId).value;
+    var bar = document.getElementById(barId);
     bar.className = 'password-strength-bar';
-    if (password.length === 0) {
+    if (value.length === 0) {
         bar.style.width = '0%';
-    } else if (password.length < 6) {
+    } else if (value.length < 6) {
         bar.className = 'password-strength-bar strength-weak';
         bar.style.width = '33%';
-    } else if (password.length < 10) {
+    } else if (value.length < 10) {
         bar.className = 'password-strength-bar strength-medium';
         bar.style.width = '66%';
     } else {
@@ -156,22 +161,12 @@ function updatePasswordStrength() {
     }
 }
 
+function updatePasswordStrength() {
+    updateStrengthBar('password', 'passwordStrengthBar');
+}
+
 function updateConfirmPasswordStrength() {
-    var confirmPassword = document.getElementById('confirmPassword').value;
-    var bar = document.getElementById('confirmPasswordStrengthBar');
-    bar.className = 'password-strength-bar';
-    if (confirmPassword.length === 0) {
-        bar.style.width = '0%';
-    } else if (confirmPassword.length < 6) {
-        bar.className = 'password-strength-bar strength-weak';
-        bar.style.width = '33%';
-    } else if (confirmPassword.length < 10) {
-        bar.className = 'password-strength-bar strength-medium';
-        bar.style.width = '66%';
-    } else {
-        bar.className = 'password-strength-bar strength-strong';
-        bar.style.width = '100%';
-    }
+    updateStrengthBar('confirmPassword', 'confirmPasswordStrengthBar');
 }
 
 function validateConfirmPasswordComplexity() {
@@ -182,6 +177,7 @@ function validateConfirmPasswordComplexity() {
     }
 }
 
+// ==================== UI: ERROR BOX ====================
 function showError(msg) {
     document.getElementById('errorText').textContent = msg;
     document.getElementById('errorMessage').classList.add('show');
@@ -191,6 +187,7 @@ function hideError() {
     document.getElementById('errorMessage').classList.remove('show');
 }
 
+// ==================== UI: FORM STATE ====================
 function toggleSubmitButton() {
     var check = document.getElementById('verificationCheck');
     var btn = document.getElementById('btnRegister');
@@ -210,7 +207,7 @@ function togglePaketList() {
 function selectPaketOption(option) {
     selectedPaket = option.getAttribute('data-paket');
     selectedHarga = parseInt(option.getAttribute('data-harga'));
-    document.querySelectorAll('.paket-option').forEach(function(o) { o.classList.remove('selected'); });
+    document.querySelectorAll('.paket-option').forEach(function (o) { o.classList.remove('selected'); });
     option.classList.add('selected');
     var placeholder = document.getElementById('paketPlaceholder');
     if (placeholder) {
@@ -224,7 +221,7 @@ function selectPaketOption(option) {
     toggleSubmitButton();
 }
 
-document.addEventListener('click', function(e) {
+document.addEventListener('click', function (e) {
     var dropdown = document.getElementById('paketDropdown');
     if (dropdown && !dropdown.contains(e.target)) {
         var select = document.getElementById('paketSelect');
@@ -234,6 +231,7 @@ document.addEventListener('click', function(e) {
     }
 });
 
+// ==================== UI: INPUT FILTER ====================
 function validateUsernameInput() {
     var input = document.getElementById('username');
     var value = input.value;
@@ -267,6 +265,7 @@ function setButtonLoading(loading) {
     btn.innerHTML = loading ? '<i class="fas fa-spinner fa-spin"></i> MEMPROSES...' : '<i class="fas fa-user-plus"></i> DAFTAR';
 }
 
+// ==================== CRYPTO ====================
 function encryptData(data) {
     try {
         var jsonStr = JSON.stringify(data);
@@ -288,14 +287,9 @@ function decryptData(encrypted) {
     }
 }
 
+// ==================== API CALL ====================
 async function callRegisterApi(action, data) {
     var payload = { action: action };
-    // FIX: field-field di dalam "data" (username, password, dll) di-merge langsung
-    // ke level atas payload, karena backend (/api/register) membacanya sebagai
-    // decrypted.username, decrypted.password, dst — BUKAN decrypted.data.username.
-    // Sebelumnya data dibungkus jadi payload.data = data, sehingga backend selalu
-    // menerima username/password/dll sebagai undefined -> "Username minimal 3 karakter!"
-    // muncul terus meskipun input sudah benar.
     if (data) {
         for (var key in data) {
             if (Object.prototype.hasOwnProperty.call(data, key)) {
@@ -333,6 +327,7 @@ async function callRegisterApi(action, data) {
     return result;
 }
 
+// ==================== UI: MAINTENANCE / BLOKIR ====================
 function tampilkanHalamanMaintenance(dataMaintenance) {
     var judul = sanitize((dataMaintenance && (dataMaintenance.title || dataMaintenance.judul)) ? (dataMaintenance.title || dataMaintenance.judul) : 'SEDANG PERBAIKAN SISTEM');
     var pesan = sanitize((dataMaintenance && (dataMaintenance.message || dataMaintenance.pesan)) ? (dataMaintenance.message || dataMaintenance.pesan) : 'Website sedang dalam perbaikan oleh admin. Silakan kembali beberapa saat lagi.');
@@ -362,10 +357,8 @@ function tampilkanHalamanBlokir() {
 
 async function checkMaintenanceAndBlock() {
     try {
-        // Cek ban akses & maintenance lewat /api/register (action: check_status).
-        // Backend sudah gabungkan dua cek ini jadi satu, dan ban akses SELALU
-        // menang kalau maintenance juga aktif (blocked: true, maintenance: false
-        // dibalikin duluan oleh backend sebelum sempat cek maintenance).
+        // Ban akses & maintenance dicek lewat /api/register (action: check_status).
+        // Ban akses SELALU menang kalau maintenance juga aktif bersamaan.
         var result = await callRegisterApi('check_status', {});
 
         if (result && result.blocked === true) {
@@ -381,22 +374,19 @@ async function checkMaintenanceAndBlock() {
         return false;
     } catch (e) {
         console.error('Error checking maintenance/block:', e);
+        // Kalau gagal cek, jangan blokir user secara gak sengaja - biarkan lanjut.
         return false;
     }
 }
 
+// ==================== REGISTER ====================
 async function register() {
     if (registerInProgress) return;
     registerInProgress = true;
     hideError();
 
     try {
-        if (!isValidUserAgent()) {
-            Swal.fire({ icon: "error", title: "Browser Tidak Valid!", confirmButtonColor: "#ef4444" });
-            registerInProgress = false;
-            return;
-        }
-        if (!isValidScreenSize()) {
+        if (!isValidUserAgent() || !isValidScreenSize()) {
             Swal.fire({ icon: "error", title: "Browser Tidak Valid!", confirmButtonColor: "#ef4444" });
             registerInProgress = false;
             return;
@@ -444,8 +434,7 @@ async function register() {
             registerInProgress = false;
             return;
         }
-        var usernameRegex = /^[a-zA-Z0-9_.]+$/;
-        if (!usernameRegex.test(username)) {
+        if (!/^[a-zA-Z0-9_.]+$/.test(username)) {
             Swal.fire({ icon: "error", title: "Simbol Tidak Diizinkan!", text: "Username hanya boleh huruf, angka, underscore (_), dan titik (.)", confirmButtonColor: "#ef4444" });
             registerInProgress = false;
             return;
@@ -516,8 +505,7 @@ async function register() {
             registerInProgress = false;
             return;
         }
-        var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) {
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
             Swal.fire({ icon: "error", title: "Email Tidak Valid!", text: "Format email tidak valid!", confirmButtonColor: "#ef4444" });
             registerInProgress = false;
             return;
@@ -578,7 +566,7 @@ async function register() {
         if (result && result.success) {
             resetRegisterAttempts();
             var waMessage = 'Assalamualaikum min, tolong aktivasi akun saya%0A%0AUsername: ' + encodeURIComponent(username) + '%0APaket: ' + encodeURIComponent(selectedPaket) + '%0AHarga: Rp ' + selectedHarga.toLocaleString() + '%0AEmail: ' + encodeURIComponent(email) + '%0ANo. HP: ' + encodeURIComponent(phone);
-            Swal.fire({ icon: "success", title: "Pendaftaran Berhasil!", timer: 3000, showConfirmButton: false }).then(function() {
+            Swal.fire({ icon: "success", title: "Pendaftaran Berhasil!", timer: 3000, showConfirmButton: false }).then(function () {
                 window.open('https://wa.me/' + WHATSAPP_NUMBER + '?text=' + waMessage, '_blank');
                 window.location.href = '/';
             });
@@ -613,7 +601,8 @@ async function register() {
     registerInProgress = false;
 }
 
-document.addEventListener('DOMContentLoaded', async function() {
+// ==================== INIT ====================
+document.addEventListener('DOMContentLoaded', async function () {
     if (!fingerprint) fingerprint = await getFingerprint();
 
     var blockedOrMaintenance = await checkMaintenanceAndBlock();
@@ -622,7 +611,11 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
 
     document.getElementById('password').addEventListener('input', updatePasswordStrength);
-    document.getElementById('username').addEventListener('input', function() {
+    document.getElementById('confirmPassword').addEventListener('input', updateConfirmPasswordStrength);
+    document.getElementById('confirmPassword').addEventListener('blur', validateConfirmPasswordComplexity);
+    document.getElementById('confirmPassword').addEventListener('paste', function (e) { e.preventDefault(); Swal.fire({ icon: "warning", title: "Paste Tidak Diizinkan!", timer: 2000, showConfirmButton: false }); });
+    document.getElementById('password').addEventListener('copy', function (e) { e.preventDefault(); Swal.fire({ icon: "warning", title: "Copy Tidak Diizinkan!", timer: 2000, showConfirmButton: false }); });
+    document.getElementById('username').addEventListener('input', function () {
         var input = document.getElementById('username');
         var value = input.value;
         var cleaned = value.replace(/\s/g, '').replace(/[^a-zA-Z0-9_.]/g, '');
@@ -630,13 +623,8 @@ document.addEventListener('DOMContentLoaded', async function() {
             input.value = cleaned;
         }
     });
-    document.getElementById('password').addEventListener('input', updatePasswordStrength);
-    document.getElementById('confirmPassword').addEventListener('input', updateConfirmPasswordStrength);
-    document.getElementById('confirmPassword').addEventListener('blur', validateConfirmPasswordComplexity);
-    document.getElementById('confirmPassword').addEventListener('paste', function(e) { e.preventDefault(); Swal.fire({ icon: "warning", title: "Paste Tidak Diizinkan!", timer: 2000, showConfirmButton: false }); });
-    document.getElementById('password').addEventListener('copy', function(e) { e.preventDefault(); Swal.fire({ icon: "warning", title: "Copy Tidak Diizinkan!", timer: 2000, showConfirmButton: false }); });
-    document.getElementById('password').addEventListener('keypress', function(e) { if (e.key === 'Enter') document.getElementById('confirmPassword').focus(); });
-    document.getElementById('confirmPassword').addEventListener('keypress', function(e) { if (e.key === 'Enter') document.getElementById('phone').focus(); });
-    document.getElementById('phone').addEventListener('keypress', function(e) { if (e.key === 'Enter') document.getElementById('email').focus(); });
-    document.getElementById('email').addEventListener('keypress', function(e) { if (e.key === 'Enter') register(); });
+    document.getElementById('password').addEventListener('keypress', function (e) { if (e.key === 'Enter') document.getElementById('confirmPassword').focus(); });
+    document.getElementById('confirmPassword').addEventListener('keypress', function (e) { if (e.key === 'Enter') document.getElementById('phone').focus(); });
+    document.getElementById('phone').addEventListener('keypress', function (e) { if (e.key === 'Enter') document.getElementById('email').focus(); });
+    document.getElementById('email').addEventListener('keypress', function (e) { if (e.key === 'Enter') register(); });
 });
