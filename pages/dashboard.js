@@ -17,6 +17,7 @@ var isBlocked = false;
 var blockedChecked = false;
 var loginInProgress = false;
 var statusCheckInterval = null;
+var currentHistoryData = [];
 
 var STORAGE_KEY = 'app_data';
 var STORAGE_SECRET = 'session_local_secret';
@@ -967,8 +968,18 @@ async function executeTopup(amt) {
             timestamp: Date.now(),
             status: 'success'
         };
-        await callRevanstore('transactions', 'POST', trx);
+        var trxResult = await callRevanstore('transactions', 'POST', trx);
         hideLoading();
+        if (trxResult && trxResult.success === false) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Perhatian',
+                text: trxResult.message || 'Transaksi gagal dicatat.',
+                confirmButtonColor: '#f59e0b'
+            });
+            return;
+        }
+        if (trxResult && trxResult.trxId) trx.trxId = trxResult.trxId;
         showReceipt(trx);
         showAlert('Berhasil!', 'success');
     } else {
@@ -993,8 +1004,18 @@ async function executeKuras(amt) {
             timestamp: Date.now(),
             status: 'success'
         };
-        await callRevanstore('transactions', 'POST', trx);
+        var trxResult = await callRevanstore('transactions', 'POST', trx);
         hideLoading();
+        if (trxResult && trxResult.success === false) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Perhatian',
+                text: trxResult.message || 'Transaksi gagal dicatat.',
+                confirmButtonColor: '#f59e0b'
+            });
+            return;
+        }
+        if (trxResult && trxResult.trxId) trx.trxId = trxResult.trxId;
         showReceipt(trx);
         showAlert('Berhasil!', 'success');
     } else {
@@ -1007,7 +1028,8 @@ function showReceipt(trx) {
     hideAllSections();
     var typeText = trx.type === 'topup' ? 'TOP UP' : 'KURAS';
     var sign = trx.type === 'topup' ? '+' : '-';
-    var html = '<div class="receipt-content"><div class="receipt-header"><h3>TOP UP</h3><p>Detail Transaksi</p></div><div class="receipt-details"><div class="receipt-row"><span>Akun:</span><span>' + sanitize(trx.accountName) + '</span></div><div class="receipt-row"><span>Jenis:</span><span>' + sanitize(typeText) + '</span></div><div class="receipt-row"><span>Jumlah:</span><span style="color:' + (trx.type === 'topup' ? '#10b981' : '#f59e0b') + '">' + sign + formatCurrency(trx.amount) + '</span></div><div class="receipt-row"><span>Saldo Awal:</span><span>' + formatCurrency(trx.oldBalance) + '</span></div><div class="receipt-row"><span>Saldo Akhir:</span><span>' + formatCurrency(trx.newBalance) + '</span></div><div class="receipt-row"><span>Tanggal:</span><span>' + new Date(trx.timestamp).toLocaleString('id-ID') + '</span></div><div class="receipt-row"><span>Status:</span><span style="color:#10b981;">BERHASIL</span></div></div></div><div style="display:flex;gap:8px;margin-top:20px;"><button class="btn btn-primary" onclick="window._showTrxModal()" style="flex:1;">LANJUTKAN</button><button class="btn btn-secondary" onclick="window._goHome()" style="flex:1;">HOME</button></div>';
+    var idRow = trx.trxId ? '<div class="receipt-row"><span>ID Transaksi:</span><span style="font-family:monospace;">' + sanitize(trx.trxId) + '</span></div>' : '';
+    var html = '<div class="receipt-content"><div class="receipt-header"><h3>TOP UP</h3><p>Detail Transaksi</p></div><div class="receipt-details">' + idRow + '<div class="receipt-row"><span>Akun:</span><span>' + sanitize(trx.accountName) + '</span></div><div class="receipt-row"><span>Jenis:</span><span>' + sanitize(typeText) + '</span></div><div class="receipt-row"><span>Jumlah:</span><span style="color:' + (trx.type === 'topup' ? '#10b981' : '#f59e0b') + '">' + sign + formatCurrency(trx.amount) + '</span></div><div class="receipt-row"><span>Saldo Awal:</span><span>' + formatCurrency(trx.oldBalance) + '</span></div><div class="receipt-row"><span>Saldo Akhir:</span><span>' + formatCurrency(trx.newBalance) + '</span></div><div class="receipt-row"><span>Tanggal:</span><span>' + new Date(trx.timestamp).toLocaleString('id-ID') + '</span></div><div class="receipt-row"><span>Status:</span><span style="color:#10b981;">BERHASIL</span></div></div></div><div style="display:flex;gap:8px;margin-top:20px;"><button class="btn btn-primary" onclick="window._showTrxModal()" style="flex:1;">LANJUTKAN</button><button class="btn btn-secondary" onclick="window._goHome()" style="flex:1;">HOME</button></div>';
     var receiptContent = document.getElementById('receiptContent');
     safeSetHTML(receiptContent, html);
     document.getElementById('receiptSection').style.display = 'block';
@@ -1046,9 +1068,10 @@ async function showHistory() {
     document.getElementById('historySection').style.display = 'block';
     showLoading('Mengambil data...');
     try {
-        var data = await callRevanstore('transactions', 'GET');
+        var data = await callRevanstore('transactions', 'GET', { username: currentUser.username });
         var list = document.getElementById('transactionsList');
         if (!data || typeof data !== 'object' || Object.keys(data).length === 0) {
+            currentHistoryData = [];
             if (list) {
                 var emptyHtml = '<p style="text-align:center;color:#666;padding:40px 20px;">Belum ada transaksi</p>';
                 safeSetHTML(list, emptyHtml);
@@ -1059,22 +1082,26 @@ async function showHistory() {
         var arr = Object.keys(data).map(function(k) {
             return {
                 id: k,
+                trxId: data[k].trxId || '-',
                 type: data[k].type,
                 accountName: data[k].accountName,
                 amount: data[k].amount,
                 oldBalance: data[k].oldBalance,
                 newBalance: data[k].newBalance,
+                oldName: data[k].oldName,
+                newName: data[k].newName,
                 operator: data[k].operator,
                 timestamp: data[k].timestamp
             };
         }).sort(function(a, b) {
             return b.timestamp - a.timestamp;
         });
+        currentHistoryData = arr;
         var html = '';
-        arr.forEach(function(t) {
+        arr.forEach(function(t, idx) {
             var typeText = t.type === 'topup' ? 'TOP UP' : t.type === 'kuras' ? 'KURAS' : 'GANTI NAMA';
             var sign = t.type === 'topup' ? '+' : t.type === 'kuras' ? '-' : '';
-            html += '<div class="transaction-item ' + sanitize(t.type) + '"><div class="transaction-header"><div>' + sanitize(t.accountName) + '</div><div class="transaction-amount">' + sign + formatCurrency(t.amount) + '</div></div><div class="transaction-details"><div>' + sanitize(typeText) + '</div><div>' + new Date(t.timestamp).toLocaleString('id-ID') + '</div></div><div class="transaction-balance"><span>Sebelum: ' + formatCurrency(t.oldBalance) + '</span><span>→</span><span>Sesudah: ' + formatCurrency(t.newBalance) + '</span></div></div>';
+            html += '<div class="transaction-item ' + sanitize(t.type) + '" onclick="showTransactionDetail(' + idx + ')" style="cursor:pointer;"><div class="transaction-header"><div>' + sanitize(t.accountName) + '</div><div class="transaction-amount">' + sign + formatCurrency(t.amount) + '</div></div><div class="transaction-details"><div>' + sanitize(typeText) + ' · ' + sanitize(t.trxId) + '</div><div>' + new Date(t.timestamp).toLocaleString('id-ID') + '</div></div><div class="transaction-balance"><span>Sebelum: ' + formatCurrency(t.oldBalance) + '</span><span>→</span><span>Sesudah: ' + formatCurrency(t.newBalance) + '</span></div></div>';
         });
         if (list) safeSetHTML(list, html);
         hideLoading();
@@ -1083,6 +1110,42 @@ async function showHistory() {
         showAlert('Gagal!', 'error');
     }
 }
+
+function showTransactionDetail(idx) {
+    var t = currentHistoryData[idx];
+    if (!t) return;
+    var typeText = t.type === 'topup' ? 'TOP UP' : t.type === 'kuras' ? 'KURAS' : 'GANTI NAMA';
+    var html;
+    if (t.type === 'gantinama') {
+        html = '<div style="text-align:left;font-size:14px;">' +
+            '<p><b>ID Transaksi:</b> ' + sanitize(t.trxId) + '</p>' +
+            '<p><b>Akun:</b> ' + sanitize(t.accountName) + '</p>' +
+            '<p><b>Nama Lama:</b> ' + sanitize(t.oldName || '-') + '</p>' +
+            '<p><b>Nama Baru:</b> ' + sanitize(t.newName || '-') + '</p>' +
+            '<p><b>Operator:</b> ' + sanitize(t.operator) + '</p>' +
+            '<p><b>Tanggal:</b> ' + new Date(t.timestamp).toLocaleString('id-ID') + '</p>' +
+            '</div>';
+    } else {
+        var sign = t.type === 'topup' ? '+' : '-';
+        html = '<div style="text-align:left;font-size:14px;">' +
+            '<p><b>ID Transaksi:</b> ' + sanitize(t.trxId) + '</p>' +
+            '<p><b>Akun:</b> ' + sanitize(t.accountName) + '</p>' +
+            '<p><b>Jenis:</b> ' + sanitize(typeText) + '</p>' +
+            '<p><b>Jumlah:</b> ' + sign + formatCurrency(t.amount) + '</p>' +
+            '<p><b>Saldo Awal:</b> ' + formatCurrency(t.oldBalance) + '</p>' +
+            '<p><b>Saldo Akhir:</b> ' + formatCurrency(t.newBalance) + '</p>' +
+            '<p><b>Operator:</b> ' + sanitize(t.operator) + '</p>' +
+            '<p><b>Tanggal:</b> ' + new Date(t.timestamp).toLocaleString('id-ID') + '</p>' +
+            '</div>';
+    }
+    Swal.fire({
+        title: 'Detail Transaksi',
+        html: html,
+        confirmButtonText: 'Tutup',
+        confirmButtonColor: '#0ea5e9'
+    });
+}
+window.showTransactionDetail = showTransactionDetail;
 
 function showDeleteHistoryConfirm() {
     Swal.fire({
@@ -1102,7 +1165,7 @@ function showDeleteHistoryConfirm() {
 async function deleteAllHistory() {
     showLoading('Menghapus...');
     try {
-        var result = await callRevanstore('transactions', 'DELETE');
+        var result = await callRevanstore('transactions', 'DELETE', { username: currentUser.username });
         hideLoading();
         if (result && result.success) {
             Swal.fire({
@@ -1198,7 +1261,7 @@ async function executeChangeName(newName) {
             var old = currentAccount.name;
             currentAccount.name = newName;
             document.getElementById('accountName').textContent = newName;
-            await callRevanstore('transactions', 'POST', {
+            var trxResult = await callRevanstore('transactions', 'POST', {
                 type: 'gantinama',
                 accountName: currentAccount.name,
                 oldName: old,
@@ -1207,12 +1270,22 @@ async function executeChangeName(newName) {
                 timestamp: Date.now(),
                 status: 'success'
             });
+            hideLoading();
+            if (trxResult && trxResult.success === false) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Perhatian',
+                    text: trxResult.message || 'Transaksi gagal dicatat.',
+                    confirmButtonColor: '#f59e0b'
+                });
+                return;
+            }
+            var idRow = (trxResult && trxResult.trxId) ? '<div class="receipt-row"><span>ID Transaksi:</span><span style="font-family:monospace;">' + sanitize(trxResult.trxId) + '</span></div>' : '';
             hideAllSections();
-            var html = '<div class="receipt-content"><div class="receipt-header"><h3>GANTI NAMA</h3></div><div class="receipt-details"><div class="receipt-row"><span>Lama:</span><span>' + sanitize(old) + '</span></div><div class="receipt-row"><span>Baru:</span><span style="color:#0ea5e9;">' + sanitize(newName) + '</span></div></div></div><button class="btn btn-primary btn-block" onclick="window._goBackAccount()">KEMBALI</button>';
+            var html = '<div class="receipt-content"><div class="receipt-header"><h3>GANTI NAMA</h3></div><div class="receipt-details">' + idRow + '<div class="receipt-row"><span>Lama:</span><span>' + sanitize(old) + '</span></div><div class="receipt-row"><span>Baru:</span><span style="color:#0ea5e9;">' + sanitize(newName) + '</span></div></div></div><button class="btn btn-primary btn-block" onclick="window._goBackAccount()">KEMBALI</button>';
             var receiptContent = document.getElementById('receiptContent');
             safeSetHTML(receiptContent, html);
             document.getElementById('receiptSection').style.display = 'block';
-            hideLoading();
             showAlert('Berhasil!', 'success');
         } else {
             hideLoading();
