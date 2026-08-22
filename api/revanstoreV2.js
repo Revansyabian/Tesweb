@@ -20,6 +20,7 @@ const db = admin.database();
 const rateLimitMap = new Map();
 const RATE_LIMIT_MAX = 20;
 const RATE_LIMIT_WINDOW = 60000;
+const TRX_MAX_AGE = 172800000;
 
 function checkRateLimit(ip) {
   const now = Date.now();
@@ -179,6 +180,90 @@ async function logActivity(username, action, details, ip, fp) {
     const newRef = db.ref('activity_logs').push();
     await newRef.set({ data: enc });
   } catch(e) {}
+}
+
+function sanitizeKey(str) {
+  return String(str || '').replace(/[.#$\[\]\/]/g, '_');
+}
+
+async function checkTransactionRateLimit(operator) {
+  const key = 'trx_rate_' + sanitizeKey(operator || 'anon');
+  const ref = db.ref('transaction_rate_limits/' + key);
+  const snap = await ref.once('value');
+  const raw = snap.val();
+  const now = Date.now();
+  let timestamps = [];
+  if (raw?.data) {
+    try {
+      const dec = JSON.parse(CryptoJS.AES.decrypt(raw.data, ADMIN_KEY).toString(CryptoJS.enc.Utf8));
+      timestamps = dec.timestamps || [];
+    } catch(e) {}
+  }
+  timestamps = timestamps.filter(t => now - t < 60000);
+  if (timestamps.length >= 5) return false;
+  timestamps.push(now);
+  const enc = CryptoJS.AES.encrypt(JSON.stringify({ timestamps }), ADMIN_KEY).toString();
+  await ref.set({ data: enc });
+  return true;
+}
+
+async function cleanupOldTransactions() {
+  try {
+    const snap = await db.ref('transactions').once('value');
+    const raw = snap.val();
+    if (!raw) return;
+    const now = Date.now();
+    const updates = {};
+    for (const key in raw) {
+      const decrypted = await decryptData(raw[key]);
+      if (decrypted && decrypted.timestamp && (now - decrypted.timestamp > TRX_MAX_AGE)) {
+        updates[key] = null;
+      }
+    }
+    if (Object.keys(updates).length > 0) {
+      await db.ref('transactions').update(updates);
+    }
+  } catch(e) {}
+}
+
+async function getUserTrxCode(username) {
+  const safeUsername = sanitizeKey(username);
+  const codeRef = db.ref('user_trx_codes/' + safeUsername);
+  const snap = await codeRef.once('value');
+  const raw = snap.val();
+  if (raw?.data) {
+    try {
+      const dec = JSON.parse(CryptoJS.AES.decrypt(raw.data, ADMIN_KEY).toString(CryptoJS.enc.Utf8));
+      if (dec && dec.code) return dec.code;
+    } catch(e) {}
+  }
+  const allCodesSnap = await db.ref('user_trx_codes').once('value');
+  const allCodes = allCodesSnap.val() || {};
+  const usedCodes = new Set();
+  for (const k in allCodes) {
+    try {
+      const dec = JSON.parse(CryptoJS.AES.decrypt(allCodes[k].data, ADMIN_KEY).toString(CryptoJS.enc.Utf8));
+      if (dec && dec.code) usedCodes.add(dec.code);
+    } catch(e) {}
+  }
+  let code;
+  do {
+    code = String(Math.floor(1000 + Math.random() * 9000));
+  } while (usedCodes.has(code));
+  const enc = CryptoJS.AES.encrypt(JSON.stringify({ code, username, createdAt: Date.now() }), ADMIN_KEY).toString();
+  await codeRef.set({ data: enc });
+  return code;
+}
+
+async function countUserTransactions(username, transactionsRaw) {
+  let count = 0;
+  if (transactionsRaw) {
+    for (const key in transactionsRaw) {
+      const d = await decryptData(transactionsRaw[key]);
+      if (d && d.operator === username) count++;
+    }
+  }
+  return count;
 }
 
 export default async function handler(req, res) {
@@ -569,6 +654,55 @@ export default async function handler(req, res) {
     if (path === 'block_fp_manual' && method === 'POST') {
       await blockFP(data.fp);
       await logActivity('admin', 'block_fp', 'FP diblokir', ip, fp);
+      return res.status(200).json(encryptResponse({ success: true }));
+    }
+
+    if (path === 'transactions' && method === 'POST') {
+      const trxUsername = data?.operator || '';
+      const rateOk = await checkTransactionRateLimit(trxUsername || ip);
+      if (!rateOk) {
+        return res.status(200).json(encryptResponse({ success: false, error: 'rate_limit_trx', message: 'Terlalu banyak transaksi, tunggu sebentar sebelum transaksi lagi.' }));
+      }
+      await cleanupOldTransactions();
+      const code = await getUserTrxCode(trxUsername || 'unknown');
+      const existingSnap = await db.ref('transactions').once('value');
+      const existingCount = await countUserTransactions(trxUsername || 'unknown', existingSnap.val());
+      const seq = existingCount + 1;
+      const trxId = code + '-' + String(seq).padStart(3, '0');
+      const trxData = { ...data, trxId };
+      const enc = encryptData(trxData);
+      const r = db.ref('transactions').push();
+      await r.set({ data: enc });
+      return res.status(200).json(encryptResponse({ success: true, id: r.key, trxId }));
+    }
+
+    if (path === 'transactions' && method === 'GET') {
+      await cleanupOldTransactions();
+      const trxUsername = data?.username || '';
+      const snap = await db.ref('transactions').once('value');
+      const raw = snap.val();
+      const result = {};
+      if (raw) {
+        for (const key in raw) {
+          const d = await decryptData(raw[key]);
+          if (d && (!trxUsername || d.operator === trxUsername)) result[key] = d;
+        }
+      }
+      return res.status(200).json(encryptResponse(result));
+    }
+
+    if (path === 'transactions' && method === 'DELETE') {
+      const trxUsername = data?.username || '';
+      const snap = await db.ref('transactions').once('value');
+      const raw = snap.val();
+      if (raw) {
+        const updates = {};
+        for (const key in raw) {
+          const d = await decryptData(raw[key]);
+          if (d && d.operator === trxUsername) updates[key] = null;
+        }
+        if (Object.keys(updates).length > 0) await db.ref('transactions').update(updates);
+      }
       return res.status(200).json(encryptResponse({ success: true }));
     }
 
