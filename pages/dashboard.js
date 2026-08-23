@@ -421,21 +421,26 @@ function getDaysLeftText(daysLeft) {
 
 function checkAccountExpiry(user) {
     if (!user || !user.expiry_date) {
-        return { expired: false, daysLeft: 999999, daysLeftText: 'Permanen', daysLeftClass: 'days-permanent' };
+        return { expired: false, daysLeft: 999999, daysLeftText: 'Permanen', daysLeftClass: 'days-permanent', valid: true };
     }
     if (String(user.expiry_date).includes('9999')) {
-        return { expired: false, daysLeft: 999999, daysLeftText: 'Permanen', daysLeftClass: 'days-permanent' };
+        return { expired: false, daysLeft: 999999, daysLeftText: 'Permanen', daysLeftClass: 'days-permanent', valid: true };
+    }
+    var parsed = parseDate(user.expiry_date);
+    if (!parsed) {
+        return { expired: false, daysLeft: 999999, daysLeftText: 'Tidak Valid', daysLeftClass: 'days-red', valid: false };
     }
     var daysLeft = calculateRemainingDays(user.expiry_date);
     if (daysLeft === 999999) {
-        return { expired: false, daysLeft: 999999, daysLeftText: 'Permanen', daysLeftClass: 'days-permanent' };
+        return { expired: false, daysLeft: 999999, daysLeftText: 'Permanen', daysLeftClass: 'days-permanent', valid: true };
     }
     var expired = daysLeft < 0;
     return {
         expired: expired,
         daysLeft: daysLeft,
         daysLeftText: getDaysLeftText(daysLeft),
-        daysLeftClass: getDaysLeftClass(daysLeft)
+        daysLeftClass: getDaysLeftClass(daysLeft),
+        valid: true
     };
 }
 
@@ -457,6 +462,19 @@ function showExpiredBanner() {
         } else {
             logout();
         }
+    });
+}
+
+function showInvalidExpiryError() {
+    Swal.fire({
+        icon: 'error',
+        title: 'MASA AKTIF TIDAK VALID',
+        html: '<p style="font-size:16px;margin-bottom:12px;">Format tanggal masa aktif akun Anda tidak valid!</p><p style="color:#64748b;font-size:14px;">Anda akan logout otomatis.</p>',
+        confirmButtonText: 'OK',
+        confirmButtonColor: '#ef4444',
+        allowOutsideClick: false
+    }).then(function() {
+        autoLogout();
     });
 }
 
@@ -543,6 +561,18 @@ function checkAuth() {
             full_name: session.full_name || session.username,
             expiry_date: session.expiry_date || ''
         };
+        
+        // Validasi masa aktif dari session
+        if (currentUser.expiry_date) {
+            var expiryCheck = checkAccountExpiry(currentUser);
+            if (!expiryCheck.valid) {
+                setTimeout(function() {
+                    showInvalidExpiryError();
+                }, 500);
+                return false;
+            }
+        }
+        
         return true;
     } catch (e) {
         storageRemove('sesi_pengguna');
@@ -625,10 +655,25 @@ async function checkAccountStatus() {
             currentUser.role = result.user.role || currentUser.role;
             currentUser.full_name = result.user.full_name || currentUser.full_name;
             currentUser.expiry_date = result.user.expiry_date || currentUser.expiry_date;
+            
             var expiryCheck = checkAccountExpiry(currentUser);
+            if (!expiryCheck.valid) {
+                showInvalidExpiryError();
+                return;
+            }
             if (expiryCheck.expired) {
                 showExpiredBanner();
                 return;
+            }
+            
+            // Update session dengan expiry_date terbaru
+            var saved = storageGet('sesi_pengguna');
+            if (saved) {
+                try {
+                    var session = JSON.parse(saved);
+                    session.expiry_date = currentUser.expiry_date;
+                    storageSet('sesi_pengguna', JSON.stringify(session));
+                } catch(e) {}
             }
         }
     } catch (e) {}
@@ -655,9 +700,22 @@ function updateProfileInfo() {
     var elUsername = document.getElementById('profileUsername');
     var elName = document.getElementById('profileName');
     var elRole = document.getElementById('profileRole');
+    var elExpiry = document.getElementById('profileExpiry');
     if (elUsername) elUsername.textContent = currentUser.username;
     if (elName) elName.textContent = currentUser.full_name || currentUser.username;
     if (elRole) elRole.textContent = currentUser.role || 'User';
+    
+    // Tampilkan masa aktif
+    if (elExpiry) {
+        var expiryCheck = checkAccountExpiry(currentUser);
+        if (!expiryCheck.valid) {
+            elExpiry.textContent = 'TIDAK VALID';
+            elExpiry.className = 'days-red';
+        } else {
+            elExpiry.textContent = expiryCheck.daysLeftText;
+            elExpiry.className = expiryCheck.daysLeftClass;
+        }
+    }
 }
 
 function navigateBottom(page) {
@@ -1424,6 +1482,10 @@ document.addEventListener('DOMContentLoaded', async function() {
     if (bottomNav) bottomNav.style.display = 'flex';
     
     var expiryCheck = checkAccountExpiry(currentUser);
+    if (!expiryCheck.valid) {
+        showInvalidExpiryError();
+        return;
+    }
     if (expiryCheck.expired) {
         showExpiredBanner();
         return;
