@@ -1,8 +1,8 @@
-var API_REVANSTORE = '/api/revanstoreV2';
+var API_REVANSTORE = '/api/rvnstore';
+var API_TOPUP = '/api/rvnstore';
 var WHATSAPP_NUMBER = "6285199120995";
 var MAX_TOPUP_AMOUNT = 2147483647;
 var RECAPTCHA_V3_SITE_KEY = '6LcVBn4tAAAAAINTTIleUbUZr1ZykvyB6WA-oOfT';
-var API_SECRET = '1417-1426-1527-1517';
 
 var currentUser = null;
 var currentAccount = null;
@@ -20,6 +20,10 @@ var currentHistoryData = [];
 
 var STORAGE_KEY = 'app_data';
 var STORAGE_SECRET = 'session_local_secret';
+
+var sessionKey = null;
+var sessionIV = null;
+var sessionKeyExpiry = null;
 
 function storageSet(key, value) {
     try {
@@ -122,9 +126,83 @@ async function getRecaptchaV3Token(action) {
     }
 }
 
+function generateSessionKey() {
+    return CryptoJS.lib.WordArray.random(32).toString(CryptoJS.enc.Hex);
+}
+
+function generateSessionIV() {
+    return CryptoJS.lib.WordArray.random(16).toString(CryptoJS.enc.Hex);
+}
+
+async function getSessionKey() {
+    try {
+        var res = await fetch('/api/session-key', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Fingerprint': fingerprint || 'unknown'
+            },
+            body: JSON.stringify({
+                timestamp: Date.now()
+            })
+        });
+        
+        if (!res.ok) return false;
+        
+        var result = await res.json();
+        if (result && result.key && result.iv) {
+            sessionKey = result.key;
+            sessionIV = result.iv;
+            sessionKeyExpiry = Date.now() + (result.expiresIn || 300) * 1000;
+            return true;
+        }
+        return false;
+    } catch (e) {
+        return false;
+    }
+}
+
+function isSessionKeyValid() {
+    return sessionKey && sessionIV && sessionKeyExpiry && Date.now() < sessionKeyExpiry;
+}
+
+function encryptWithSession(data) {
+    try {
+        var jsonStr = JSON.stringify(data);
+        var encrypted = CryptoJS.AES.encrypt(jsonStr, CryptoJS.enc.Hex.parse(sessionKey), {
+            iv: CryptoJS.enc.Hex.parse(sessionIV),
+            mode: CryptoJS.mode.CBC,
+            padding: CryptoJS.pad.Pkcs7
+        });
+        return encrypted.toString();
+    } catch (e) {
+        return null;
+    }
+}
+
+function decryptWithSession(encryptedData, iv) {
+    try {
+        var decrypted = CryptoJS.AES.decrypt(encryptedData, CryptoJS.enc.Hex.parse(sessionKey), {
+            iv: CryptoJS.enc.Hex.parse(iv),
+            mode: CryptoJS.mode.CBC,
+            padding: CryptoJS.pad.Pkcs7
+        });
+        var jsonStr = decrypted.toString(CryptoJS.enc.Utf8);
+        if (!jsonStr) return null;
+        return JSON.parse(jsonStr);
+    } catch (e) {
+        return null;
+    }
+}
+
 async function checkIfBlocked() {
     if (blockedChecked) return isBlocked;
     if (!fingerprint) fingerprint = await getFingerprint();
+    
+    if (!isSessionKeyValid()) {
+        await getSessionKey();
+    }
+    
     try {
         var captchaToken = await getRecaptchaV3Token('check_blocked');
         var payload = {
@@ -136,20 +214,35 @@ async function checkIfBlocked() {
             },
             timestamp: Date.now()
         };
-        var encryptedPayload = CryptoJS.AES.encrypt(JSON.stringify(payload), API_SECRET).toString();
-        var res = await fetch(API_REVANSTORE, {
+        
+        var encryptedPayload = encryptWithSession(payload);
+        if (!encryptedPayload) {
+            isBlocked = storageGet('perangkat_diblokir') === 'true';
+            blockedChecked = true;
+            return isBlocked;
+        }
+        
+        var res = await fetch('/api/proxy', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-Fingerprint': fingerprint
+                'X-Fingerprint': fingerprint,
+                'X-Session-Id': sessionKey.substring(0, 32)
             },
-            body: JSON.stringify({ data: encryptedPayload })
+            body: JSON.stringify({
+                data: encryptedPayload,
+                iv: sessionIV,
+                timestamp: Date.now()
+            })
         });
+        
         var result = await res.json();
-        if (result.encrypted && result.data) {
-            var dec = CryptoJS.AES.decrypt(result.data, API_SECRET).toString(CryptoJS.enc.Utf8);
-            if (dec) result = JSON.parse(dec);
+        
+        if (result && result.encrypted && result.iv) {
+            var decrypted = decryptWithSession(result.encrypted, result.iv);
+            if (decrypted) result = decrypted;
         }
+        
         if (result && result.blocked) {
             isBlocked = true;
             storageSet('perangkat_diblokir', 'true');
@@ -167,26 +260,41 @@ async function checkIfBlocked() {
 
 async function periksaMaintenance() {
     try {
+        if (!isSessionKeyValid()) {
+            await getSessionKey();
+        }
+        
         var payload = {
             path: 'maintenance_status',
             method: 'GET',
             data: null,
             timestamp: Date.now()
         };
-        var encryptedPayload = CryptoJS.AES.encrypt(JSON.stringify(payload), API_SECRET).toString();
-        var res = await fetch(API_REVANSTORE, {
+        
+        var encryptedPayload = encryptWithSession(payload);
+        if (!encryptedPayload) return null;
+        
+        var res = await fetch('/api/proxy', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-Fingerprint': fingerprint || 'check'
+                'X-Fingerprint': fingerprint || 'check',
+                'X-Session-Id': sessionKey.substring(0, 32)
             },
-            body: JSON.stringify({ data: encryptedPayload })
+            body: JSON.stringify({
+                data: encryptedPayload,
+                iv: sessionIV,
+                timestamp: Date.now()
+            })
         });
+        
         var result = await res.json();
-        if (result.encrypted && result.data) {
-            var dec = CryptoJS.AES.decrypt(result.data, API_SECRET).toString(CryptoJS.enc.Utf8);
-            if (dec) result = JSON.parse(dec);
+        
+        if (result && result.encrypted && result.iv) {
+            var decrypted = decryptWithSession(result.encrypted, result.iv);
+            if (decrypted) result = decrypted;
         }
+        
         if (result && (result.maintenance === true || result.title || result.message)) {
             return result;
         }
@@ -216,6 +324,12 @@ function tampilkanHalamanMaintenance(dataMaintenance) {
 async function callRevanstore(path, method, data) {
     if (!fingerprint) fingerprint = await getFingerprint();
     if (isBlocked && path !== 'check_blocked') throw new Error('Akses ditolak');
+    
+    if (!isSessionKeyValid()) {
+        var keyOk = await getSessionKey();
+        if (!keyOk) throw new Error('Gagal mendapatkan session key');
+    }
+    
     var captchaToken = await getRecaptchaV3Token(path);
     var payload = {
         path: path,
@@ -224,24 +338,136 @@ async function callRevanstore(path, method, data) {
         captchaToken: captchaToken,
         timestamp: Date.now()
     };
-    var encryptedPayload = CryptoJS.AES.encrypt(JSON.stringify(payload), API_SECRET).toString();
-    var headers = {
-        'Content-Type': 'application/json',
-        'X-Fingerprint': fingerprint
-    };
-    var res = await fetch(API_REVANSTORE, {
+    
+    var encryptedPayload = encryptWithSession(payload);
+    if (!encryptedPayload) throw new Error('Gagal enkripsi data');
+    
+    var res = await fetch('/api/proxy', {
         method: 'POST',
-        headers: headers,
-        body: JSON.stringify({ data: encryptedPayload })
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Fingerprint': fingerprint,
+            'X-Session-Id': sessionKey.substring(0, 32)
+        },
+        body: JSON.stringify({
+            data: encryptedPayload,
+            iv: sessionIV,
+            timestamp: Date.now()
+        })
     });
+    
     if (res.status === 429) throw new Error('Terlalu banyak permintaan');
+    if (res.status === 401) {
+        sessionKey = null;
+        sessionIV = null;
+        var newKeyOk = await getSessionKey();
+        if (!newKeyOk) throw new Error('Sesi berakhir, silakan refresh');
+        
+        encryptedPayload = encryptWithSession(payload);
+        if (!encryptedPayload) throw new Error('Gagal enkripsi data');
+        
+        res = await fetch('/api/proxy', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Fingerprint': fingerprint,
+                'X-Session-Id': sessionKey.substring(0, 32)
+            },
+            body: JSON.stringify({
+                data: encryptedPayload,
+                iv: sessionIV,
+                timestamp: Date.now()
+            })
+        });
+        
+        if (res.status === 429) throw new Error('Terlalu banyak permintaan');
+    }
+    
     var text = await res.text();
     if (!text || text === 'null') return null;
+    
     var result = JSON.parse(text);
-    if (result.encrypted && result.data) {
-        var dec = CryptoJS.AES.decrypt(result.data, API_SECRET).toString(CryptoJS.enc.Utf8);
-        if (dec) return JSON.parse(dec);
+    
+    if (result && result.encrypted && result.iv) {
+        var decrypted = decryptWithSession(result.encrypted, result.iv);
+        if (decrypted) return decrypted;
     }
+    
+    return result;
+}
+
+async function callTopupAPI(path, method, data) {
+    if (!fingerprint) fingerprint = await getFingerprint();
+    if (isBlocked && path !== 'check_blocked') throw new Error('Akses ditolak');
+    
+    if (!isSessionKeyValid()) {
+        var keyOk = await getSessionKey();
+        if (!keyOk) throw new Error('Gagal mendapatkan session key');
+    }
+    
+    var captchaToken = await getRecaptchaV3Token(path);
+    var payload = {
+        path: path,
+        method: method || 'GET',
+        data: data || null,
+        captchaToken: captchaToken,
+        timestamp: Date.now()
+    };
+    
+    var encryptedPayload = encryptWithSession(payload);
+    if (!encryptedPayload) throw new Error('Gagal enkripsi data');
+    
+    var res = await fetch(API_TOPUP, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Fingerprint': fingerprint,
+            'X-Session-Id': sessionKey.substring(0, 32)
+        },
+        body: JSON.stringify({
+            data: encryptedPayload,
+            iv: sessionIV,
+            timestamp: Date.now()
+        })
+    });
+    
+    if (res.status === 429) throw new Error('Terlalu banyak permintaan');
+    if (res.status === 401) {
+        sessionKey = null;
+        sessionIV = null;
+        var newKeyOk = await getSessionKey();
+        if (!newKeyOk) throw new Error('Sesi berakhir, silakan refresh');
+        
+        encryptedPayload = encryptWithSession(payload);
+        if (!encryptedPayload) throw new Error('Gagal enkripsi data');
+        
+        res = await fetch(API_TOPUP, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Fingerprint': fingerprint,
+                'X-Session-Id': sessionKey.substring(0, 32)
+            },
+            body: JSON.stringify({
+                data: encryptedPayload,
+                iv: sessionIV,
+                timestamp: Date.now()
+            })
+        });
+        
+        if (res.status === 429) throw new Error('Terlalu banyak permintaan');
+    }
+    
+    var text = await res.text();
+    if (!text || text === 'null') return null;
+    
+    var result = JSON.parse(text);
+    
+    if (result && result.encrypted && result.iv) {
+        var decrypted = decryptWithSession(result.encrypted, result.iv);
+        if (decrypted) return decrypted;
+    }
+    
     return result;
 }
 
@@ -362,30 +588,62 @@ function backToAccount() {
 function parseDate(dateStr) {
     if (!dateStr) return null;
     if (String(dateStr).includes('9999')) return null;
-    var parts = String(dateStr).split('/');
-    if (parts.length !== 3) {
-        if (String(dateStr).includes('-')) {
-            parts = String(dateStr).split('-');
-            if (parts.length !== 3) return null;
-        } else {
+    
+    var dateString = String(dateStr).trim();
+    
+    if (/^\d{4}-\d{2}-\d{2}/.test(dateString)) {
+        dateString = dateString.substring(0, 10);
+        var parts = dateString.split('-');
+        var year = parseInt(parts[0], 10);
+        var month = parseInt(parts[1], 10) - 1;
+        var day = parseInt(parts[2], 10);
+        
+        if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
+        if (year < 2000 || year > 2100) return null;
+        if (month < 0 || month > 11) return null;
+        if (day < 1 || day > 31) return null;
+        
+        var date = new Date(year, month, day);
+        if (date.getFullYear() !== year || date.getMonth() !== month || date.getDate() !== day) {
             return null;
         }
+        return date;
     }
-    var day, month, year;
-    if (parts[0].length === 4) {
-        year = parseInt(parts[0], 10);
-        month = parseInt(parts[1], 10) - 1;
-        day = parseInt(parts[2], 10);
-    } else {
-        month = parseInt(parts[0], 10) - 1;
-        day = parseInt(parts[1], 10);
-        year = parseInt(parts[2], 10);
+    
+    if (/^\d{1,2}\/\d{1,2}\/\d{4}/.test(dateString)) {
+        dateString = dateString.substring(0, 10);
+        var slashParts = dateString.split('/');
+        var d1 = parseInt(slashParts[0], 10);
+        var d2 = parseInt(slashParts[1], 10);
+        var yr = parseInt(slashParts[2], 10);
+        
+        if (isNaN(d1) || isNaN(d2) || isNaN(yr)) return null;
+        if (yr < 2000 || yr > 2100) return null;
+        
+        var day2, month2;
+        
+        if (d1 > 12) {
+            day2 = d1;
+            month2 = d2 - 1;
+        } else if (d2 > 12) {
+            month2 = d1 - 1;
+            day2 = d2;
+        } else {
+            day2 = d1;
+            month2 = d2 - 1;
+        }
+        
+        if (month2 < 0 || month2 > 11) return null;
+        if (day2 < 1 || day2 > 31) return null;
+        
+        var dateObj = new Date(yr, month2, day2);
+        if (dateObj.getFullYear() !== yr || dateObj.getMonth() !== month2 || dateObj.getDate() !== day2) {
+            return null;
+        }
+        return dateObj;
     }
-    if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
-    if (month < 0 || month > 11 || day < 1 || day > 31 || year < 2000) return null;
-    var date = new Date(year, month, day);
-    if (date.getMonth() !== month || date.getDate() !== day) return null;
-    return date;
+    
+    return null;
 }
 
 function calculateRemainingDays(expiryDate) {
@@ -420,15 +678,15 @@ function getDaysLeftText(daysLeft) {
 }
 
 function checkAccountExpiry(user) {
-    if (!user || !user.expiry_date) {
-        return { expired: false, daysLeft: 999999, daysLeftText: 'Permanen', daysLeftClass: 'days-permanent', valid: true };
+    if (!user || !user.expiry_date || user.expiry_date === '' || user.expiry_date === null || user.expiry_date === undefined) {
+        return { expired: false, daysLeft: 999999, daysLeftText: 'Tidak Diketahui', daysLeftClass: 'days-yellow', valid: false };
     }
     if (String(user.expiry_date).includes('9999')) {
         return { expired: false, daysLeft: 999999, daysLeftText: 'Permanen', daysLeftClass: 'days-permanent', valid: true };
     }
     var parsed = parseDate(user.expiry_date);
     if (!parsed) {
-        return { expired: false, daysLeft: 999999, daysLeftText: 'Tidak Valid', daysLeftClass: 'days-red', valid: false };
+        return { expired: false, daysLeft: 999999, daysLeftText: 'Format Tidak Valid', daysLeftClass: 'days-red', valid: false };
     }
     var daysLeft = calculateRemainingDays(user.expiry_date);
     if (daysLeft === 999999) {
@@ -510,17 +768,14 @@ function showBannedPopup(until) {
     });
 }
 
-function showBanAccessPage(until) {
-    var untilText = (until || 0) === 0 ? 'PERMANEN' : ('sampai ' + new Date(until).toLocaleString('id-ID'));
-    var html = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#f0f9ff 0%,#bae6fd 50%,#7dd3fc 100%);padding:20px;font-family:\'Segoe UI\',sans-serif;">' +
-        '<div style="background:#ffffff;border-radius:24px;padding:48px 36px;width:100%;max-width:420px;text-align:center;box-shadow:0 20px 60px rgba(0,191,255,0.15);border:1px solid rgba(0,191,255,0.1);">' +
-        '<div style="font-size:72px;color:#f59e0b;margin-bottom:12px;">🚫</div>' +
-        '<h2 style="font-size:24px;font-weight:700;color:#0c4a6e;margin-bottom:8px;">AKSES DIBLOKIR</h2>' +
-        '<p style="font-size:14px;color:#64748b;margin-bottom:6px;">Maaf, akses Anda diblokir oleh admin.</p>' +
-        '<div style="background:#fef3c7;color:#92400e;padding:12px 16px;border-radius:12px;font-weight:600;font-size:14px;margin:16px 0 24px;">Durasi: ' + sanitize(untilText) + '</div>' +
-        '<button onclick="window.open(\'https://wa.me/' + WHATSAPP_NUMBER + '?text=Assalamualaikum%20admin%2C%20akses%20saya%20diblokir\',\'_blank\')" style="display:inline-flex;align-items:center;gap:10px;padding:12px 32px;background:#25D366;color:#fff;border:none;border-radius:30px;font-weight:600;font-size:15px;cursor:pointer;transition:0.2s;font-family:\'Segoe UI\',sans-serif;">' +
-        '<i class="fab fa-whatsapp"></i> Hubungi Admin</button></div></div>';
-    safeSetHTML(document.body, html);
+function tampilkanHalamanBlokir() {
+    document.body.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;font-family:\'Segoe UI\',sans-serif;">' +
+        '<div style="background:#ffffff;border-radius:24px;padding:48px 36px;max-width:420px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.08);border:1px solid #e2e8f0;">' +
+        '<i class="fas fa-lock" style="font-size:64px;color:#ef4444;margin-bottom:16px;display:block;"></i>' +
+        '<span style="display:inline-block;background:#fef2f2;color:#dc2626;padding:4px 16px;border-radius:20px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;border:1px solid #fecaca;margin-bottom:12px;"><i class="fas fa-exclamation-circle"></i> DIBLOKIR</span>' +
+        '<h1 style="font-size:24px;font-weight:700;color:#1e293b;margin-bottom:8px;">AKSES DITOLAK</h1>' +
+        '<p style="font-size:14px;color:#64748b;line-height:1.6;">Akses ditolak, jika ingin dibuka silakan hubungi admin.</p>' +
+        '</div></div>';
 }
 
 function showSuspendedPopup() {
@@ -542,7 +797,7 @@ function showSuspendedPopup() {
 function checkAuth() {
     var saved = storageGet('sesi_pengguna');
     if (!saved) {
-        window.location.href = '/';
+        window.location.href = '/index.html';
         return false;
     }
     try {
@@ -550,7 +805,7 @@ function checkAuth() {
         var age = Date.now() - (session.timestamp || 0);
         if (age > 7 * 24 * 60 * 60 * 1000) {
             storageRemove('sesi_pengguna');
-            window.location.href = '/pages/login';
+            window.location.href = '/index.html';
             return false;
         }
         currentUser = {
@@ -562,7 +817,6 @@ function checkAuth() {
             expiry_date: session.expiry_date || ''
         };
         
-        // Validasi masa aktif dari session
         if (currentUser.expiry_date) {
             var expiryCheck = checkAccountExpiry(currentUser);
             if (!expiryCheck.valid) {
@@ -576,7 +830,7 @@ function checkAuth() {
         return true;
     } catch (e) {
         storageRemove('sesi_pengguna');
-        window.location.href = '/pages/login';
+        window.location.href = '/index.html';
         return false;
     }
 }
@@ -584,32 +838,12 @@ function checkAuth() {
 async function checkAccountStatus() {
     if (!currentUser) return;
     try {
-        var captchaToken = await getRecaptchaV3Token('check_status');
-        var payload = {
-            path: 'check_account_status',
-            method: 'POST',
-            data: {
-                username: currentUser.username,
-                user_id: currentUser.id,
-                fingerprint: fingerprint,
-                captchaToken: captchaToken
-            },
-            timestamp: Date.now()
-        };
-        var encryptedPayload = CryptoJS.AES.encrypt(JSON.stringify(payload), API_SECRET).toString();
-        var res = await fetch(API_REVANSTORE, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Fingerprint': fingerprint
-            },
-            body: JSON.stringify({ data: encryptedPayload })
+        var result = await callRevanstore('check_account_status', 'POST', {
+            username: currentUser.username,
+            user_id: currentUser.id,
+            fingerprint: fingerprint
         });
-        var result = await res.json();
-        if (result.encrypted && result.data) {
-            var dec = CryptoJS.AES.decrypt(result.data, API_SECRET).toString(CryptoJS.enc.Utf8);
-            if (dec) result = JSON.parse(dec);
-        }
+        
         if (result && result.banned) {
             var untilText = (result.bannedUntil || 0) === 0 ? 'PERMANEN' : ('sampai ' + new Date(result.bannedUntil).toLocaleString('id-ID'));
             Swal.fire({
@@ -625,17 +859,7 @@ async function checkAccountStatus() {
             return;
         }
         if (result && result.banAkses) {
-            var untilTextA = (result.banAksesUntil || 0) === 0 ? 'PERMANEN' : ('sampai ' + new Date(result.banAksesUntil).toLocaleString('id-ID'));
-            Swal.fire({
-                icon: 'error',
-                title: 'AKSES DIBLOKIR',
-                html: 'Maaf, akses Anda diblokir oleh admin.<br><br>Durasi: ' + sanitize(untilTextA),
-                confirmButtonText: 'OK',
-                confirmButtonColor: '#ef4444',
-                allowOutsideClick: false
-            }).then(function() {
-                autoLogout();
-            });
+            tampilkanHalamanBlokir();
             return;
         }
         if (result && result.forceLogout) {
@@ -666,7 +890,6 @@ async function checkAccountStatus() {
                 return;
             }
             
-            // Update session dengan expiry_date terbaru
             var saved = storageGet('sesi_pengguna');
             if (saved) {
                 try {
@@ -682,7 +905,7 @@ async function checkAccountStatus() {
 function autoLogout() {
     storageRemove('sesi_pengguna');
     if (statusCheckInterval) clearInterval(statusCheckInterval);
-    window.location.href = '/pages/login';
+    window.location.href = '/index.html';
 }
 
 function logout() {
@@ -692,7 +915,7 @@ function logout() {
     lastDeviceId = null;
     storageRemove('sesi_pengguna');
     if (statusCheckInterval) clearInterval(statusCheckInterval);
-    window.location.href = '/pages/login';
+    window.location.href = '/index.html';
 }
 
 function updateProfileInfo() {
@@ -705,15 +928,14 @@ function updateProfileInfo() {
     if (elName) elName.textContent = currentUser.full_name || currentUser.username;
     if (elRole) elRole.textContent = currentUser.role || 'User';
     
-    // Tampilkan masa aktif
     if (elExpiry) {
         var expiryCheck = checkAccountExpiry(currentUser);
         if (!expiryCheck.valid) {
             elExpiry.textContent = 'TIDAK VALID';
-            elExpiry.className = 'days-red';
+            elExpiry.className = 'profile-value days-red';
         } else {
             elExpiry.textContent = expiryCheck.daysLeftText;
-            elExpiry.className = expiryCheck.daysLeftClass;
+            elExpiry.className = 'profile-value ' + expiryCheck.daysLeftClass;
         }
     }
 }
@@ -756,20 +978,9 @@ async function loginWithDeviceId(deviceId) {
                 },
                 timestamp: Date.now()
             };
-            var encryptedPayload = CryptoJS.AES.encrypt(JSON.stringify(loginData), API_SECRET).toString();
-            var res = await fetch(API_REVANSTORE, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Fingerprint': fingerprint
-                },
-                body: JSON.stringify({ data: encryptedPayload })
-            });
-            var result = await res.json();
-            if (result.encrypted && result.data) {
-                var dec = CryptoJS.AES.decrypt(result.data, API_SECRET).toString(CryptoJS.enc.Utf8);
-                if (dec) result = JSON.parse(dec);
-            }
+            
+            var result = await callRevanstore('login', 'POST', loginData.data);
+            
             if (result && result.data && result.data.SessionTicket) {
                 currentAuthToken = result.data.SessionTicket;
             } else {
@@ -803,32 +1014,16 @@ async function getUserInfoFromPlayFab() {
     if (!currentAuthToken) return null;
     try {
         var infoData = {
-            path: 'get_player_info',
-            method: 'POST',
-            data: {
-                authToken: currentAuthToken,
-                infoRequest: {
-                    GetUserAccountInfo: true,
-                    GetUserVirtualCurrency: true,
-                    GetPlayerProfile: true
-                }
-            },
-            timestamp: Date.now()
+            authToken: currentAuthToken,
+            infoRequest: {
+                GetUserAccountInfo: true,
+                GetUserVirtualCurrency: true,
+                GetPlayerProfile: true
+            }
         };
-        var encryptedPayload = CryptoJS.AES.encrypt(JSON.stringify(infoData), API_SECRET).toString();
-        var res = await fetch(API_REVANSTORE, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Fingerprint': fingerprint
-            },
-            body: JSON.stringify({ data: encryptedPayload })
-        });
-        var result = await res.json();
-        if (result.encrypted && result.data) {
-            var dec = CryptoJS.AES.decrypt(result.data, API_SECRET).toString(CryptoJS.enc.Utf8);
-            if (dec) result = JSON.parse(dec);
-        }
+        
+        var result = await callRevanstore('get_player_info', 'POST', infoData);
+        
         if (result && result.data) {
             var info = result.data.InfoResultPayload;
             var acc = info.AccountInfo;
@@ -1019,31 +1214,15 @@ async function addCashToAccount(amt) {
     if (!currentAuthToken) return false;
     try {
         var executeData = {
-            path: 'execute_cloudscript',
-            method: 'POST',
-            data: {
-                authToken: currentAuthToken,
-                functionName: "AddRp",
-                functionParameter: { addValue: amt },
-                revisionSelection: "Live",
-                generatePlayStreamEvent: true
-            },
-            timestamp: Date.now()
+            authToken: currentAuthToken,
+            functionName: "AddRp",
+            functionParameter: { addValue: amt },
+            revisionSelection: "Live",
+            generatePlayStreamEvent: true
         };
-        var encryptedPayload = CryptoJS.AES.encrypt(JSON.stringify(executeData), API_SECRET).toString();
-        var res = await fetch(API_REVANSTORE, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Fingerprint': fingerprint
-            },
-            body: JSON.stringify({ data: encryptedPayload })
-        });
-        var result = await res.json();
-        if (result.encrypted && result.data) {
-            var dec = CryptoJS.AES.decrypt(result.data, API_SECRET).toString(CryptoJS.enc.Utf8);
-            if (dec) result = JSON.parse(dec);
-        }
+        
+        var result = await callTopupAPI('execute_cloudscript', 'POST', executeData);
+        
         if (result && result.data) {
             await new Promise(function(r) { setTimeout(r, 2000); });
             var info = await getUserInfoFromPlayFab();
@@ -1367,28 +1546,12 @@ async function executeChangeName(newName) {
     showLoading('Mengubah...');
     try {
         var changeData = {
-            path: 'change_display_name',
-            method: 'POST',
-            data: {
-                authToken: currentAuthToken,
-                displayName: newName
-            },
-            timestamp: Date.now()
+            authToken: currentAuthToken,
+            displayName: newName
         };
-        var encryptedPayload = CryptoJS.AES.encrypt(JSON.stringify(changeData), API_SECRET).toString();
-        var res = await fetch(API_REVANSTORE, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Fingerprint': fingerprint
-            },
-            body: JSON.stringify({ data: encryptedPayload })
-        });
-        var result = await res.json();
-        if (result.encrypted && result.data) {
-            var dec = CryptoJS.AES.decrypt(result.data, API_SECRET).toString(CryptoJS.enc.Utf8);
-            if (dec) result = JSON.parse(dec);
-        }
+        
+        var result = await callRevanstore('change_display_name', 'POST', changeData);
+        
         if (result && result.data && result.data.DisplayName) {
             var old = currentAccount.name;
             currentAccount.name = newName;
