@@ -186,8 +186,8 @@ function sanitizeKey(str) {
   return String(str || '').replace(/[.#$\[\]\/]/g, '_');
 }
 
-async function checkTransactionRateLimit(operator) {
-  const key = 'trx_rate_' + sanitizeKey(operator || 'anon');
+async function checkTransactionRateLimit(user) {
+  const key = 'trx_rate_' + sanitizeKey(user || 'anon');
   const ref = db.ref('transaction_rate_limits/' + key);
   const snap = await ref.once('value');
   const raw = snap.val();
@@ -260,7 +260,8 @@ async function countUserTransactions(username, transactionsRaw) {
   if (transactionsRaw) {
     for (const key in transactionsRaw) {
       const d = await decryptData(transactionsRaw[key]);
-      if (d && d.operator === username) count++;
+      const userField = d?.user || d?.operator || '';
+      if (d && userField === username) count++;
     }
   }
   return count;
@@ -274,7 +275,7 @@ export default async function handler(req, res) {
   else if (allowedOrigins.includes('*')) res.setHeader('Access-Control-Allow-Origin', '*');
   
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-API-Key, X-Fingerprint, X-Operator');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-API-Key, X-Fingerprint, X-User');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-XSS-Protection', '1; mode=block');
@@ -285,10 +286,10 @@ export default async function handler(req, res) {
   const ip = req.headers['x-forwarded-for'] || 'unknown';
   const fp = req.headers['x-fingerprint'] || '';
   
-  let operator = '';
+  let user = '';
   try {
-    const encryptedOperator = req.headers['x-operator'] || '';
-    if (encryptedOperator) operator = CryptoJS.AES.decrypt(encryptedOperator, ADMIN_KEY).toString(CryptoJS.enc.Utf8);
+    const encryptedUser = req.headers['x-user'] || '';
+    if (encryptedUser) user = CryptoJS.AES.decrypt(encryptedUser, ADMIN_KEY).toString(CryptoJS.enc.Utf8);
   } catch(e) {}
   
   if (!checkRateLimit(ip)) return res.status(429).json({ error: 'Terlalu banyak request. Coba lagi nanti.' });
@@ -366,31 +367,31 @@ export default async function handler(req, res) {
       
       const snap = await db.ref('users/' + user_id).once('value');
       const raw = snap.val();
-      const user = await decryptData(raw);
+      const userData = await decryptData(raw);
       
-      if (!user || user.username !== username) {
+      if (!userData || userData.username !== username) {
         return res.status(200).json(encryptResponse({ valid: false, message: 'Sesi tidak valid' }));
       }
 
-      if (user.banned === true) {
-        return res.status(200).json(encryptResponse({ banned: true, bannedUntil: user.bannedUntil || 0 }));
+      if (userData.banned === true) {
+        return res.status(200).json(encryptResponse({ banned: true, bannedUntil: userData.bannedUntil || 0 }));
       }
 
-      if (user.banAkses === true) {
-        if (user.banAksesUntil && user.banAksesUntil !== 0 && user.banAksesUntil < Date.now()) {
-          const updatedData = { ...user, banAkses: false, banAksesUntil: 0 };
+      if (userData.banAkses === true) {
+        if (userData.banAksesUntil && userData.banAksesUntil !== 0 && userData.banAksesUntil < Date.now()) {
+          const updatedData = { ...userData, banAkses: false, banAksesUntil: 0 };
           const enc = CryptoJS.AES.encrypt(JSON.stringify(updatedData), ADMIN_KEY).toString();
           await db.ref('users/' + user_id).update({ data: enc });
         } else {
-          return res.status(200).json(encryptResponse({ banAkses: true, banAksesUntil: user.banAksesUntil || 0 }));
+          return res.status(200).json(encryptResponse({ banAkses: true, banAksesUntil: userData.banAksesUntil || 0 }));
         }
       }
 
-      if (user.forceLogout === true) {
+      if (userData.forceLogout === true) {
         return res.status(200).json(encryptResponse({ forceLogout: true }));
       }
 
-      return res.status(200).json(encryptResponse({ valid: true, user: { id: user_id, username: user.username, role: user.role || 'Operator', full_name: user.full_name || user.username, expiry_date: user.expiry_date || '' } }));
+      return res.status(200).json(encryptResponse({ valid: true, user: { id: user_id, username: userData.username, role: userData.role || 'User', full_name: userData.full_name || userData.username, expiry_date: userData.expiry_date || '' } }));
     }
 
     if (path === 'access_key' && method === 'GET') {
@@ -617,7 +618,7 @@ export default async function handler(req, res) {
           return res.status(200).json(encryptResponse({
             success: true,
             data: {
-              id: key, username: decryptedUser.username, role: decryptedUser.role || 'Operator',
+              id: key, username: decryptedUser.username, role: decryptedUser.role || 'User',
               full_name: decryptedUser.full_name || decryptedUser.username, expiry_date: decryptedUser.expiry_date || '',
               ip: currentIP, fingerprint: currentFP
             }
@@ -658,18 +659,18 @@ export default async function handler(req, res) {
     }
 
     if (path === 'transactions' && method === 'POST') {
-      const trxUsername = data?.operator || '';
-      const rateOk = await checkTransactionRateLimit(trxUsername || ip);
+      const trxUser = data?.user || data?.operator || '';
+      const rateOk = await checkTransactionRateLimit(trxUser || ip);
       if (!rateOk) {
         return res.status(200).json(encryptResponse({ success: false, error: 'rate_limit_trx', message: 'Terlalu banyak transaksi, tunggu sebentar sebelum transaksi lagi.' }));
       }
       await cleanupOldTransactions();
-      const code = await getUserTrxCode(trxUsername || 'unknown');
+      const code = await getUserTrxCode(trxUser || 'unknown');
       const existingSnap = await db.ref('transactions').once('value');
-      const existingCount = await countUserTransactions(trxUsername || 'unknown', existingSnap.val());
+      const existingCount = await countUserTransactions(trxUser || 'unknown', existingSnap.val());
       const seq = existingCount + 1;
       const trxId = code + '-' + String(seq).padStart(3, '0');
-      const trxData = { ...data, trxId };
+      const trxData = { ...data, user: trxUser, trxId };
       const enc = encryptData(trxData);
       const r = db.ref('transactions').push();
       await r.set({ data: enc });
@@ -685,7 +686,8 @@ export default async function handler(req, res) {
       if (raw) {
         for (const key in raw) {
           const d = await decryptData(raw[key]);
-          if (d && (!trxUsername || d.operator === trxUsername)) result[key] = d;
+          const userField = d?.user || d?.operator || '';
+          if (d && (!trxUsername || userField === trxUsername)) result[key] = d;
         }
       }
       return res.status(200).json(encryptResponse(result));
@@ -699,7 +701,8 @@ export default async function handler(req, res) {
         const updates = {};
         for (const key in raw) {
           const d = await decryptData(raw[key]);
-          if (d && d.operator === trxUsername) updates[key] = null;
+          const userField = d?.user || d?.operator || '';
+          if (d && userField === trxUsername) updates[key] = null;
         }
         if (Object.keys(updates).length > 0) await db.ref('transactions').update(updates);
       }
