@@ -11,7 +11,7 @@ if (!ADMIN_KEY) {
 const API_SECRET = process.env.API_SECRET || '1417-1426-1527-1517';
 const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
 const RECAPTCHA_V2_SECRET_KEY = process.env.RECAPTCHA_V2_SECRET_KEY || '';
-const EMAIL_FROM = process.env.EMAIL_FROM || 'Web Top Up Bussid <mail.webtopupbussid.web.id>';
+const EMAIL_FROM = process.env.EMAIL_FROM || 'Web Top Up Bussid <noreply@webtopupbussid.web.id>';
 const BASE_URL = process.env.BASE_URL || 'https://tesweb-kohl.vercel.app';
 
 const RESET_TOKEN_EXPIRY = 15 * 60 * 1000;
