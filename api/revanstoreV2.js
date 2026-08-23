@@ -1,11 +1,12 @@
 import CryptoJS from 'crypto-js';
 import admin from 'firebase-admin';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 
 const ADMIN_KEY = process.env.ADMIN_KEY;
 const RECAPTCHA_V2_SECRET_KEY = process.env.RECAPTCHA_V2_SECRET_KEY;
 const RECAPTCHA_V3_SECRET_KEY = process.env.RECAPTCHA_V3_SECRET_KEY;
-const API_SECRET = process.env.API_SECRET || '1417-1426-1527-1517';
+const API_SECRET = process.env.API_SECRET;
 const SALT_ROUNDS = 12;
 
 if (!admin.apps.length) {
@@ -21,6 +22,7 @@ const rateLimitMap = new Map();
 const RATE_LIMIT_MAX = 20;
 const RATE_LIMIT_WINDOW = 60000;
 const TRX_MAX_AGE = 172800000;
+const sessionKeys = new Map();
 
 function checkRateLimit(ip) {
   const now = Date.now();
@@ -275,7 +277,7 @@ export default async function handler(req, res) {
   else if (allowedOrigins.includes('*')) res.setHeader('Access-Control-Allow-Origin', '*');
   
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-API-Key, X-Fingerprint, X-User');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-API-Key, X-Fingerprint, X-User, X-Session-Id');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-XSS-Protection', '1; mode=block');
@@ -304,7 +306,9 @@ export default async function handler(req, res) {
       'check_account_status',
       'login_failed',
       'login_success',
-      'maintenance_status'
+      'maintenance_status',
+      'session-key',
+      'proxy'
     ];
     
     if (req.body?.data && typeof req.body.data === 'string') {
@@ -328,6 +332,74 @@ export default async function handler(req, res) {
     }
     
     if (!path || typeof path !== 'string' || path.length > 200) return res.status(400).json({ error: 'Path tidak valid' });
+    
+    // ==================== SESSION KEY ENDPOINT ====================
+    if (path === 'session-key') {
+      const key = crypto.randomBytes(32).toString('hex');
+      const iv = crypto.randomBytes(16).toString('hex');
+      const sessionId = key.substring(0, 32);
+      
+      sessionKeys.set(sessionId, {
+        key: key,
+        iv: iv,
+        createdAt: Date.now(),
+        expiresAt: Date.now() + (5 * 60 * 1000)
+      });
+      
+      for (const [id, session] of sessionKeys) {
+        if (Date.now() > session.expiresAt) {
+          sessionKeys.delete(id);
+        }
+      }
+      
+      return res.status(200).json({
+        key: key,
+        iv: iv,
+        expiresIn: 300
+      });
+    }
+    
+    // ==================== PROXY ENDPOINT ====================
+    if (path === 'proxy') {
+      const sessionId = req.headers['x-session-id'] || '';
+      const encryptedData = data?.data || '';
+      const iv = data?.iv || '';
+      const timestamp = data?.timestamp || 0;
+      
+      const session = sessionKeys.get(sessionId);
+      if (!session) {
+        return res.status(401).json({ error: 'Session expired' });
+      }
+      
+      if (Date.now() > session.expiresAt) {
+        sessionKeys.delete(sessionId);
+        return res.status(401).json({ error: 'Session expired' });
+      }
+      
+      if (Math.abs(Date.now() - timestamp) > 60000) {
+        return res.status(401).json({ error: 'Request expired' });
+      }
+      
+      let payload;
+      try {
+        const decrypted = CryptoJS.AES.decrypt(encryptedData, CryptoJS.enc.Hex.parse(session.key), {
+          iv: CryptoJS.enc.Hex.parse(iv),
+          mode: CryptoJS.mode.CBC,
+          padding: CryptoJS.pad.Pkcs7
+        });
+        payload = JSON.parse(decrypted.toString(CryptoJS.enc.Utf8));
+      } catch (e) {
+        return res.status(401).json({ error: 'Invalid encryption' });
+      }
+      
+      if (!payload || !payload.path) {
+        return res.status(400).json({ error: 'Path required' });
+      }
+      
+      path = payload.path;
+      method = payload.method || 'GET';
+      data = payload.data || null;
+    }
     
     const ref = db.ref(path);
 
