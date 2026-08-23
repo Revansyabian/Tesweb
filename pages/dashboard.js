@@ -87,7 +87,7 @@ function safeSetHTML(element, html) {
     if (!element) return;
     if (window.DOMPurify) {
         element.innerHTML = DOMPurify.sanitize(html, {
-            ALLOWED_TAGS: ['div', 'span', 'p', 'h1', 'h2', 'h3', 'button', 'i', 'b', 'br'],
+            ALLOWED_TAGS: ['div', 'span', 'p', 'h1', 'h2', 'h3', 'button', 'i', 'b', 'br', 'pre', 'code', 'strong', 'em', 'small'],
             ALLOWED_ATTR: ['class', 'style', 'onclick', 'id']
         });
     } else {
@@ -213,6 +213,7 @@ function tampilkanHalamanMaintenance(dataMaintenance) {
         '<div style="background:#fef3c7;color:#92400e;padding:12px 16px;border-radius:12px;font-weight:600;font-size:13px;margin:16px 0 24px;">' + teksEstimasi + '</div>' +
         '</div></div>';
 }
+
 async function callRevanstore(path, method, data) {
     if (!fingerprint) fingerprint = await getFingerprint();
     if (isBlocked && path !== 'check_blocked') throw new Error('Akses ditolak');
@@ -454,16 +455,24 @@ function checkAccountExpiry(user) {
 }
 
 function showExpiredBanner() {
-    var eb = document.getElementById('expiredBanner');
-    if (eb) eb.style.display = 'flex';
-    var ma = document.getElementById('mainApp');
-    if (ma) ma.style.display = 'none';
-}
-
-function closeExpiredBanner() {
-    var eb = document.getElementById('expiredBanner');
-    if (eb) eb.style.display = 'none';
-    logout();
+    Swal.fire({
+        icon: 'warning',
+        title: '⚠️ MASA AKTIF HABIS',
+        html: '<p style="font-size:16px;margin-bottom:12px;">Yah, masa aktif akun kamu sudah habis!</p><p style="color:#64748b;font-size:14px;">Silakan perpanjang masa aktif ya.</p>',
+        confirmButtonText: '<i class="fab fa-whatsapp"></i> Perpanjang Sekarang',
+        confirmButtonColor: '#25D366',
+        showCancelButton: true,
+        cancelButtonText: 'Logout',
+        cancelButtonColor: '#ef4444',
+        allowOutsideClick: false
+    }).then(function(result) {
+        if (result.isConfirmed) {
+            var msg = encodeURIComponent("Assalamualaikum admin, saya ingin memperpanjang masa aktif akun. Username: " + (currentUser ? currentUser.username : ''));
+            window.open('https://wa.me/' + WHATSAPP_NUMBER + '?text=' + msg, '_blank');
+        } else {
+            logout();
+        }
+    });
 }
 
 function openWhatsApp() {
@@ -545,7 +554,7 @@ function checkAuth() {
             id: session.user_id,
             username: session.username,
             token: session.token || null,
-            role: session.role || 'Operator',
+            role: session.role || 'User',
             full_name: session.full_name || session.username,
             expiry_date: session.expiry_date || ''
         };
@@ -631,6 +640,11 @@ async function checkAccountStatus() {
             currentUser.role = result.user.role || currentUser.role;
             currentUser.full_name = result.user.full_name || currentUser.full_name;
             currentUser.expiry_date = result.user.expiry_date || currentUser.expiry_date;
+            var expiryCheck = checkAccountExpiry(currentUser);
+            if (expiryCheck.expired) {
+                showExpiredBanner();
+                return;
+            }
         }
     } catch (e) {}
 }
@@ -656,16 +670,9 @@ function updateProfileInfo() {
     var elUsername = document.getElementById('profileUsername');
     var elName = document.getElementById('profileName');
     var elRole = document.getElementById('profileRole');
-    var elExpiry = document.getElementById('profileExpiry');
     if (elUsername) elUsername.textContent = currentUser.username;
     if (elName) elName.textContent = currentUser.full_name || currentUser.username;
-    if (elRole) elRole.textContent = currentUser.role || 'Operator';
-    if (elExpiry) {
-        var expiryCheck = checkAccountExpiry(currentUser);
-        var expiryFormatted = currentUser.expiry_date || 'Tidak ada';
-        var html = '<span>' + sanitize(expiryFormatted) + '</span> <span class="expiry-days-left ' + expiryCheck.daysLeftClass + '">' + sanitize(expiryCheck.daysLeftText) + '</span>';
-        safeSetHTML(elExpiry, html);
-    }
+    if (elRole) elRole.textContent = currentUser.role || 'User';
 }
 
 function navigateBottom(page) {
@@ -758,7 +765,8 @@ async function getUserInfoFromPlayFab() {
                     id: acc.FacebookInfo.FacebookId || null,
                     name: acc.FacebookInfo.FullName || 'Tidak tertaut',
                     email: acc.FacebookInfo.Email || null,
-                    isConnected: true                };
+                    isConnected: true
+                };
                 if (fb.id) fbAvatar = 'https://graph.facebook.com/' + fb.id + '/picture?type=large';
             }
             return {
@@ -964,7 +972,7 @@ async function executeTopup(amt) {
             amount: amt,
             oldBalance: old,
             newBalance: currentAccount.balance,
-            operator: currentUser.username,
+            user: currentUser.username,
             timestamp: Date.now(),
             status: 'success'
         };
@@ -1000,7 +1008,7 @@ async function executeKuras(amt) {
             amount: amt,
             oldBalance: old,
             newBalance: currentAccount.balance,
-            operator: currentUser.username,
+            user: currentUser.username,
             timestamp: Date.now(),
             status: 'success'
         };
@@ -1029,7 +1037,7 @@ function showReceipt(trx) {
     var typeText = trx.type === 'topup' ? 'TOP UP' : 'KURAS';
     var sign = trx.type === 'topup' ? '+' : '-';
     var idRow = trx.trxId ? '<div class="receipt-row"><span>ID Transaksi:</span><span style="font-family:monospace;">' + sanitize(trx.trxId) + '</span></div>' : '';
-    var html = '<div class="receipt-content"><div class="receipt-header"><h3>TOP UP</h3><p>Detail Transaksi</p></div><div class="receipt-details">' + idRow + '<div class="receipt-row"><span>Akun:</span><span>' + sanitize(trx.accountName) + '</span></div><div class="receipt-row"><span>Jenis:</span><span>' + sanitize(typeText) + '</span></div><div class="receipt-row"><span>Jumlah:</span><span style="color:' + (trx.type === 'topup' ? '#10b981' : '#f59e0b') + '">' + sign + formatCurrency(trx.amount) + '</span></div><div class="receipt-row"><span>Saldo Awal:</span><span>' + formatCurrency(trx.oldBalance) + '</span></div><div class="receipt-row"><span>Saldo Akhir:</span><span>' + formatCurrency(trx.newBalance) + '</span></div><div class="receipt-row"><span>Tanggal:</span><span>' + new Date(trx.timestamp).toLocaleString('id-ID') + '</span></div><div class="receipt-row"><span>Status:</span><span style="color:#10b981;">BERHASIL</span></div></div></div><div style="display:flex;gap:8px;margin-top:20px;"><button class="btn btn-primary" onclick="window._showTrxModal()" style="flex:1;">LANJUTKAN</button><button class="btn btn-secondary" onclick="window._goHome()" style="flex:1;">HOME</button></div>';
+    var html = '<div class="receipt-content"><div class="receipt-header"><h3>TOP UP</h3><p>Detail Transaksi</p></div><div class="receipt-details">' + idRow + '<div class="receipt-row"><span>Akun:</span><span>' + sanitize(trx.accountName) + '</span></div><div class="receipt-row"><span>Jenis:</span><span>' + sanitize(typeText) + '</span></div><div class="receipt-row"><span>Jumlah:</span><span style="color:' + (trx.type === 'topup' ? '#10b981' : '#f59e0b') + '">' + sign + formatCurrency(trx.amount) + '</span></div><div class="receipt-row"><span>Saldo Awal:</span><span>' + formatCurrency(trx.oldBalance) + '</span></div><div class="receipt-row"><span>Saldo Akhir:</span><span>' + formatCurrency(trx.newBalance) + '</span></div><div class="receipt-row"><span>User:</span><span>' + sanitize(trx.user || '-') + '</span></div><div class="receipt-row"><span>Tanggal:</span><span>' + new Date(trx.timestamp).toLocaleString('id-ID') + '</span></div><div class="receipt-row"><span>Status:</span><span style="color:#10b981;">BERHASIL</span></div></div></div><div style="display:flex;gap:8px;margin-top:20px;"><button class="btn btn-primary" onclick="window._showTrxModal()" style="flex:1;">LANJUTKAN</button><button class="btn btn-secondary" onclick="window._goHome()" style="flex:1;">HOME</button></div>';
     var receiptContent = document.getElementById('receiptContent');
     safeSetHTML(receiptContent, html);
     document.getElementById('receiptSection').style.display = 'block';
@@ -1090,7 +1098,7 @@ async function showHistory() {
                 newBalance: data[k].newBalance,
                 oldName: data[k].oldName,
                 newName: data[k].newName,
-                operator: data[k].operator,
+                user: data[k].user || data[k].operator || '',
                 timestamp: data[k].timestamp
             };
         }).sort(function(a, b) {
@@ -1101,7 +1109,8 @@ async function showHistory() {
         arr.forEach(function(t, idx) {
             var typeText = t.type === 'topup' ? 'TOP UP' : t.type === 'kuras' ? 'KURAS' : 'GANTI NAMA';
             var sign = t.type === 'topup' ? '+' : t.type === 'kuras' ? '-' : '';
-            html += '<div class="transaction-item ' + sanitize(t.type) + '" onclick="showTransactionDetail(' + idx + ')" style="cursor:pointer;"><div class="transaction-header"><div>' + sanitize(t.accountName) + '</div><div class="transaction-amount">' + sign + formatCurrency(t.amount) + '</div></div><div class="transaction-details"><div>' + sanitize(typeText) + ' · ' + sanitize(t.trxId) + '</div><div>' + new Date(t.timestamp).toLocaleString('id-ID') + '</div></div><div class="transaction-balance"><span>Sebelum: ' + formatCurrency(t.oldBalance) + '</span><span>→</span><span>Sesudah: ' + formatCurrency(t.newBalance) + '</span></div></div>';
+            var userDisplay = t.user || 'User';
+            html += '<div class="transaction-item ' + sanitize(t.type) + '" onclick="showTransactionDetail(' + idx + ')" style="cursor:pointer;"><div class="transaction-header"><div>' + sanitize(t.accountName) + '</div><div class="transaction-amount">' + sign + formatCurrency(t.amount) + '</div></div><div class="transaction-details"><div>' + sanitize(typeText) + ' · ' + sanitize(t.trxId) + '</div><div>' + new Date(t.timestamp).toLocaleString('id-ID') + '</div></div><div class="transaction-balance"><span>User: ' + sanitize(userDisplay) + '</span><span>Saldo: ' + formatCurrency(t.newBalance) + '</span></div></div>';
         });
         if (list) safeSetHTML(list, html);
         hideLoading();
@@ -1115,6 +1124,7 @@ function showTransactionDetail(idx) {
     var t = currentHistoryData[idx];
     if (!t) return;
     var typeText = t.type === 'topup' ? 'TOP UP' : t.type === 'kuras' ? 'KURAS' : 'GANTI NAMA';
+    var userDisplay = t.user || 'User';
     var html;
     if (t.type === 'gantinama') {
         html = '<div style="text-align:left;font-size:14px;">' +
@@ -1122,7 +1132,7 @@ function showTransactionDetail(idx) {
             '<p><b>Akun:</b> ' + sanitize(t.accountName) + '</p>' +
             '<p><b>Nama Lama:</b> ' + sanitize(t.oldName || '-') + '</p>' +
             '<p><b>Nama Baru:</b> ' + sanitize(t.newName || '-') + '</p>' +
-            '<p><b>Operator:</b> ' + sanitize(t.operator) + '</p>' +
+            '<p><b>User:</b> ' + sanitize(userDisplay) + '</p>' +
             '<p><b>Tanggal:</b> ' + new Date(t.timestamp).toLocaleString('id-ID') + '</p>' +
             '</div>';
     } else {
@@ -1134,7 +1144,7 @@ function showTransactionDetail(idx) {
             '<p><b>Jumlah:</b> ' + sign + formatCurrency(t.amount) + '</p>' +
             '<p><b>Saldo Awal:</b> ' + formatCurrency(t.oldBalance) + '</p>' +
             '<p><b>Saldo Akhir:</b> ' + formatCurrency(t.newBalance) + '</p>' +
-            '<p><b>Operator:</b> ' + sanitize(t.operator) + '</p>' +
+            '<p><b>User:</b> ' + sanitize(userDisplay) + '</p>' +
             '<p><b>Tanggal:</b> ' + new Date(t.timestamp).toLocaleString('id-ID') + '</p>' +
             '</div>';
     }
@@ -1266,7 +1276,7 @@ async function executeChangeName(newName) {
                 accountName: currentAccount.name,
                 oldName: old,
                 newName: newName,
-                operator: currentUser.username,
+                user: currentUser.username,
                 timestamp: Date.now(),
                 status: 'success'
             });
@@ -1282,7 +1292,7 @@ async function executeChangeName(newName) {
             }
             var idRow = (trxResult && trxResult.trxId) ? '<div class="receipt-row"><span>ID Transaksi:</span><span style="font-family:monospace;">' + sanitize(trxResult.trxId) + '</span></div>' : '';
             hideAllSections();
-            var html = '<div class="receipt-content"><div class="receipt-header"><h3>GANTI NAMA</h3></div><div class="receipt-details">' + idRow + '<div class="receipt-row"><span>Lama:</span><span>' + sanitize(old) + '</span></div><div class="receipt-row"><span>Baru:</span><span style="color:#0ea5e9;">' + sanitize(newName) + '</span></div></div></div><button class="btn btn-primary btn-block" onclick="window._goBackAccount()">KEMBALI</button>';
+            var html = '<div class="receipt-content"><div class="receipt-header"><h3>GANTI NAMA</h3></div><div class="receipt-details">' + idRow + '<div class="receipt-row"><span>Lama:</span><span>' + sanitize(old) + '</span></div><div class="receipt-row"><span>Baru:</span><span style="color:#0ea5e9;">' + sanitize(newName) + '</span></div><div class="receipt-row"><span>User:</span><span>' + sanitize(currentUser.username) + '</span></div></div></div><button class="btn btn-primary btn-block" onclick="window._goBackAccount()">KEMBALI</button>';
             var receiptContent = document.getElementById('receiptContent');
             safeSetHTML(receiptContent, html);
             document.getElementById('receiptSection').style.display = 'block';
@@ -1348,11 +1358,13 @@ document.addEventListener('DOMContentLoaded', async function() {
     var bottomNav = document.getElementById('bottomNav');
     if (mainApp) mainApp.style.display = 'block';
     if (bottomNav) bottomNav.style.display = 'flex';
+    
     var expiryCheck = checkAccountExpiry(currentUser);
     if (expiryCheck.expired) {
         showExpiredBanner();
         return;
     }
+    
     showHome();
     if (typeof grecaptcha !== 'undefined') {
         grecaptcha.ready(async function() {
