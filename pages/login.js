@@ -14,6 +14,8 @@ var alertTimeout = null;
 var isBlocked = false;
 var blockedChecked = false;
 var loginInProgress = false;
+var globalFailedAttempts = 0;
+var globalBlockedUntil = null;
 
 var STORAGE_KEY = 'app_data';
 var STORAGE_SECRET = 'session_local_secret';
@@ -74,6 +76,26 @@ function saveBlockData(username, data) {
     storageSet(getBlockKey(username), data);
 }
 
+function getGlobalBlockData() {
+    var data = storageGet('global_block');
+    if (data) {
+        try {
+            if (data.blockedUntil && Date.now() > data.blockedUntil) {
+                storageRemove('global_block');
+                return { attempts: 0, blockedUntil: null };
+            }
+            return data;
+        } catch (e) {
+            return { attempts: 0, blockedUntil: null };
+        }
+    }
+    return { attempts: 0, blockedUntil: null };
+}
+
+function saveGlobalBlockData(data) {
+    storageSet('global_block', data);
+}
+
 function sanitize(str) {
     if (!str) return '';
     return String(str).replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#x27;');
@@ -102,6 +124,14 @@ function getBlockDuration(attempts) {
 async function checkIfBlocked() {
     if (blockedChecked) return isBlocked;
     if (!fingerprint) fingerprint = await getFingerprint();
+    
+    var globalBlock = getGlobalBlockData();
+    if (globalBlock.blockedUntil && Date.now() < globalBlock.blockedUntil) {
+        isBlocked = true;
+        blockedChecked = true;
+        return true;
+    }
+    
     try {
         var payload = {
             path: 'check_blocked',
@@ -461,6 +491,10 @@ async function login() {
         }
         if (result && result.success) {
             storageRemove(getBlockKey(username));
+            var globalBlock = getGlobalBlockData();
+            if (globalBlock.attempts > 0) {
+                saveGlobalBlockData({ attempts: 0, blockedUntil: null });
+            }
             var user = result.data;
             var expiryCheck = checkAccountExpiry(user);
             if (expiryCheck.expired) {
@@ -498,6 +532,32 @@ async function login() {
             });
         } else {
             await callRevanstore('login_failed', 'POST', {});
+            
+            var globalBlock = getGlobalBlockData();
+            globalBlock.attempts += 1;
+            
+            if (globalBlock.attempts >= 5) {
+                var duration = 15;
+                globalBlock.blockedUntil = Date.now() + duration * 60 * 1000;
+                saveGlobalBlockData(globalBlock);
+                isBlocked = true;
+                storageSet('perangkat_diblokir', 'true');
+                hideLoading();
+                grecaptcha.reset();
+                Swal.fire({ 
+                    icon: "error", 
+                    title: "PERANGKAT DIBLOKIR", 
+                    text: "Terlalu banyak percobaan gagal. Perangkat Anda diblokir selama 15 menit.", 
+                    confirmButtonColor: "#ef4444" 
+                }).then(function() {
+                    tampilkanHalamanBlokir();
+                });
+                loginInProgress = false;
+                return;
+            }
+            
+            saveGlobalBlockData(globalBlock);
+            
             blockData.attempts += 1;
             var d = getBlockDuration(blockData.attempts);
             hideLoading();
@@ -508,7 +568,13 @@ async function login() {
                 Swal.fire({ icon: "error", title: "Akses Ditolak", text: "🔒 Terlalu banyak percobaan!", confirmButtonColor: "#ef4444" });
             } else {
                 saveBlockData(username, blockData);
-                Swal.fire({ icon: "error", title: "Oops...", text: "User tidak ditemukan atau password salah!", confirmButtonColor: "#ef4444" });
+                var remaining = 5 - globalBlock.attempts;
+                Swal.fire({ 
+                    icon: "error", 
+                    title: "Oops...", 
+                    text: "User tidak ditemukan atau password salah! (" + remaining + " percobaan lagi sebelum perangkat diblokir)", 
+                    confirmButtonColor: "#ef4444" 
+                });
             }
         }
     } catch (error) {
@@ -535,20 +601,17 @@ function autoCheckSession() {
     }
 }
 
-// ==================== CEK MAINTENANCE & BLOCK SAAT LOAD ====================
 document.addEventListener('DOMContentLoaded', async function() {
     autoCheckSession();
 
     if (!fingerprint) fingerprint = await getFingerprint();
     
-    // CEK MAINTENANCE DULU (SEBELUM APAPUN)
     var maintenance = await periksaMaintenance();
     if (maintenance) { 
         tampilkanHalamanMaintenance(maintenance); 
         return; 
     }
     
-    // CEK BLOCKED
     var blocked = await checkIfBlocked();
     if (blocked) {
         tampilkanHalamanBlokir();
@@ -563,4 +626,44 @@ document.addEventListener('DOMContentLoaded', async function() {
     document.getElementById('password').addEventListener('keypress', function(e) {
         if (e.key === 'Enter') login();
     });
+
+    const togglePassword = document.getElementById('togglePassword');
+    const passwordInput = document.getElementById('password');
+
+    if (togglePassword && passwordInput) {
+        let hideTimeout = null;
+
+        togglePassword.addEventListener('click', function() {
+            const isVisible = passwordInput.getAttribute('type') === 'text';
+            passwordInput.setAttribute('type', isVisible ? 'password' : 'text');
+            this.classList.toggle('fa-eye');
+            this.classList.toggle('fa-eye-slash');
+            if (!isVisible) {
+                if (hideTimeout) clearTimeout(hideTimeout);
+                hideTimeout = setTimeout(() => {
+                    passwordInput.setAttribute('type', 'password');
+                    togglePassword.classList.remove('fa-eye');
+                    togglePassword.classList.add('fa-eye-slash');
+                    hideTimeout = null;
+                }, 5000);
+            } else {
+                if (hideTimeout) {
+                    clearTimeout(hideTimeout);
+                    hideTimeout = null;
+                }
+            }
+        });
+
+        passwordInput.addEventListener('blur', function() {
+            if (this.getAttribute('type') === 'text') {
+                this.setAttribute('type', 'password');
+                togglePassword.classList.remove('fa-eye');
+                togglePassword.classList.add('fa-eye-slash');
+                if (hideTimeout) {
+                    clearTimeout(hideTimeout);
+                    hideTimeout = null;
+                }
+            }
+        });
+    }
 });
