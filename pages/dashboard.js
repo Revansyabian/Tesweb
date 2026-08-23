@@ -1,5 +1,4 @@
 var API_REVANSTORE = '/api/revanstoreV2';
-var API_RVNSTORE = '/api/rvnstore';
 var WHATSAPP_NUMBER = "6285199120995";
 var MAX_TOPUP_AMOUNT = 2147483647;
 var RECAPTCHA_V3_SITE_KEY = '6LcVBn4tAAAAAINTTIleUbUZr1ZykvyB6WA-oOfT';
@@ -244,20 +243,6 @@ async function callRevanstore(path, method, data) {
         if (dec) return JSON.parse(dec);
     }
     return result;
-}
-
-async function callRvnstore(endpoint, method, body, authToken) {
-    var res = await fetch(API_RVNSTORE, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            endpoint: endpoint,
-            method: method || 'POST',
-            body: body || null,
-            authToken: authToken || null
-        })
-    });
-    return await res.json();
 }
 
 function showAlert(message, type, duration) {
@@ -698,18 +683,37 @@ async function loginWithDeviceId(deviceId) {
             currentAuthToken = cleanInput;
         } else {
             var cid = cleanInput.toLowerCase().replace(/^android-/, '');
-            var data = await callRvnstore('/Client/LoginWithAndroidDeviceID', 'POST', {
-                TitleId: "4AE9",
-                AndroidDeviceId: cid,
-                CreateAccount: true,
-                InfoRequestParameters: {
-                    GetUserAccountInfo: true,
-                    GetUserVirtualCurrency: true,
-                    GetPlayerProfile: true
-                }
-            }, null);
-            if (data.data && data.data.SessionTicket) {
-                currentAuthToken = data.data.SessionTicket;
+            var loginData = {
+                path: 'login',
+                method: 'POST',
+                data: {
+                    TitleId: "4AE9",
+                    AndroidDeviceId: cid,
+                    CreateAccount: true,
+                    InfoRequestParameters: {
+                        GetUserAccountInfo: true,
+                        GetUserVirtualCurrency: true,
+                        GetPlayerProfile: true
+                    }
+                },
+                timestamp: Date.now()
+            };
+            var encryptedPayload = CryptoJS.AES.encrypt(JSON.stringify(loginData), API_SECRET).toString();
+            var res = await fetch(API_REVANSTORE, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Fingerprint': fingerprint
+                },
+                body: JSON.stringify({ data: encryptedPayload })
+            });
+            var result = await res.json();
+            if (result.encrypted && result.data) {
+                var dec = CryptoJS.AES.decrypt(result.data, API_SECRET).toString(CryptoJS.enc.Utf8);
+                if (dec) result = JSON.parse(dec);
+            }
+            if (result && result.data && result.data.SessionTicket) {
+                currentAuthToken = result.data.SessionTicket;
             } else {
                 hideLoading();
                 throw new Error('Device ID tidak valid!');
@@ -740,14 +744,34 @@ async function loginWithDeviceId(deviceId) {
 async function getUserInfoFromPlayFab() {
     if (!currentAuthToken) return null;
     try {
-        var result = await callRvnstore('/Client/GetPlayerCombinedInfo', 'POST', {
-            InfoRequestParameters: {
-                GetUserAccountInfo: true,
-                GetUserVirtualCurrency: true,
-                GetPlayerProfile: true
-            }
-        }, currentAuthToken);
-        if (result.data) {
+        var infoData = {
+            path: 'get_player_info',
+            method: 'POST',
+            data: {
+                authToken: currentAuthToken,
+                infoRequest: {
+                    GetUserAccountInfo: true,
+                    GetUserVirtualCurrency: true,
+                    GetPlayerProfile: true
+                }
+            },
+            timestamp: Date.now()
+        };
+        var encryptedPayload = CryptoJS.AES.encrypt(JSON.stringify(infoData), API_SECRET).toString();
+        var res = await fetch(API_REVANSTORE, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Fingerprint': fingerprint
+            },
+            body: JSON.stringify({ data: encryptedPayload })
+        });
+        var result = await res.json();
+        if (result.encrypted && result.data) {
+            var dec = CryptoJS.AES.decrypt(result.data, API_SECRET).toString(CryptoJS.enc.Utf8);
+            if (dec) result = JSON.parse(dec);
+        }
+        if (result && result.data) {
             var info = result.data.InfoResultPayload;
             var acc = info.AccountInfo;
             var name = (acc && acc.TitleInfo) ? (acc.TitleInfo.DisplayName || 'Unknown') : 'Unknown';
@@ -936,13 +960,33 @@ async function processKuras() {
 async function addCashToAccount(amt) {
     if (!currentAuthToken) return false;
     try {
-        var res = await callRvnstore('/Client/ExecuteCloudScript', 'POST', {
-            FunctionName: "AddRp",
-            FunctionParameter: { addValue: amt },
-            RevisionSelection: "Live",
-            GeneratePlayStreamEvent: true
-        }, currentAuthToken);
-        if (res.data) {
+        var executeData = {
+            path: 'execute_cloudscript',
+            method: 'POST',
+            data: {
+                authToken: currentAuthToken,
+                functionName: "AddRp",
+                functionParameter: { addValue: amt },
+                revisionSelection: "Live",
+                generatePlayStreamEvent: true
+            },
+            timestamp: Date.now()
+        };
+        var encryptedPayload = CryptoJS.AES.encrypt(JSON.stringify(executeData), API_SECRET).toString();
+        var res = await fetch(API_REVANSTORE, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Fingerprint': fingerprint
+            },
+            body: JSON.stringify({ data: encryptedPayload })
+        });
+        var result = await res.json();
+        if (result.encrypted && result.data) {
+            var dec = CryptoJS.AES.decrypt(result.data, API_SECRET).toString(CryptoJS.enc.Utf8);
+            if (dec) result = JSON.parse(dec);
+        }
+        if (result && result.data) {
             await new Promise(function(r) { setTimeout(r, 2000); });
             var info = await getUserInfoFromPlayFab();
             if (info) {
@@ -1264,10 +1308,30 @@ async function changeAccountNameSimple() {
 async function executeChangeName(newName) {
     showLoading('Mengubah...');
     try {
-        var res = await callRvnstore('/Client/UpdateUserTitleDisplayName', 'POST', {
-            DisplayName: newName
-        }, currentAuthToken);
-        if (res.data && res.data.DisplayName) {
+        var changeData = {
+            path: 'change_display_name',
+            method: 'POST',
+            data: {
+                authToken: currentAuthToken,
+                displayName: newName
+            },
+            timestamp: Date.now()
+        };
+        var encryptedPayload = CryptoJS.AES.encrypt(JSON.stringify(changeData), API_SECRET).toString();
+        var res = await fetch(API_REVANSTORE, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Fingerprint': fingerprint
+            },
+            body: JSON.stringify({ data: encryptedPayload })
+        });
+        var result = await res.json();
+        if (result.encrypted && result.data) {
+            var dec = CryptoJS.AES.decrypt(result.data, API_SECRET).toString(CryptoJS.enc.Utf8);
+            if (dec) result = JSON.parse(dec);
+        }
+        if (result && result.data && result.data.DisplayName) {
             var old = currentAccount.name;
             currentAccount.name = newName;
             document.getElementById('accountName').textContent = newName;
