@@ -1,9 +1,9 @@
 var API_REVANSTORE = '/api/revanstoreV2';
 var API_RVNSTORE = '/api/rvnstore';
-var API_PUBLIC_KEY = '/api/public-key';
 var WHATSAPP_NUMBER = "6285199120995";
 var MAX_TOPUP_AMOUNT = 2147483647;
-var RECAPTCHA_V3_SITE_KEY = '6LfhdpUtAAAAAHzmCMdtwx0ClCByUA5WC7ZeDIC3';
+var RECAPTCHA_V3_SITE_KEY = '6LcVBn4tAAAAAINTTIleUbUZr1ZykvyB6WA-oOfT';
+var API_SECRET = '1417-1426-1527-1517';
 
 var currentUser = null;
 var currentAccount = null;
@@ -21,8 +21,6 @@ var currentHistoryData = [];
 
 var STORAGE_KEY = 'app_data';
 var STORAGE_SECRET = 'session_local_secret';
-
-var publicKeyPem = null;
 
 function storageSet(key, value) {
     try {
@@ -89,7 +87,7 @@ function safeSetHTML(element, html) {
     if (!element) return;
     if (window.DOMPurify) {
         element.innerHTML = DOMPurify.sanitize(html, {
-            ALLOWED_TAGS: ['div', 'span', 'p', 'h1', 'h2', 'h3', 'button', 'i', 'b', 'br', 'pre', 'code', 'strong', 'em', 'small'],
+            ALLOWED_TAGS: ['div', 'span', 'p', 'h1', 'h2', 'h3', 'button', 'i', 'b', 'br'],
             ALLOWED_ATTR: ['class', 'style', 'onclick', 'id']
         });
     } else {
@@ -125,164 +123,34 @@ async function getRecaptchaV3Token(action) {
     }
 }
 
-async function getPublicKey() {
-    try {
-        var res = await fetch(API_PUBLIC_KEY, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Fingerprint': fingerprint || 'unknown'
-            },
-            body: JSON.stringify({ timestamp: Date.now() })
-        });
-        if (!res.ok) return false;
-        var result = await res.json();
-        if (result && result.publicKey) {
-            publicKeyPem = result.publicKey;
-            return true;
-        }
-        return false;
-    } catch (e) {
-        return false;
-    }
-}
-
-function generateAESKey() {
-    return CryptoJS.lib.WordArray.random(32).toString(CryptoJS.enc.Hex);
-}
-
-function generateAESIV() {
-    return CryptoJS.lib.WordArray.random(16).toString(CryptoJS.enc.Hex);
-}
-
-function encryptWithAES(data, key, iv) {
-    try {
-        var jsonStr = JSON.stringify(data);
-        var encrypted = CryptoJS.AES.encrypt(jsonStr, CryptoJS.enc.Hex.parse(key), {
-            iv: CryptoJS.enc.Hex.parse(iv),
-            mode: CryptoJS.mode.CBC,
-            padding: CryptoJS.pad.Pkcs7
-        });
-        return encrypted.toString();
-    } catch (e) {
-        return null;
-    }
-}
-
-function decryptWithAES(encryptedData, key, iv) {
-    try {
-        var decrypted = CryptoJS.AES.decrypt(encryptedData, CryptoJS.enc.Hex.parse(key), {
-            iv: CryptoJS.enc.Hex.parse(iv),
-            mode: CryptoJS.mode.CBC,
-            padding: CryptoJS.pad.Pkcs7
-        });
-        var jsonStr = decrypted.toString(CryptoJS.enc.Utf8);
-        if (!jsonStr) return null;
-        return JSON.parse(jsonStr);
-    } catch (e) {
-        return null;
-    }
-}
-
-async function encryptAESKeyWithRSA(aesKeyToEncrypt) {
-    try {
-        var pemContent = publicKeyPem
-            .replace('-----BEGIN PUBLIC KEY-----', '')
-            .replace('-----END PUBLIC KEY-----', '')
-            .replace(/\s/g, '');
-        var binaryDer = atob(pemContent);
-        var binaryDerBytes = new Uint8Array(binaryDer.length);
-        for (var i = 0; i < binaryDer.length; i++) {
-            binaryDerBytes[i] = binaryDer.charCodeAt(i);
-        }
-        var rsaPublicKey = await crypto.subtle.importKey(
-            'spki',
-            binaryDerBytes,
-            { name: 'RSA-OAEP', hash: 'SHA-256' },
-            false,
-            ['encrypt']
-        );
-        var aesKeyBytes = new TextEncoder().encode(aesKeyToEncrypt);
-        var encryptedKey = await crypto.subtle.encrypt(
-            { name: 'RSA-OAEP' },
-            rsaPublicKey,
-            aesKeyBytes
-        );
-        return btoa(String.fromCharCode.apply(null, new Uint8Array(encryptedKey)));
-    } catch (e) {
-        return null;
-    }
-}
-
-// HYBRID ke /api/revanstoreV2
-async function callRevanstore(path, method, data) {
-    if (!fingerprint) fingerprint = await getFingerprint();
-    if (isBlocked && path !== 'check_blocked') throw new Error('Akses ditolak');
-    if (!publicKeyPem) {
-        var keyOk = await getPublicKey();
-        if (!keyOk) throw new Error('Gagal mendapatkan kunci');
-    }
-    var aesKey = generateAESKey();
-    var aesIV = generateAESIV();
-    var captchaToken = await getRecaptchaV3Token(path);
-    var payload = {
-        path: path,
-        method: method || 'GET',
-        data: data || null,
-        captchaToken: captchaToken,
-        timestamp: Date.now()
-    };
-    var encryptedPayload = encryptWithAES(payload, aesKey, aesIV);
-    if (!encryptedPayload) throw new Error('Gagal enkripsi data');
-    var encryptedKey = await encryptAESKeyWithRSA(aesKey);
-    if (!encryptedKey) throw new Error('Gagal enkripsi kunci');
-    var res = await fetch(API_REVANSTORE, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-Fingerprint': fingerprint
-        },
-        body: JSON.stringify({
-            key: encryptedKey,
-            data: encryptedPayload,
-            iv: aesIV,
-            timestamp: Date.now()
-        })
-    });
-    if (res.status === 429) throw new Error('Terlalu banyak permintaan');
-    var text = await res.text();
-    if (!text || text === 'null') return null;
-    var result = JSON.parse(text);
-    if (result && result.encrypted && result.iv) {
-        var decrypted = decryptWithAES(result.encrypted, aesKey, result.iv);
-        if (decrypted) return decrypted;
-    }
-    return result;
-}
-
-// PLAIN ke /api/rvnstore
-async function callRvnstore(endpoint, method, body, authToken) {
-    var res = await fetch(API_RVNSTORE, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            endpoint: endpoint,
-            method: method || 'POST',
-            body: body || null,
-            authToken: authToken || null
-        })
-    });
-    return await res.json();
-}
-
 async function checkIfBlocked() {
     if (blockedChecked) return isBlocked;
     if (!fingerprint) fingerprint = await getFingerprint();
     try {
-        var result = await callRevanstore('check_blocked', 'POST', {
-            fingerprint: fingerprint,
-            captchaToken: await getRecaptchaV3Token('check_blocked')
+        var captchaToken = await getRecaptchaV3Token('check_blocked');
+        var payload = {
+            path: 'check_blocked',
+            method: 'POST',
+            data: {
+                fingerprint: fingerprint,
+                captchaToken: captchaToken
+            },
+            timestamp: Date.now()
+        };
+        var encryptedPayload = CryptoJS.AES.encrypt(JSON.stringify(payload), API_SECRET).toString();
+        var res = await fetch(API_REVANSTORE, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Fingerprint': fingerprint
+            },
+            body: JSON.stringify({ data: encryptedPayload })
         });
+        var result = await res.json();
+        if (result.encrypted && result.data) {
+            var dec = CryptoJS.AES.decrypt(result.data, API_SECRET).toString(CryptoJS.enc.Utf8);
+            if (dec) result = JSON.parse(dec);
+        }
         if (result && result.blocked) {
             isBlocked = true;
             storageSet('perangkat_diblokir', 'true');
@@ -300,7 +168,26 @@ async function checkIfBlocked() {
 
 async function periksaMaintenance() {
     try {
-        var result = await callRevanstore('maintenance_status', 'GET', null);
+        var payload = {
+            path: 'maintenance_status',
+            method: 'GET',
+            data: null,
+            timestamp: Date.now()
+        };
+        var encryptedPayload = CryptoJS.AES.encrypt(JSON.stringify(payload), API_SECRET).toString();
+        var res = await fetch(API_REVANSTORE, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Fingerprint': fingerprint || 'check'
+            },
+            body: JSON.stringify({ data: encryptedPayload })
+        });
+        var result = await res.json();
+        if (result.encrypted && result.data) {
+            var dec = CryptoJS.AES.decrypt(result.data, API_SECRET).toString(CryptoJS.enc.Utf8);
+            if (dec) result = JSON.parse(dec);
+        }
         if (result && (result.maintenance === true || result.title || result.message)) {
             return result;
         }
@@ -325,6 +212,51 @@ function tampilkanHalamanMaintenance(dataMaintenance) {
         '<p style="color:#64748b;font-size:14px;margin-bottom:6px;line-height:1.6;">' + pesan + '</p>' +
         '<div style="background:#fef3c7;color:#92400e;padding:12px 16px;border-radius:12px;font-weight:600;font-size:13px;margin:16px 0 24px;">' + teksEstimasi + '</div>' +
         '</div></div>';
+}
+async function callRevanstore(path, method, data) {
+    if (!fingerprint) fingerprint = await getFingerprint();
+    if (isBlocked && path !== 'check_blocked') throw new Error('Akses ditolak');
+    var captchaToken = await getRecaptchaV3Token(path);
+    var payload = {
+        path: path,
+        method: method || 'GET',
+        data: data || null,
+        captchaToken: captchaToken,
+        timestamp: Date.now()
+    };
+    var encryptedPayload = CryptoJS.AES.encrypt(JSON.stringify(payload), API_SECRET).toString();
+    var headers = {
+        'Content-Type': 'application/json',
+        'X-Fingerprint': fingerprint
+    };
+    var res = await fetch(API_REVANSTORE, {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify({ data: encryptedPayload })
+    });
+    if (res.status === 429) throw new Error('Terlalu banyak permintaan');
+    var text = await res.text();
+    if (!text || text === 'null') return null;
+    var result = JSON.parse(text);
+    if (result.encrypted && result.data) {
+        var dec = CryptoJS.AES.decrypt(result.data, API_SECRET).toString(CryptoJS.enc.Utf8);
+        if (dec) return JSON.parse(dec);
+    }
+    return result;
+}
+
+async function callRvnstore(endpoint, method, body, authToken) {
+    var res = await fetch(API_RVNSTORE, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            endpoint: endpoint,
+            method: method || 'POST',
+            body: body || null,
+            authToken: authToken || null
+        })
+    });
+    return await res.json();
 }
 
 function showAlert(message, type, duration) {
@@ -522,24 +454,16 @@ function checkAccountExpiry(user) {
 }
 
 function showExpiredBanner() {
-    Swal.fire({
-        icon: 'warning',
-        title: '⚠️ MASA AKTIF HABIS',
-        html: '<p style="font-size:16px;margin-bottom:12px;">Yah, masa aktif akun kamu sudah habis!</p><p style="color:#64748b;font-size:14px;">Silakan perpanjang masa aktif ya.</p>',
-        confirmButtonText: '<i class="fab fa-whatsapp"></i> Perpanjang Sekarang',
-        confirmButtonColor: '#25D366',
-        showCancelButton: true,
-        cancelButtonText: 'Logout',
-        cancelButtonColor: '#ef4444',
-        allowOutsideClick: false
-    }).then(function(result) {
-        if (result.isConfirmed) {
-            var msg = encodeURIComponent("Assalamualaikum admin, saya ingin memperpanjang masa aktif akun. Username: " + (currentUser ? currentUser.username : ''));
-            window.open('https://wa.me/' + WHATSAPP_NUMBER + '?text=' + msg, '_blank');
-        } else {
-            logout();
-        }
-    });
+    var eb = document.getElementById('expiredBanner');
+    if (eb) eb.style.display = 'flex';
+    var ma = document.getElementById('mainApp');
+    if (ma) ma.style.display = 'none';
+}
+
+function closeExpiredBanner() {
+    var eb = document.getElementById('expiredBanner');
+    if (eb) eb.style.display = 'none';
+    logout();
 }
 
 function openWhatsApp() {
@@ -621,7 +545,7 @@ function checkAuth() {
             id: session.user_id,
             username: session.username,
             token: session.token || null,
-            role: session.role || 'User',
+            role: session.role || 'Operator',
             full_name: session.full_name || session.username,
             expiry_date: session.expiry_date || ''
         };
@@ -636,11 +560,32 @@ function checkAuth() {
 async function checkAccountStatus() {
     if (!currentUser) return;
     try {
-        var result = await callRevanstore('check_account_status', 'POST', {
-            username: currentUser.username,
-            user_id: currentUser.id,
-            fingerprint: fingerprint
+        var captchaToken = await getRecaptchaV3Token('check_status');
+        var payload = {
+            path: 'check_account_status',
+            method: 'POST',
+            data: {
+                username: currentUser.username,
+                user_id: currentUser.id,
+                fingerprint: fingerprint,
+                captchaToken: captchaToken
+            },
+            timestamp: Date.now()
+        };
+        var encryptedPayload = CryptoJS.AES.encrypt(JSON.stringify(payload), API_SECRET).toString();
+        var res = await fetch(API_REVANSTORE, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Fingerprint': fingerprint
+            },
+            body: JSON.stringify({ data: encryptedPayload })
         });
+        var result = await res.json();
+        if (result.encrypted && result.data) {
+            var dec = CryptoJS.AES.decrypt(result.data, API_SECRET).toString(CryptoJS.enc.Utf8);
+            if (dec) result = JSON.parse(dec);
+        }
         if (result && result.banned) {
             var untilText = (result.bannedUntil || 0) === 0 ? 'PERMANEN' : ('sampai ' + new Date(result.bannedUntil).toLocaleString('id-ID'));
             Swal.fire({
@@ -650,33 +595,42 @@ async function checkAccountStatus() {
                 confirmButtonText: 'OK',
                 confirmButtonColor: '#ef4444',
                 allowOutsideClick: false
-            }).then(function() { autoLogout(); });
+            }).then(function() {
+                autoLogout();
+            });
             return;
         }
         if (result && result.banAkses) {
-            showBanAccessPage(result.banAksesUntil || 0);
+            var untilTextA = (result.banAksesUntil || 0) === 0 ? 'PERMANEN' : ('sampai ' + new Date(result.banAksesUntil).toLocaleString('id-ID'));
+            Swal.fire({
+                icon: 'error',
+                title: 'AKSES DIBLOKIR',
+                html: 'Maaf, akses Anda diblokir oleh admin.<br><br>Durasi: ' + sanitize(untilTextA),
+                confirmButtonText: 'OK',
+                confirmButtonColor: '#ef4444',
+                allowOutsideClick: false
+            }).then(function() {
+                autoLogout();
+            });
             return;
         }
         if (result && result.forceLogout) {
             Swal.fire({
                 icon: 'warning',
                 title: 'AKUN DITANGGUHKAN',
-                html: 'Akun Anda ditangguhkan.<br><br>Silakan hubungi admin.',
+                html: 'Akun Anda ditangguhkan karena indikasi aktivitas mencurigakan.<br><br>Silakan hubungi admin.',
                 confirmButtonText: 'OK',
                 confirmButtonColor: '#ef4444',
                 allowOutsideClick: false
-            }).then(function() { autoLogout(); });
+            }).then(function() {
+                autoLogout();
+            });
             return;
         }
         if (result && result.valid && result.user) {
             currentUser.role = result.user.role || currentUser.role;
             currentUser.full_name = result.user.full_name || currentUser.full_name;
             currentUser.expiry_date = result.user.expiry_date || currentUser.expiry_date;
-            var expiryCheck = checkAccountExpiry(currentUser);
-            if (expiryCheck.expired) {
-                showExpiredBanner();
-                return;
-            }
         }
     } catch (e) {}
 }
@@ -702,13 +656,22 @@ function updateProfileInfo() {
     var elUsername = document.getElementById('profileUsername');
     var elName = document.getElementById('profileName');
     var elRole = document.getElementById('profileRole');
+    var elExpiry = document.getElementById('profileExpiry');
     if (elUsername) elUsername.textContent = currentUser.username;
     if (elName) elName.textContent = currentUser.full_name || currentUser.username;
-    if (elRole) elRole.textContent = currentUser.role || 'User';
+    if (elRole) elRole.textContent = currentUser.role || 'Operator';
+    if (elExpiry) {
+        var expiryCheck = checkAccountExpiry(currentUser);
+        var expiryFormatted = currentUser.expiry_date || 'Tidak ada';
+        var html = '<span>' + sanitize(expiryFormatted) + '</span> <span class="expiry-days-left ' + expiryCheck.daysLeftClass + '">' + sanitize(expiryCheck.daysLeftText) + '</span>';
+        safeSetHTML(elExpiry, html);
+    }
 }
 
 function navigateBottom(page) {
-    document.querySelectorAll('.bottom-nav a').forEach(function(a) { a.classList.remove('active'); });
+    document.querySelectorAll('.bottom-nav a').forEach(function(a) {
+        a.classList.remove('active');
+    });
     if (event && event.target) event.target.classList.add('active');
     if (page === 'home') showHome();
     else if (page === 'riwayat') showHistory();
@@ -717,7 +680,10 @@ function navigateBottom(page) {
 
 async function loginWithDeviceId(deviceId) {
     var blocked = await checkIfBlocked();
-    if (blocked) { showBlockedScreen(); return false; }
+    if (blocked) {
+        showBlockedScreen();
+        return false;
+    }
     showLoading('Menghubungkan...');
     try {
         var cleanInput = sanitize(deviceId.trim());
@@ -780,13 +746,28 @@ async function getUserInfoFromPlayFab() {
             var name = (acc && acc.TitleInfo) ? (acc.TitleInfo.DisplayName || 'Unknown') : 'Unknown';
             var balance = info.UserVirtualCurrency ? info.UserVirtualCurrency.RP : 0;
             var pfid = acc ? (acc.PlayFabId || '-') : '-';
-            var fb = { id: null, name: 'Tidak tertaut', email: null, isConnected: false };
+            var fb = {
+                id: null,
+                name: 'Tidak tertaut',
+                email: null,
+                isConnected: false
+            };
             var fbAvatar = null;
             if (acc && acc.FacebookInfo) {
-                fb = { id: acc.FacebookInfo.FacebookId || null, name: acc.FacebookInfo.FullName || 'Tidak tertaut', email: acc.FacebookInfo.Email || null, isConnected: true };
+                fb = {
+                    id: acc.FacebookInfo.FacebookId || null,
+                    name: acc.FacebookInfo.FullName || 'Tidak tertaut',
+                    email: acc.FacebookInfo.Email || null,
+                    isConnected: true                };
                 if (fb.id) fbAvatar = 'https://graph.facebook.com/' + fb.id + '/picture?type=large';
             }
-            return { name: name, balance: balance, facebook: fb, facebookAvatarUrl: fbAvatar, playFabId: pfid };
+            return {
+                name: name,
+                balance: balance,
+                facebook: fb,
+                facebookAvatarUrl: fbAvatar,
+                playFabId: pfid
+            };
         }
     } catch (e) {}
     return null;
@@ -794,7 +775,10 @@ async function getUserInfoFromPlayFab() {
 
 async function searchAccount() {
     var id = document.getElementById('deviceId').value.trim();
-    if (!id) { showAlert('Masukkan Device ID!', 'error'); return; }
+    if (!id) {
+        showAlert('Masukkan Device ID!', 'error');
+        return;
+    }
     var ok = await loginWithDeviceId(id);
     if (ok) {
         lastDeviceId = id;
@@ -818,8 +802,12 @@ function tampilkanFotoProfile(acc) {
         img.style.height = '100%';
         img.style.objectFit = 'cover';
         img.style.borderRadius = '50%';
-        img.onload = function() { c.appendChild(img); };
-        img.onerror = function() { c.innerHTML = '<i class="fas fa-user"></i>'; };
+        img.onload = function() {
+            c.appendChild(img);
+        };
+        img.onerror = function() {
+            c.innerHTML = '<i class="fas fa-user"></i>';
+        };
     } else {
         c.innerHTML = '<i class="fas fa-user"></i>';
     }
@@ -849,7 +837,10 @@ function showAccountInfo(acc) {
 }
 
 function refreshAccountInfo() {
-    if (!currentAccount) { showAlert('Cari akun dulu!', 'error'); return; }
+    if (!currentAccount) {
+        showAlert('Cari akun dulu!', 'error');
+        return;
+    }
     showLoading('Menyegarkan...');
     setTimeout(async function() {
         var info = await getUserInfoFromPlayFab();
@@ -870,7 +861,10 @@ function refreshAccountInfo() {
 
 function setAmount(a) {
     var el = document.getElementById('topupAmount');
-    if (el) { el.value = a; validateTopupAmount(); }
+    if (el) {
+        el.value = a;
+        validateTopupAmount();
+    }
 }
 
 function setupQuickAmounts() {
@@ -913,7 +907,10 @@ async function processTopup() {
     var el = document.getElementById('topupAmount');
     if (!el) return;
     var amt = parseAmount(el.value.trim());
-    if (amt <= 0) { showAlert('Jumlah tidak valid!', 'error'); return; }
+    if (amt <= 0) {
+        showAlert('Jumlah tidak valid!', 'error');
+        return;
+    }
     showConfirm('TOP UP', 'Top up ' + formatCurrency(amt) + '?', 'topup', { amount: amt });
 }
 
@@ -921,7 +918,10 @@ async function processKuras() {
     if (!currentAccount) return;
     var el = document.getElementById('kurasAmount');
     var amt = el ? parseAmount(el.value.trim()) || currentAccount.balance : currentAccount.balance;
-    if (amt <= 0 || amt > currentAccount.balance) { showAlert('Saldo tidak cukup!', 'error'); return; }
+    if (amt <= 0 || amt > currentAccount.balance) {
+        showAlert('Saldo tidak cukup!', 'error');
+        return;
+    }
     showConfirm('KURAS', 'Kuras ' + formatCurrency(amt) + '?', 'kuras', { amount: amt });
 }
 
@@ -964,14 +964,19 @@ async function executeTopup(amt) {
             amount: amt,
             oldBalance: old,
             newBalance: currentAccount.balance,
-            user: currentUser.username,
+            operator: currentUser.username,
             timestamp: Date.now(),
             status: 'success'
         };
         var trxResult = await callRevanstore('transactions', 'POST', trx);
         hideLoading();
         if (trxResult && trxResult.success === false) {
-            Swal.fire({ icon: 'warning', title: 'Perhatian', text: trxResult.message || 'Transaksi gagal dicatat.', confirmButtonColor: '#f59e0b' });
+            Swal.fire({
+                icon: 'warning',
+                title: 'Perhatian',
+                text: trxResult.message || 'Transaksi gagal dicatat.',
+                confirmButtonColor: '#f59e0b'
+            });
             return;
         }
         if (trxResult && trxResult.trxId) trx.trxId = trxResult.trxId;
@@ -995,14 +1000,19 @@ async function executeKuras(amt) {
             amount: amt,
             oldBalance: old,
             newBalance: currentAccount.balance,
-            user: currentUser.username,
+            operator: currentUser.username,
             timestamp: Date.now(),
             status: 'success'
         };
         var trxResult = await callRevanstore('transactions', 'POST', trx);
         hideLoading();
         if (trxResult && trxResult.success === false) {
-            Swal.fire({ icon: 'warning', title: 'Perhatian', text: trxResult.message || 'Transaksi gagal dicatat.', confirmButtonColor: '#f59e0b' });
+            Swal.fire({
+                icon: 'warning',
+                title: 'Perhatian',
+                text: trxResult.message || 'Transaksi gagal dicatat.',
+                confirmButtonColor: '#f59e0b'
+            });
             return;
         }
         if (trxResult && trxResult.trxId) trx.trxId = trxResult.trxId;
@@ -1019,7 +1029,7 @@ function showReceipt(trx) {
     var typeText = trx.type === 'topup' ? 'TOP UP' : 'KURAS';
     var sign = trx.type === 'topup' ? '+' : '-';
     var idRow = trx.trxId ? '<div class="receipt-row"><span>ID Transaksi:</span><span style="font-family:monospace;">' + sanitize(trx.trxId) + '</span></div>' : '';
-    var html = '<div class="receipt-content"><div class="receipt-header"><h3>TOP UP</h3><p>Detail Transaksi</p></div><div class="receipt-details">' + idRow + '<div class="receipt-row"><span>Akun:</span><span>' + sanitize(trx.accountName) + '</span></div><div class="receipt-row"><span>Jenis:</span><span>' + sanitize(typeText) + '</span></div><div class="receipt-row"><span>Jumlah:</span><span style="color:' + (trx.type === 'topup' ? '#10b981' : '#f59e0b') + '">' + sign + formatCurrency(trx.amount) + '</span></div><div class="receipt-row"><span>Saldo Awal:</span><span>' + formatCurrency(trx.oldBalance) + '</span></div><div class="receipt-row"><span>Saldo Akhir:</span><span>' + formatCurrency(trx.newBalance) + '</span></div><div class="receipt-row"><span>User:</span><span>' + sanitize(trx.user || '-') + '</span></div><div class="receipt-row"><span>Tanggal:</span><span>' + new Date(trx.timestamp).toLocaleString('id-ID') + '</span></div><div class="receipt-row"><span>Status:</span><span style="color:#10b981;">BERHASIL</span></div></div></div><div style="display:flex;gap:8px;margin-top:20px;"><button class="btn btn-primary" onclick="window._showTrxModal()" style="flex:1;">LANJUTKAN</button><button class="btn btn-secondary" onclick="window._goHome()" style="flex:1;">HOME</button></div>';
+    var html = '<div class="receipt-content"><div class="receipt-header"><h3>TOP UP</h3><p>Detail Transaksi</p></div><div class="receipt-details">' + idRow + '<div class="receipt-row"><span>Akun:</span><span>' + sanitize(trx.accountName) + '</span></div><div class="receipt-row"><span>Jenis:</span><span>' + sanitize(typeText) + '</span></div><div class="receipt-row"><span>Jumlah:</span><span style="color:' + (trx.type === 'topup' ? '#10b981' : '#f59e0b') + '">' + sign + formatCurrency(trx.amount) + '</span></div><div class="receipt-row"><span>Saldo Awal:</span><span>' + formatCurrency(trx.oldBalance) + '</span></div><div class="receipt-row"><span>Saldo Akhir:</span><span>' + formatCurrency(trx.newBalance) + '</span></div><div class="receipt-row"><span>Tanggal:</span><span>' + new Date(trx.timestamp).toLocaleString('id-ID') + '</span></div><div class="receipt-row"><span>Status:</span><span style="color:#10b981;">BERHASIL</span></div></div></div><div style="display:flex;gap:8px;margin-top:20px;"><button class="btn btn-primary" onclick="window._showTrxModal()" style="flex:1;">LANJUTKAN</button><button class="btn btn-secondary" onclick="window._goHome()" style="flex:1;">HOME</button></div>';
     var receiptContent = document.getElementById('receiptContent');
     safeSetHTML(receiptContent, html);
     document.getElementById('receiptSection').style.display = 'block';
@@ -1027,17 +1037,31 @@ function showReceipt(trx) {
 
 window._showTrxModal = function() {
     var modal = document.getElementById('trxLagiModal');
-    if (modal) { modal.style.display = 'flex'; modal.style.opacity = '1'; modal.style.visibility = 'visible'; }
+    if (modal) {
+        modal.style.display = 'flex';
+        modal.style.opacity = '1';
+        modal.style.visibility = 'visible';
+    }
 };
 window._tutupTrxModal = function() {
     var modal = document.getElementById('trxLagiModal');
     if (modal) modal.style.display = 'none';
 };
-window._pilihTopup = function() { window._tutupTrxModal(); showTopupFromAccount(); };
-window._pilihKuras = function() { window._tutupTrxModal(); showKurasFromAccount(); };
-window._goHome = function() { showHome(); };
+window._pilihTopup = function() {
+    window._tutupTrxModal();
+    showTopupFromAccount();
+};
+window._pilihKuras = function() {
+    window._tutupTrxModal();
+    showKurasFromAccount();
+};
+window._goHome = function() {
+    showHome();
+};
 
-function backToHome() { showHome(); }
+function backToHome() {
+    showHome();
+}
 
 async function showHistory() {
     hideAllSections();
@@ -1066,17 +1090,18 @@ async function showHistory() {
                 newBalance: data[k].newBalance,
                 oldName: data[k].oldName,
                 newName: data[k].newName,
-                user: data[k].user || data[k].operator || '',
+                operator: data[k].operator,
                 timestamp: data[k].timestamp
             };
-        }).sort(function(a, b) { return b.timestamp - a.timestamp; });
+        }).sort(function(a, b) {
+            return b.timestamp - a.timestamp;
+        });
         currentHistoryData = arr;
         var html = '';
         arr.forEach(function(t, idx) {
             var typeText = t.type === 'topup' ? 'TOP UP' : t.type === 'kuras' ? 'KURAS' : 'GANTI NAMA';
             var sign = t.type === 'topup' ? '+' : t.type === 'kuras' ? '-' : '';
-            var userDisplay = t.user || 'User';
-            html += '<div class="transaction-item ' + sanitize(t.type) + '" onclick="showTransactionDetail(' + idx + ')" style="cursor:pointer;"><div class="transaction-header"><div>' + sanitize(t.accountName) + '</div><div class="transaction-amount">' + sign + formatCurrency(t.amount) + '</div></div><div class="transaction-details"><div>' + sanitize(typeText) + ' · ' + sanitize(t.trxId) + '</div><div>' + new Date(t.timestamp).toLocaleString('id-ID') + '</div></div><div class="transaction-balance"><span>User: ' + sanitize(userDisplay) + '</span><span>Saldo: ' + formatCurrency(t.newBalance) + '</span></div></div>';
+            html += '<div class="transaction-item ' + sanitize(t.type) + '" onclick="showTransactionDetail(' + idx + ')" style="cursor:pointer;"><div class="transaction-header"><div>' + sanitize(t.accountName) + '</div><div class="transaction-amount">' + sign + formatCurrency(t.amount) + '</div></div><div class="transaction-details"><div>' + sanitize(typeText) + ' · ' + sanitize(t.trxId) + '</div><div>' + new Date(t.timestamp).toLocaleString('id-ID') + '</div></div><div class="transaction-balance"><span>Sebelum: ' + formatCurrency(t.oldBalance) + '</span><span>→</span><span>Sesudah: ' + formatCurrency(t.newBalance) + '</span></div></div>';
         });
         if (list) safeSetHTML(list, html);
         hideLoading();
@@ -1090,7 +1115,6 @@ function showTransactionDetail(idx) {
     var t = currentHistoryData[idx];
     if (!t) return;
     var typeText = t.type === 'topup' ? 'TOP UP' : t.type === 'kuras' ? 'KURAS' : 'GANTI NAMA';
-    var userDisplay = t.user || 'User';
     var html;
     if (t.type === 'gantinama') {
         html = '<div style="text-align:left;font-size:14px;">' +
@@ -1098,7 +1122,7 @@ function showTransactionDetail(idx) {
             '<p><b>Akun:</b> ' + sanitize(t.accountName) + '</p>' +
             '<p><b>Nama Lama:</b> ' + sanitize(t.oldName || '-') + '</p>' +
             '<p><b>Nama Baru:</b> ' + sanitize(t.newName || '-') + '</p>' +
-            '<p><b>User:</b> ' + sanitize(userDisplay) + '</p>' +
+            '<p><b>Operator:</b> ' + sanitize(t.operator) + '</p>' +
             '<p><b>Tanggal:</b> ' + new Date(t.timestamp).toLocaleString('id-ID') + '</p>' +
             '</div>';
     } else {
@@ -1110,11 +1134,16 @@ function showTransactionDetail(idx) {
             '<p><b>Jumlah:</b> ' + sign + formatCurrency(t.amount) + '</p>' +
             '<p><b>Saldo Awal:</b> ' + formatCurrency(t.oldBalance) + '</p>' +
             '<p><b>Saldo Akhir:</b> ' + formatCurrency(t.newBalance) + '</p>' +
-            '<p><b>User:</b> ' + sanitize(userDisplay) + '</p>' +
+            '<p><b>Operator:</b> ' + sanitize(t.operator) + '</p>' +
             '<p><b>Tanggal:</b> ' + new Date(t.timestamp).toLocaleString('id-ID') + '</p>' +
             '</div>';
     }
-    Swal.fire({ title: 'Detail Transaksi', html: html, confirmButtonText: 'Tutup', confirmButtonColor: '#0ea5e9' });
+    Swal.fire({
+        title: 'Detail Transaksi',
+        html: html,
+        confirmButtonText: 'Tutup',
+        confirmButtonColor: '#0ea5e9'
+    });
 }
 window.showTransactionDetail = showTransactionDetail;
 
@@ -1128,7 +1157,9 @@ function showDeleteHistoryConfirm() {
         cancelButtonColor: "#64748b",
         confirmButtonText: "HAPUS SEMUA",
         cancelButtonText: "BATAL"
-    }).then((result) => { if (result.isConfirmed) deleteAllHistory(); });
+    }).then((result) => {
+        if (result.isConfirmed) deleteAllHistory();
+    });
 }
 
 async function deleteAllHistory() {
@@ -1137,14 +1168,30 @@ async function deleteAllHistory() {
         var result = await callRevanstore('transactions', 'DELETE', { username: currentUser.username });
         hideLoading();
         if (result && result.success) {
-            Swal.fire({ icon: "success", title: "Berhasil!", text: "Semua riwayat dihapus!", timer: 2000, showConfirmButton: false });
+            Swal.fire({
+                icon: "success",
+                title: "Berhasil!",
+                text: "Semua riwayat dihapus!",
+                timer: 2000,
+                showConfirmButton: false
+            });
             if (document.getElementById('historySection').style.display === 'block') showHistory();
         } else {
-            Swal.fire({ icon: "info", title: "Info", text: "Tidak ada riwayat!", confirmButtonColor: "#0ea5e9" });
+            Swal.fire({
+                icon: "info",
+                title: "Info",
+                text: "Tidak ada riwayat!",
+                confirmButtonColor: "#0ea5e9"
+            });
         }
     } catch (error) {
         hideLoading();
-        Swal.fire({ icon: "error", title: "Oops...", text: "Gagal menghapus!", confirmButtonColor: "#ef4444" });
+        Swal.fire({
+            icon: "error",
+            title: "Oops...",
+            text: "Gagal menghapus!",
+            confirmButtonColor: "#ef4444"
+        });
     }
 }
 
@@ -1184,15 +1231,23 @@ async function checkNameAvailability() {
     var d = document.getElementById('nameAvailability');
     d.innerHTML = 'Mengecek...';
     d.style.display = 'block';
-    setTimeout(function() { d.innerHTML = '✅ Tersedia!'; }, 1000);
+    setTimeout(function() {
+        d.innerHTML = '✅ Tersedia!';
+    }, 1000);
 }
 
 async function changeAccountNameSimple() {
     var nameEl = document.getElementById('newAccountName');
     if (!nameEl) return;
     var name = sanitize(nameEl.value.trim());
-    if (!name) { showAlert('Masukkan nama!', 'error'); return; }
-    if (!currentAccount || !currentAuthToken) { showAlert('Cari akun dulu!', 'error'); return; }
+    if (!name) {
+        showAlert('Masukkan nama!', 'error');
+        return;
+    }
+    if (!currentAccount || !currentAuthToken) {
+        showAlert('Cari akun dulu!', 'error');
+        return;
+    }
     showConfirm('GANTI NAMA', 'Ganti ke "' + name + '"?', 'changename', name);
 }
 
@@ -1211,18 +1266,23 @@ async function executeChangeName(newName) {
                 accountName: currentAccount.name,
                 oldName: old,
                 newName: newName,
-                user: currentUser.username,
+                operator: currentUser.username,
                 timestamp: Date.now(),
                 status: 'success'
             });
             hideLoading();
             if (trxResult && trxResult.success === false) {
-                Swal.fire({ icon: 'warning', title: 'Perhatian', text: trxResult.message || 'Transaksi gagal dicatat.', confirmButtonColor: '#f59e0b' });
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Perhatian',
+                    text: trxResult.message || 'Transaksi gagal dicatat.',
+                    confirmButtonColor: '#f59e0b'
+                });
                 return;
             }
             var idRow = (trxResult && trxResult.trxId) ? '<div class="receipt-row"><span>ID Transaksi:</span><span style="font-family:monospace;">' + sanitize(trxResult.trxId) + '</span></div>' : '';
             hideAllSections();
-            var html = '<div class="receipt-content"><div class="receipt-header"><h3>GANTI NAMA</h3></div><div class="receipt-details">' + idRow + '<div class="receipt-row"><span>Lama:</span><span>' + sanitize(old) + '</span></div><div class="receipt-row"><span>Baru:</span><span style="color:#0ea5e9;">' + sanitize(newName) + '</span></div><div class="receipt-row"><span>User:</span><span>' + sanitize(currentUser.username) + '</span></div></div></div><button class="btn btn-primary btn-block" onclick="window._goBackAccount()">KEMBALI</button>';
+            var html = '<div class="receipt-content"><div class="receipt-header"><h3>GANTI NAMA</h3></div><div class="receipt-details">' + idRow + '<div class="receipt-row"><span>Lama:</span><span>' + sanitize(old) + '</span></div><div class="receipt-row"><span>Baru:</span><span style="color:#0ea5e9;">' + sanitize(newName) + '</span></div></div></div><button class="btn btn-primary btn-block" onclick="window._goBackAccount()">KEMBALI</button>';
             var receiptContent = document.getElementById('receiptContent');
             safeSetHTML(receiptContent, html);
             document.getElementById('receiptSection').style.display = 'block';
@@ -1237,7 +1297,9 @@ async function executeChangeName(newName) {
     }
 }
 
-window._goBackAccount = function() { backToAccount(); };
+window._goBackAccount = function() {
+    backToAccount();
+};
 
 function showNameChangeModal(msg, type) {
     var m = document.getElementById('nameChangeModal');
@@ -1246,34 +1308,51 @@ function showNameChangeModal(msg, type) {
     m.classList.add('active');
 }
 
-function closeNameChangeModal() { document.getElementById('nameChangeModal').classList.remove('active'); }
+function closeNameChangeModal() {
+    document.getElementById('nameChangeModal').classList.remove('active');
+}
 
 function setupEventListeners() {
     var t = document.getElementById('topupAmount');
-    if (t) t.addEventListener('keypress', function(e) { if (e.key === 'Enter') processTopup(); });
+    if (t) t.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') processTopup();
+    });
     var d = document.getElementById('deviceId');
-    if (d) d.addEventListener('keypress', function(e) { if (e.key === 'Enter') searchAccount(); });
+    if (d) d.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') searchAccount();
+    });
 }
 
 document.addEventListener('DOMContentLoaded', async function() {
     if (!checkAuth()) return;
+
     var maintenance = await periksaMaintenance();
     if (maintenance) { tampilkanHalamanMaintenance(maintenance); return; }
+
     setupEventListeners();
     setupQuickAmounts();
     document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
     document.addEventListener('keydown', function(e) {
-        if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && e.key === 'I') || (e.ctrlKey && e.key === 'U')) { e.preventDefault(); return false; }
+        if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && e.key === 'I') || (e.ctrlKey && e.key === 'U')) {
+            e.preventDefault();
+            return false;
+        }
     });
     if (!fingerprint) fingerprint = await getFingerprint();
     var blocked = await checkIfBlocked();
-    if (blocked) { showBlockedScreen(); return; }
+    if (blocked) {
+        showBlockedScreen();
+        return;
+    }
     var mainApp = document.getElementById('mainApp');
     var bottomNav = document.getElementById('bottomNav');
     if (mainApp) mainApp.style.display = 'block';
     if (bottomNav) bottomNav.style.display = 'flex';
     var expiryCheck = checkAccountExpiry(currentUser);
-    if (expiryCheck.expired) { showExpiredBanner(); return; }
+    if (expiryCheck.expired) {
+        showExpiredBanner();
+        return;
+    }
     showHome();
     if (typeof grecaptcha !== 'undefined') {
         grecaptcha.ready(async function() {
