@@ -1,9 +1,5 @@
 const rateLimit = require('express-rate-limit');
 const { createProxyMiddleware } = require('http-proxy-middleware');
-const CryptoJS = require('crypto-js');
-const crypto = require('crypto');
-
-const RSA_PRIVATE_KEY = process.env.RSA_PRIVATE_KEY;
 
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -45,111 +41,24 @@ module.exports = async function handler(req, res) {
 
   return limiter(req, res, async () => {
     try {
-      let path = null;
-      let method = 'POST';
-      let data = null;
-      let aesKey = null;
+      const { endpoint, method, body, authToken } = req.body;
       
-      if (req.body?.key && req.body?.data && req.body?.iv) {
-        try {
-          const cleanPrivateKey = RSA_PRIVATE_KEY.replace(/\\n/g, '\n');
-          
-          const encryptedKey = Buffer.from(req.body.key, 'base64');
-          const decryptedKey = crypto.privateDecrypt(
-            {
-              key: cleanPrivateKey,
-              padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
-              oaepHash: 'sha256'
-            },
-            encryptedKey
-          );
-          
-          aesKey = decryptedKey.toString('utf8');
-          
-          const decrypted = CryptoJS.AES.decrypt(req.body.data, CryptoJS.enc.Hex.parse(aesKey), {
-            iv: CryptoJS.enc.Hex.parse(req.body.iv),
-            mode: CryptoJS.mode.CBC,
-            padding: CryptoJS.pad.Pkcs7
-          });
-          
-          const decryptedStr = decrypted.toString(CryptoJS.enc.Utf8);
-          if (!decryptedStr) {
-            return res.status(401).json({ error: 'Invalid encryption' });
-          }
-          
-          const payload = JSON.parse(decryptedStr);
-          path = payload.path;
-          method = payload.method || 'POST';
-          data = payload.data || null;
-        } catch (e) {
-          console.error('Decrypt error:', e.message);
-          return res.status(401).json({ error: 'Invalid encryption: ' + e.message });
-        }
-      } else if (req.body?.path) {
-        path = req.body.path;
-        method = req.body.method || 'POST';
-        data = req.body.data || null;
-      } else {
-        return res.status(400).json({ error: 'Path required' });
-      }
-      
-      if (!path) {
-        return res.status(400).json({ error: 'Path required' });
-      }
-      
-      let playfabEndpoint = '';
-      let playfabBody = null;
-      
-      if (path === 'login') {
-        playfabEndpoint = '/Client/LoginWithAndroidDeviceID';
-        playfabBody = data;
-      } else if (path === 'get_player_info') {
-        playfabEndpoint = '/Client/GetPlayerCombinedInfo';
-        playfabBody = data;
-      } else if (path === 'execute_cloudscript') {
-        playfabEndpoint = '/Client/ExecuteCloudScript';
-        playfabBody = data;
-      } else if (path === 'change_display_name') {
-        playfabEndpoint = '/Client/UpdateUserTitleDisplayName';
-        playfabBody = data;
-      } else {
-        return res.status(400).json({ error: 'Unknown path: ' + path });
+      if (!endpoint) {
+        return res.status(400).json({ error: 'Endpoint required' });
       }
       
       const headers = { 'Content-Type': 'application/json' };
-      
-      if (playfabBody && playfabBody.authToken) {
-        headers['X-Authorization'] = playfabBody.authToken;
-        delete playfabBody.authToken;
+      if (authToken) {
+        headers['X-Authorization'] = authToken;
       }
       
-      const response = await fetch(`https://4AE9.playfabapi.com${playfabEndpoint}`, {
-        method: 'POST',
+      const response = await fetch(`https://4AE9.playfabapi.com${endpoint}`, {
+        method: method || 'POST',
         headers: headers,
-        body: JSON.stringify(playfabBody)
+        body: body ? JSON.stringify(body) : undefined
       });
       
       const result = await response.json();
-      
-      if (aesKey) {
-        try {
-          const newIV = crypto.randomBytes(16).toString('hex');
-          const encryptedResponse = CryptoJS.AES.encrypt(JSON.stringify(result), CryptoJS.enc.Hex.parse(aesKey), {
-            iv: CryptoJS.enc.Hex.parse(newIV),
-            mode: CryptoJS.mode.CBC,
-            padding: CryptoJS.pad.Pkcs7
-          });
-          
-          return res.status(200).json({
-            encrypted: encryptedResponse.toString(),
-            iv: newIV
-          });
-        } catch (e) {
-          console.error('Encrypt response error:', e.message);
-          return res.status(200).json(result);
-        }
-      }
-      
       return res.status(200).json(result);
     } catch (error) {
       console.error('rvnstore error:', error.message);
