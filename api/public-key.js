@@ -13,10 +13,12 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   
   if (!PUBLIC_KEY) {
-    return res.status(500).json({ error: 'Public key not configured' });
+    return res.status(500).json({ error: 'RSA Public Key not configured' });
   }
   
+  const cleanPublicKey = PUBLIC_KEY.replace(/\\n/g, '\n');
+  
   return res.status(200).json({
-    publicKey: PUBLIC_KEY.replace(/\\n/g, '\n')
+    publicKey: cleanPublicKey
   });
 }
