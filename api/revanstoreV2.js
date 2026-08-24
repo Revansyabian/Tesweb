@@ -1,11 +1,12 @@
 import CryptoJS from 'crypto-js';
 import admin from 'firebase-admin';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 
 const ADMIN_KEY = process.env.ADMIN_KEY;
-const API_SECRET = process.env.API_SECRET;
 const RECAPTCHA_V2_SECRET_KEY = process.env.RECAPTCHA_V2_SECRET_KEY;
 const RECAPTCHA_V3_SECRET_KEY = process.env.RECAPTCHA_V3_SECRET_KEY;
+const RSA_PRIVATE_KEY = process.env.RSA_PRIVATE_KEY;
 const SALT_ROUNDS = 12;
 
 if (!admin.apps.length) {
@@ -37,8 +38,11 @@ async function decryptData(raw) {
   if (raw.data) {
     try {
       const dec = CryptoJS.AES.decrypt(raw.data, ADMIN_KEY).toString(CryptoJS.enc.Utf8);
-      return JSON.parse(dec);
-    } catch(e) { return raw.data || raw; }
+      const parsed = JSON.parse(dec);
+      return parsed;
+    } catch(e) { 
+      return raw.data || raw; 
+    }
   }
   return raw;
 }
@@ -189,7 +193,9 @@ async function cleanupOldTransactions() {
     const updates = {};
     for (const key in raw) {
       const decrypted = await decryptData(raw[key]);
-      if (decrypted && decrypted.timestamp && (now - decrypted.timestamp > TRX_MAX_AGE)) updates[key] = null;
+      if (decrypted && decrypted.timestamp && (now - decrypted.timestamp > TRX_MAX_AGE)) {
+        updates[key] = null;
+      }
     }
     if (Object.keys(updates).length > 0) await db.ref('transactions').update(updates);
   } catch(e) {}
@@ -252,33 +258,57 @@ export default async function handler(req, res) {
 
   try {
     let path, method, data;
-    if (req.body?.data && typeof req.body.data === 'string') {
-      const decrypted = CryptoJS.AES.decrypt(req.body.data, API_SECRET).toString(CryptoJS.enc.Utf8);
-      const parsed = JSON.parse(decrypted);
-      if (!parsed || !parsed.path) return res.status(400).json({ error: 'Payload tidak valid' });
-      path = parsed.path;
-      method = parsed.method;
-      data = parsed.data;
+    let useHybridEncryption = false;
+    let hybridAESKey = null;
+    
+    if (req.body?.key && req.body?.data && req.body?.iv && RSA_PRIVATE_KEY) {
+      try {
+        const cleanPrivateKey = RSA_PRIVATE_KEY.replace(/\\n/g, '\n');
+        const encryptedKey = Buffer.from(req.body.key, 'base64');
+        const decryptedKey = crypto.privateDecrypt(
+          { key: cleanPrivateKey, padding: crypto.constants.RSA_PKCS1_OAEP_PADDING, oaepHash: 'sha256' },
+          encryptedKey
+        );
+        hybridAESKey = decryptedKey.toString('utf8');
+        const decrypted = CryptoJS.AES.decrypt(req.body.data, CryptoJS.enc.Hex.parse(hybridAESKey), {
+          iv: CryptoJS.enc.Hex.parse(req.body.iv),
+          mode: CryptoJS.mode.CBC,
+          padding: CryptoJS.pad.Pkcs7
+        });
+        const payload = JSON.parse(decrypted.toString(CryptoJS.enc.Utf8));
+        path = payload.path;
+        method = payload.method || 'GET';
+        data = payload.data || null;
+        useHybridEncryption = true;
+      } catch(e) {
+        return res.status(401).json({ error: 'Invalid encryption' });
+      }
     } else if (req.body?.path) {
       path = req.body.path;
-      method = req.body.method;
-      data = req.body.data;
+      method = req.body.method || 'GET';
+      data = req.body.data || null;
     } else {
       return res.status(400).json({ error: 'Permintaan tidak valid' });
     }
+    
     if (!path || typeof path !== 'string' || path.length > 200) return res.status(400).json({ error: 'Path tidak valid' });
 
     const sendResponse = (responseData) => {
-      const encrypted = CryptoJS.AES.encrypt(JSON.stringify(responseData), API_SECRET).toString();
-      return res.status(200).json({ data: encrypted });
+      if (useHybridEncryption && hybridAESKey) {
+        const newIV = crypto.randomBytes(16).toString('hex');
+        const encrypted = CryptoJS.AES.encrypt(JSON.stringify(responseData), CryptoJS.enc.Hex.parse(hybridAESKey), {
+          iv: CryptoJS.enc.Hex.parse(newIV),
+          mode: CryptoJS.mode.CBC,
+          padding: CryptoJS.pad.Pkcs7
+        });
+        return res.status(200).json({ encrypted: encrypted.toString(), iv: newIV });
+      }
+      return res.status(200).json(responseData);
     };
 
     const ref = db.ref(path);
 
     if (path === 'check_blocked' && method === 'POST') {
-      const captchaToken = data?.captchaToken || '';
-      const captchaValid = await verifyRecaptchaV3(captchaToken);
-      if (!captchaValid) return sendResponse({ blocked: true, blockType: 'captcha' });
       const ipBlocked = await isIPBlocked(ip);
       const fpBlocked = fp ? await isFPBlocked(fp) : false;
       return sendResponse({ blocked: ipBlocked || fpBlocked });
@@ -291,11 +321,6 @@ export default async function handler(req, res) {
         const result = raw ? await decryptData(raw) : {};
         return sendResponse(result || {});
       }
-      if (method === 'PUT') {
-        const enc = CryptoJS.AES.encrypt(JSON.stringify(data), ADMIN_KEY).toString();
-        await ref.set({ data: enc });
-        return sendResponse({ success: true });
-      }
     }
 
     if (path === 'check_account_status' && method === 'POST') {
@@ -306,117 +331,50 @@ export default async function handler(req, res) {
       const userData = await decryptData(raw);
       if (!userData || userData.username !== username) return sendResponse({ valid: false });
       if (userData.banned === true) return sendResponse({ banned: true, bannedUntil: userData.bannedUntil || 0 });
-      if (userData.banAkses === true) {
-        if (userData.banAksesUntil && userData.banAksesUntil !== 0 && userData.banAksesUntil < Date.now()) {
-          const updatedData = { ...userData, banAkses: false, banAksesUntil: 0 };
-          const enc = CryptoJS.AES.encrypt(JSON.stringify(updatedData), ADMIN_KEY).toString();
-          await db.ref('users/' + user_id).update({ data: enc });
-        } else {
-          return sendResponse({ banAkses: true, banAksesUntil: userData.banAksesUntil || 0 });
-        }
-      }
+      if (userData.banAkses === true) return sendResponse({ banAkses: true, banAksesUntil: userData.banAksesUntil || 0 });
       if (userData.forceLogout === true) return sendResponse({ forceLogout: true });
       return sendResponse({ valid: true, user: { id: user_id, username: userData.username, role: userData.role || 'User', full_name: userData.full_name || userData.username, expiry_date: userData.expiry_date || '' } });
     }
 
-    if (path === 'register' && method === 'POST') {
-      const captchaToken = data?.captchaToken || '';
-      const captchaValid = await verifyRecaptchaV2(captchaToken);
-      if (!captchaValid) return sendResponse({ success: false, error: 'invalid_captcha' });
-      const username = data?.username || '';
-      const email = data?.email || '';
-      const usersSnap = await db.ref('users').once('value');
-      const users = usersSnap.val();
-      if (users) {
-        for (const key in users) {
-          const userData = await decryptData(users[key]);
-          if (userData && userData.username === username) return sendResponse({ success: false, error: 'username_exists' });
-          if (userData && email && userData.email === email) return sendResponse({ success: false, error: 'email_exists' });
-        }
-      }
-      const hashedPassword = await hashPassword(data?.password || '');
-      if (!hashedPassword) return sendResponse({ success: false, error: 'server_error' });
-      const registerData = { ...data, password_hash: hashedPassword, password: undefined, status: 'pending', activationStatus: 'pending', role: 'User', createdAt: Date.now() };
-      delete registerData.password;
-      const enc = CryptoJS.AES.encrypt(JSON.stringify(registerData), ADMIN_KEY).toString();
-      const newRef = db.ref('users').push();
-      await newRef.set({ data: enc });
-      await logActivity(username, 'register', 'Pendaftaran baru', ip, fp);
-      return sendResponse({ success: true, message: 'Pendaftaran berhasil!' });
-    }
-
-    if (path === 'login' && method === 'POST') {
-      const captchaToken = data?.captchaToken || '';
-      const captchaValid = await verifyRecaptchaV2(captchaToken);
-      if (!captchaValid) return sendResponse({ blocked: true, message: 'reCAPTCHA gagal.' });
-      if (await isIPBlocked(ip) || (fp && await isFPBlocked(fp))) return sendResponse({ blocked: true });
-      const snap = await db.ref('users').once('value');
-      const users = snap.val();
-      if (!users) return sendResponse({ success: false });
-      const username = data.username;
-      const password = data.password;
-      for (const key in users) {
-        const decryptedUser = await decryptData(users[key]);
-        if (decryptedUser && decryptedUser.username === username) {
-          const isPasswordValid = await verifyPassword(password, decryptedUser.password_hash);
-          if (!isPasswordValid) continue;
-          if (decryptedUser.activationStatus === 'pending') return sendResponse({ success: false, error: 'pending_activation' });
-          if (decryptedUser.banned === true) return sendResponse({ success: false, banned: true, bannedUntil: decryptedUser.bannedUntil || 0 });
-          if (decryptedUser.forceLogout === true) return sendResponse({ success: false, forceLogout: true });
-          const updatedData = { ...decryptedUser, ip: ip, fingerprint: fp, lastLogin: { ip, fingerprint: fp, timestamp: Date.now() } };
-          const enc = CryptoJS.AES.encrypt(JSON.stringify(updatedData), ADMIN_KEY).toString();
-          await db.ref('users/' + key).update({ data: enc });
-          await resetLoginAttempt(ip, fp);
-          await logActivity(username, 'login_success', 'Login berhasil', ip, fp);
-          return sendResponse({ success: true, data: { id: key, username: decryptedUser.username, role: decryptedUser.role || 'User', full_name: decryptedUser.full_name || decryptedUser.username, expiry_date: decryptedUser.expiry_date || '', ip, fingerprint: fp } });
-        }
-      }
-      return sendResponse({ success: false });
-    }
-
-    if (path === 'login_failed' && method === 'POST') {
-      const attempts = await trackLoginAttempt(ip, fp);
-      await new Promise(r => setTimeout(r, Math.min(attempts * 500, 3000)));
-      if (attempts >= 5) { await blockIP(ip); if (fp) await blockFP(fp); return sendResponse({ blocked: true }); }
-      return sendResponse({ attempts, remaining: 5 - attempts });
-    }
-
-    if (path === 'login_success' && method === 'POST') {
-      await resetLoginAttempt(ip, fp);
-      return sendResponse({ success: true });
-    }
-
+    // ==================== TRANSAKSI ====================
     if (path === 'transactions' && method === 'POST') {
       const trxUser = data?.user || data?.operator || '';
       const rateOk = await checkTransactionRateLimit(trxUser || ip);
       if (!rateOk) return sendResponse({ success: false, error: 'rate_limit_trx' });
-      await cleanupOldTransactions();
+      
       const code = await getUserTrxCode(trxUser || 'unknown');
       const existingSnap = await db.ref('transactions').once('value');
-      const existingCount = await countUserTransactions(trxUser || 'unknown', existingSnap.val());
+      const existingRaw = existingSnap.val() || {};
+      const existingCount = await countUserTransactions(trxUser || 'unknown', existingRaw);
       const seq = existingCount + 1;
       const trxId = code + '-' + String(seq).padStart(3, '0');
-      const trxData = { ...data, user: trxUser, trxId, timestamp: data?.timestamp || Date.now() };
+      
+      const trxData = {
+        ...data,
+        user: trxUser,
+        trxId: trxId,
+        timestamp: data?.timestamp || Date.now()
+      };
+      
       const enc = CryptoJS.AES.encrypt(JSON.stringify(trxData), ADMIN_KEY).toString();
       const r = db.ref('transactions').push();
       await r.set({ data: enc });
-      return sendResponse({ success: true, id: r.key, trxId });
+      
+      return sendResponse({ success: true, id: r.key, trxId: trxId });
     }
 
     if (path === 'transactions' && method === 'GET') {
-      await cleanupOldTransactions();
       const trxUsername = data?.username || '';
       const snap = await db.ref('transactions').once('value');
-      const raw = snap.val();
+      const raw = snap.val() || {};
       const result = {};
-      if (raw) {
-        for (const key in raw) {
-          const d = await decryptData(raw[key]);
-          const userField = d?.user || d?.operator || '';
-          if (d && (!trxUsername || userField === trxUsername)) {
-            d.timestamp = d.timestamp || Date.now();
-            result[key] = d;
-          }
+      for (const key in raw) {
+        const d = await decryptData(raw[key]);
+        const userField = d?.user || d?.operator || '';
+        if (d && (!trxUsername || userField === trxUsername)) {
+          d.trxId = d.trxId || '-';
+          d.timestamp = d.timestamp || Date.now();
+          result[key] = d;
         }
       }
       return sendResponse(result);
@@ -425,53 +383,20 @@ export default async function handler(req, res) {
     if (path === 'transactions' && method === 'DELETE') {
       const trxUsername = data?.username || '';
       const snap = await db.ref('transactions').once('value');
-      const raw = snap.val();
-      if (raw) {
-        const updates = {};
-        for (const key in raw) {
-          const d = await decryptData(raw[key]);
-          const userField = d?.user || d?.operator || '';
-          if (d && userField === trxUsername) updates[key] = null;
-        }
-        if (Object.keys(updates).length > 0) await db.ref('transactions').update(updates);
+      const raw = snap.val() || {};
+      const updates = {};
+      for (const key in raw) {
+        const d = await decryptData(raw[key]);
+        const userField = d?.user || d?.operator || '';
+        if (d && userField === trxUsername) updates[key] = null;
       }
+      if (Object.keys(updates).length > 0) await db.ref('transactions').update(updates);
       return sendResponse({ success: true });
     }
-
-    if (method === 'GET') {
-      const snap = await ref.once('value');
-      const raw = snap.val();
-      const result = {};
-      if (raw) { for (const key in raw) { const d = await decryptData(raw[key]); if (d) result[key] = d; } }
-      return sendResponse(result);
-    }
-
-    if (method === 'POST') {
-      const enc = CryptoJS.AES.encrypt(JSON.stringify(data), ADMIN_KEY).toString();
-      const r = ref.push();
-      await r.set({ data: enc });
-      return sendResponse({ success: true, id: r.key });
-    }
-
-    if (method === 'PUT') {
-      const enc = CryptoJS.AES.encrypt(JSON.stringify(data), ADMIN_KEY).toString();
-      await ref.set({ data: enc });
-      return sendResponse({ success: true });
-    }
-
-    if (method === 'PATCH') {
-      const snap = await ref.once('value');
-      const existing = await decryptData(snap.val());
-      const merged = Object.assign({}, existing || {}, data);
-      const enc = CryptoJS.AES.encrypt(JSON.stringify(merged), ADMIN_KEY).toString();
-      await ref.update({ data: enc });
-      return sendResponse({ success: true });
-    }
-
-    if (method === 'DELETE') { await ref.remove(); return sendResponse({ success: true }); }
 
     return res.status(400).json({ error: 'Metode tidak valid' });
   } catch (error) {
-    return res.status(500).json({ error: 'Server error' });
+    console.error('Server error:', error.message);
+    return res.status(500).json({ error: 'Terjadi kesalahan pada server.' });
   }
 }
