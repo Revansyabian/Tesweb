@@ -272,6 +272,13 @@ async function sendEncryptedRequest(apiUrl, path, method, data) {
         if (decrypted) return decrypted;
     }
     
+    if (result && result.data && typeof result.data === 'string') {
+        try {
+            var dec = CryptoJS.AES.decrypt(result.data, aesKey).toString(CryptoJS.enc.Utf8);
+            if (dec) return JSON.parse(dec);
+        } catch(e) {}
+    }
+    
     return result;
 }
 
@@ -1157,7 +1164,7 @@ function showReceipt(trx) {
     var typeText = trx.type === 'topup' ? 'TOP UP' : 'KURAS';
     var sign = trx.type === 'topup' ? '+' : '-';
     var idRow = trx.trxId ? '<div class="receipt-row"><span>ID Transaksi:</span><span style="font-family:monospace;">' + sanitize(trx.trxId) + '</span></div>' : '';
-    var html = '<div class="receipt-content"><div class="receipt-header"><h3>TOP UP</h3><p>Detail Transaksi</p></div><div class="receipt-details">' + idRow + '<div class="receipt-row"><span>Akun:</span><span>' + sanitize(trx.accountName) + '</span></div><div class="receipt-row"><span>Jenis:</span><span>' + sanitize(typeText) + '</span></div><div class="receipt-row"><span>Jumlah:</span><span style="color:' + (trx.type === 'topup' ? '#10b981' : '#f59e0b') + '">' + sign + formatCurrency(trx.amount) + '</span></div><div class="receipt-row"><span>Saldo Awal:</span><span>' + formatCurrency(trx.oldBalance) + '</span></div><div class="receipt-row"><span>Saldo Akhir:</span><span>' + formatCurrency(trx.newBalance) + '</span></div><div class="receipt-row"><span>User:</span><span>' + sanitize(trx.user || '-') + '</span></div><div class="receipt-row"><span>Tanggal:</span><span>' + new Date(trx.timestamp).toLocaleString('id-ID') + '</span></div><div class="receipt-row"><span>Status:</span><span style="color:#10b981;">BERHASIL</span></div></div></div><div style="display:flex;gap:8px;margin-top:20px;"><button class="btn btn-primary" onclick="window._showTrxModal()" style="flex:1;">LANJUTKAN</button><button class="btn btn-secondary" onclick="window._goHome()" style="flex:1;">HOME</button></div>';
+    var html = '<div class="receipt-content"><div class="receipt-header"><h3>TOP UP</h3><p>Detail Transaksi</p></div><div class="receipt-details">' + idRow + '<div class="receipt-row"><span>Akun:</span><span>' + sanitize(trx.accountName) + '</span></div><div class="receipt-row"><span>Jenis:</span><span>' + sanitize(typeText) + '</span></div><div class="receipt-row"><span>Jumlah:</span><span style="color:' + (trx.type === 'topup' ? '#10b981' : '#f59e0b') + '">' + sign + formatCurrency(trx.amount) + '</span></div><div class="receipt-row"><span>Saldo Awal:</span><span>' + formatCurrency(trx.oldBalance) + '</span></div><div class="receipt-row"><span>Saldo Akhir:</span><span>' + formatCurrency(trx.newBalance) + '</span></div><div class="receipt-row"><span>User:</span><span>' + sanitize(trx.user || '-') + '</span></div><div class="receipt-row"><span>Tanggal:</span><span>' + (trx.timestamp ? new Date(trx.timestamp).toLocaleString('id-ID') : '-') + '</span></div><div class="receipt-row"><span>Status:</span><span style="color:#10b981;">BERHASIL</span></div></div></div><div style="display:flex;gap:8px;margin-top:20px;"><button class="btn btn-primary" onclick="window._showTrxModal()" style="flex:1;">LANJUTKAN</button><button class="btn btn-secondary" onclick="window._goHome()" style="flex:1;">HOME</button></div>';
     var receiptContent = document.getElementById('receiptContent');
     safeSetHTML(receiptContent, html);
     document.getElementById('receiptSection').style.display = 'block';
@@ -1219,10 +1226,10 @@ async function showHistory() {
                 oldName: data[k].oldName,
                 newName: data[k].newName,
                 user: data[k].user || data[k].operator || '',
-                timestamp: data[k].timestamp
+                timestamp: data[k].timestamp || Date.now()
             };
         }).sort(function(a, b) {
-            return b.timestamp - a.timestamp;
+            return (b.timestamp || 0) - (a.timestamp || 0);
         });
         currentHistoryData = arr;
         var html = '';
@@ -1230,7 +1237,8 @@ async function showHistory() {
             var typeText = t.type === 'topup' ? 'TOP UP' : t.type === 'kuras' ? 'KURAS' : 'GANTI NAMA';
             var sign = t.type === 'topup' ? '+' : t.type === 'kuras' ? '-' : '';
             var userDisplay = t.user || 'User';
-            html += '<div class="transaction-item ' + sanitize(t.type) + '" onclick="showTransactionDetail(' + idx + ')" style="cursor:pointer;"><div class="transaction-header"><div>' + sanitize(t.accountName) + '</div><div class="transaction-amount">' + sign + formatCurrency(t.amount) + '</div></div><div class="transaction-details"><div>' + sanitize(typeText) + ' · ' + sanitize(t.trxId) + '</div><div>' + new Date(t.timestamp).toLocaleString('id-ID') + '</div></div><div class="transaction-balance"><span>User: ' + sanitize(userDisplay) + '</span><span>Saldo: ' + formatCurrency(t.newBalance) + '</span></div></div>';
+            var dateDisplay = t.timestamp ? new Date(t.timestamp).toLocaleString('id-ID') : '-';
+            html += '<div class="transaction-item ' + sanitize(t.type) + '" onclick="showTransactionDetail(' + idx + ')" style="cursor:pointer;"><div class="transaction-header"><div>' + sanitize(t.accountName) + '</div><div class="transaction-amount">' + sign + formatCurrency(t.amount) + '</div></div><div class="transaction-details"><div>' + sanitize(typeText) + ' · ' + sanitize(t.trxId) + '</div><div>' + dateDisplay + '</div></div><div class="transaction-balance"><span>User: ' + sanitize(userDisplay) + '</span><span>Saldo: ' + formatCurrency(t.newBalance) + '</span></div></div>';
         });
         if (list) safeSetHTML(list, html);
         hideLoading();
@@ -1245,6 +1253,7 @@ function showTransactionDetail(idx) {
     if (!t) return;
     var typeText = t.type === 'topup' ? 'TOP UP' : t.type === 'kuras' ? 'KURAS' : 'GANTI NAMA';
     var userDisplay = t.user || 'User';
+    var dateDisplay = t.timestamp ? new Date(t.timestamp).toLocaleString('id-ID') : '-';
     var html;
     if (t.type === 'gantinama') {
         html = '<div style="text-align:left;font-size:14px;">' +
@@ -1253,7 +1262,7 @@ function showTransactionDetail(idx) {
             '<p><b>Nama Lama:</b> ' + sanitize(t.oldName || '-') + '</p>' +
             '<p><b>Nama Baru:</b> ' + sanitize(t.newName || '-') + '</p>' +
             '<p><b>User:</b> ' + sanitize(userDisplay) + '</p>' +
-            '<p><b>Tanggal:</b> ' + new Date(t.timestamp).toLocaleString('id-ID') + '</p>' +
+            '<p><b>Tanggal:</b> ' + dateDisplay + '</p>' +
             '</div>';
     } else {
         var sign = t.type === 'topup' ? '+' : '-';
@@ -1265,7 +1274,7 @@ function showTransactionDetail(idx) {
             '<p><b>Saldo Awal:</b> ' + formatCurrency(t.oldBalance) + '</p>' +
             '<p><b>Saldo Akhir:</b> ' + formatCurrency(t.newBalance) + '</p>' +
             '<p><b>User:</b> ' + sanitize(userDisplay) + '</p>' +
-            '<p><b>Tanggal:</b> ' + new Date(t.timestamp).toLocaleString('id-ID') + '</p>' +
+            '<p><b>Tanggal:</b> ' + dateDisplay + '</p>' +
             '</div>';
     }
     Swal.fire({
