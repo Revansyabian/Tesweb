@@ -333,7 +333,7 @@ export default async function handler(req, res) {
     
     if (!path || typeof path !== 'string' || path.length > 200) return res.status(400).json({ error: 'Path tidak valid' });
     
-    // ==================== SESSION KEY ENDPOINT ====================
+    // ==================== SESSION KEY ====================
     if (path === 'session-key') {
       const key = crypto.randomBytes(32).toString('hex');
       const iv = crypto.randomBytes(16).toString('hex');
@@ -342,6 +342,7 @@ export default async function handler(req, res) {
       sessionKeys.set(sessionId, {
         key: key,
         iv: iv,
+        fingerprint: fp,
         createdAt: Date.now(),
         expiresAt: Date.now() + (5 * 60 * 1000)
       });
@@ -359,7 +360,7 @@ export default async function handler(req, res) {
       });
     }
     
-    // ==================== PROXY ENDPOINT ====================
+    // ==================== PROXY ====================
     if (path === 'proxy') {
       const sessionId = req.headers['x-session-id'] || '';
       const encryptedData = data?.data || '';
@@ -378,6 +379,10 @@ export default async function handler(req, res) {
       
       if (Math.abs(Date.now() - timestamp) > 60000) {
         return res.status(401).json({ error: 'Request expired' });
+      }
+      
+      if (session.fingerprint !== fp) {
+        return res.status(401).json({ error: 'Fingerprint mismatch' });
       }
       
       let payload;
@@ -399,6 +404,9 @@ export default async function handler(req, res) {
       path = payload.path;
       method = payload.method || 'GET';
       data = payload.data || null;
+      
+      // Flag untuk menandai response harus dienkripsi dengan session key
+      var useSessionEncryption = true;
     }
     
     const ref = db.ref(path);
