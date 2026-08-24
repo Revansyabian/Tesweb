@@ -1,5 +1,6 @@
-var API_REVANSTORE = '/api/rvnstore';
+var API_REVANSTORE = '/api/revanstoreV2';
 var API_TOPUP = '/api/rvnstore';
+var API_SESSION = '/api/session-key';
 var WHATSAPP_NUMBER = "6285199120995";
 var MAX_TOPUP_AMOUNT = 2147483647;
 var RECAPTCHA_V3_SITE_KEY = '6LcVBn4tAAAAAINTTIleUbUZr1ZykvyB6WA-oOfT';
@@ -126,25 +127,15 @@ async function getRecaptchaV3Token(action) {
     }
 }
 
-function generateSessionKey() {
-    return CryptoJS.lib.WordArray.random(32).toString(CryptoJS.enc.Hex);
-}
-
-function generateSessionIV() {
-    return CryptoJS.lib.WordArray.random(16).toString(CryptoJS.enc.Hex);
-}
-
 async function getSessionKey() {
     try {
-        var res = await fetch('/api/session-key', {
+        var res = await fetch(API_SESSION, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'X-Fingerprint': fingerprint || 'unknown'
             },
-            body: JSON.stringify({
-                timestamp: Date.now()
-            })
+            body: JSON.stringify({ timestamp: Date.now() })
         });
         
         if (!res.ok) return false;
@@ -195,132 +186,6 @@ function decryptWithSession(encryptedData, iv) {
     }
 }
 
-async function checkIfBlocked() {
-    if (blockedChecked) return isBlocked;
-    if (!fingerprint) fingerprint = await getFingerprint();
-    
-    if (!isSessionKeyValid()) {
-        await getSessionKey();
-    }
-    
-    try {
-        var captchaToken = await getRecaptchaV3Token('check_blocked');
-        var payload = {
-            path: 'check_blocked',
-            method: 'POST',
-            data: {
-                fingerprint: fingerprint,
-                captchaToken: captchaToken
-            },
-            timestamp: Date.now()
-        };
-        
-        var encryptedPayload = encryptWithSession(payload);
-        if (!encryptedPayload) {
-            isBlocked = storageGet('perangkat_diblokir') === 'true';
-            blockedChecked = true;
-            return isBlocked;
-        }
-        
-        var res = await fetch('/api/proxy', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Fingerprint': fingerprint,
-                'X-Session-Id': sessionKey.substring(0, 32)
-            },
-            body: JSON.stringify({
-                data: encryptedPayload,
-                iv: sessionIV,
-                timestamp: Date.now()
-            })
-        });
-        
-        var result = await res.json();
-        
-        if (result && result.encrypted && result.iv) {
-            var decrypted = decryptWithSession(result.encrypted, result.iv);
-            if (decrypted) result = decrypted;
-        }
-        
-        if (result && result.blocked) {
-            isBlocked = true;
-            storageSet('perangkat_diblokir', 'true');
-        } else {
-            isBlocked = false;
-            storageRemove('perangkat_diblokir');
-        }
-        blockedChecked = true;
-    } catch (e) {
-        isBlocked = storageGet('perangkat_diblokir') === 'true';
-        blockedChecked = true;
-    }
-    return isBlocked;
-}
-
-async function periksaMaintenance() {
-    try {
-        if (!isSessionKeyValid()) {
-            await getSessionKey();
-        }
-        
-        var payload = {
-            path: 'maintenance_status',
-            method: 'GET',
-            data: null,
-            timestamp: Date.now()
-        };
-        
-        var encryptedPayload = encryptWithSession(payload);
-        if (!encryptedPayload) return null;
-        
-        var res = await fetch('/api/proxy', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Fingerprint': fingerprint || 'check',
-                'X-Session-Id': sessionKey.substring(0, 32)
-            },
-            body: JSON.stringify({
-                data: encryptedPayload,
-                iv: sessionIV,
-                timestamp: Date.now()
-            })
-        });
-        
-        var result = await res.json();
-        
-        if (result && result.encrypted && result.iv) {
-            var decrypted = decryptWithSession(result.encrypted, result.iv);
-            if (decrypted) result = decrypted;
-        }
-        
-        if (result && (result.maintenance === true || result.title || result.message)) {
-            return result;
-        }
-        return null;
-    } catch (e) {
-        return null;
-    }
-}
-
-function tampilkanHalamanMaintenance(dataMaintenance) {
-    var judul = sanitize((dataMaintenance && (dataMaintenance.title || dataMaintenance.judul)) ? (dataMaintenance.title || dataMaintenance.judul) : 'SEDANG PERBAIKAN SISTEM');
-    var pesan = sanitize((dataMaintenance && (dataMaintenance.message || dataMaintenance.pesan)) ? (dataMaintenance.message || dataMaintenance.pesan) : 'Website sedang dalam perbaikan oleh admin. Silakan kembali beberapa saat lagi.');
-    var sampai = (dataMaintenance && (dataMaintenance.until || dataMaintenance.sampai)) ? (dataMaintenance.until || dataMaintenance.sampai) : null;
-    var teksEstimasi = sanitize(sampai ? 'Estimasi selesai: ' + new Date(sampai).toLocaleString('id-ID') : 'Mohon maaf atas ketidaknyamanan ini.');
-
-    document.body.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;font-family:\'Segoe UI\',sans-serif;">' +
-        '<div style="background:#ffffff;border-radius:24px;padding:48px 36px;width:100%;max-width:440px;text-align:center;box-shadow:0 25px 60px rgba(0,0,0,0.08);border:1px solid #e2e8f0;">' +
-        '<div style="width:90px;height:90px;background:#fef3c7;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;">' +
-        '<i class="fas fa-tools" style="font-size:40px;color:#f59e0b;"></i>' +
-        '</div>' +
-        '<h1 style="color:#0c4a6e;font-size:24px;font-weight:700;margin-bottom:8px;">' + judul + '</h1>' +
-        '<p style="color:#64748b;font-size:14px;margin-bottom:6px;line-height:1.6;">' + pesan + '</p>' +
-        '<div style="background:#fef3c7;color:#92400e;padding:12px 16px;border-radius:12px;font-weight:600;font-size:13px;margin:16px 0 24px;">' + teksEstimasi + '</div>' +
-        '</div></div>';
-}
-
 async function callRevanstore(path, method, data) {
     if (!fingerprint) fingerprint = await getFingerprint();
     if (isBlocked && path !== 'check_blocked') throw new Error('Akses ditolak');
@@ -342,7 +207,7 @@ async function callRevanstore(path, method, data) {
     var encryptedPayload = encryptWithSession(payload);
     if (!encryptedPayload) throw new Error('Gagal enkripsi data');
     
-    var res = await fetch('/api/proxy', {
+    var res = await fetch(API_REVANSTORE, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -366,7 +231,7 @@ async function callRevanstore(path, method, data) {
         encryptedPayload = encryptWithSession(payload);
         if (!encryptedPayload) throw new Error('Gagal enkripsi data');
         
-        res = await fetch('/api/proxy', {
+        res = await fetch(API_REVANSTORE, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -398,7 +263,7 @@ async function callRevanstore(path, method, data) {
 
 async function callTopupAPI(path, method, data) {
     if (!fingerprint) fingerprint = await getFingerprint();
-    if (isBlocked && path !== 'check_blocked') throw new Error('Akses ditolak');
+    if (isBlocked) throw new Error('Akses ditolak');
     
     if (!isSessionKeyValid()) {
         var keyOk = await getSessionKey();
@@ -469,6 +334,60 @@ async function callTopupAPI(path, method, data) {
     }
     
     return result;
+}
+
+async function checkIfBlocked() {
+    if (blockedChecked) return isBlocked;
+    if (!fingerprint) fingerprint = await getFingerprint();
+    
+    try {
+        var result = await callRevanstore('check_blocked', 'POST', {
+            fingerprint: fingerprint,
+            captchaToken: await getRecaptchaV3Token('check_blocked')
+        });
+        
+        if (result && result.blocked) {
+            isBlocked = true;
+            storageSet('perangkat_diblokir', 'true');
+        } else {
+            isBlocked = false;
+            storageRemove('perangkat_diblokir');
+        }
+        blockedChecked = true;
+    } catch (e) {
+        isBlocked = storageGet('perangkat_diblokir') === 'true';
+        blockedChecked = true;
+    }
+    return isBlocked;
+}
+
+async function periksaMaintenance() {
+    try {
+        var result = await callRevanstore('maintenance_status', 'GET', null);
+        if (result && (result.maintenance === true || result.title || result.message)) {
+            return result;
+        }
+        return null;
+    } catch (e) {
+        return null;
+    }
+}
+
+function tampilkanHalamanMaintenance(dataMaintenance) {
+    var judul = sanitize((dataMaintenance && (dataMaintenance.title || dataMaintenance.judul)) ? (dataMaintenance.title || dataMaintenance.judul) : 'SEDANG PERBAIKAN SISTEM');
+    var pesan = sanitize((dataMaintenance && (dataMaintenance.message || dataMaintenance.pesan)) ? (dataMaintenance.message || dataMaintenance.pesan) : 'Website sedang dalam perbaikan oleh admin. Silakan kembali beberapa saat lagi.');
+    var sampai = (dataMaintenance && (dataMaintenance.until || dataMaintenance.sampai)) ? (dataMaintenance.until || dataMaintenance.sampai) : null;
+    var teksEstimasi = sanitize(sampai ? 'Estimasi selesai: ' + new Date(sampai).toLocaleString('id-ID') : 'Mohon maaf atas ketidaknyamanan ini.');
+
+    document.body.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;font-family:\'Segoe UI\',sans-serif;">' +
+        '<div style="background:#ffffff;border-radius:24px;padding:48px 36px;width:100%;max-width:440px;text-align:center;box-shadow:0 25px 60px rgba(0,0,0,0.08);border:1px solid #e2e8f0;">' +
+        '<div style="width:90px;height:90px;background:#fef3c7;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;">' +
+        '<i class="fas fa-tools" style="font-size:40px;color:#f59e0b;"></i>' +
+        '</div>' +
+        '<h1 style="color:#0c4a6e;font-size:24px;font-weight:700;margin-bottom:8px;">' + judul + '</h1>' +
+        '<p style="color:#64748b;font-size:14px;margin-bottom:6px;line-height:1.6;">' + pesan + '</p>' +
+        '<div style="background:#fef3c7;color:#92400e;padding:12px 16px;border-radius:12px;font-weight:600;font-size:13px;margin:16px 0 24px;">' + teksEstimasi + '</div>' +
+        '</div></div>';
 }
 
 function showAlert(message, type, duration) {
@@ -751,23 +670,6 @@ function showBlockedScreen() {
     safeSetHTML(document.body, html);
 }
 
-function showBannedPopup(until) {
-    var untilText = (until || 0) === 0 ? 'PERMANEN' : ('sampai ' + new Date(until).toLocaleString('id-ID'));
-    Swal.fire({
-        icon: 'error',
-        title: 'AKUN DIBANNED',
-        html: '<p>Maaf, akun Anda telah dibanned oleh admin.</p><p style="color:#dc2626;background:#fee2e2;padding:8px;border-radius:8px;"><b>Durasi: ' + sanitize(untilText) + '</b></p>',
-        confirmButtonText: '<i class="fab fa-whatsapp"></i> Hubungi Admin',
-        confirmButtonColor: '#25D366',
-        showCancelButton: true,
-        cancelButtonText: 'Tutup',
-        cancelButtonColor: '#64748b',
-        allowOutsideClick: false
-    }).then(function(r) {
-        if (r.isConfirmed) window.open('https://wa.me/' + WHATSAPP_NUMBER + '?text=Assalamualaikum%20admin%2C%20akun%20saya%20dibanned', '_blank');
-    });
-}
-
 function tampilkanHalamanBlokir() {
     document.body.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;font-family:\'Segoe UI\',sans-serif;">' +
         '<div style="background:#ffffff;border-radius:24px;padding:48px 36px;max-width:420px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.08);border:1px solid #e2e8f0;">' +
@@ -963,23 +865,16 @@ async function loginWithDeviceId(deviceId) {
             currentAuthToken = cleanInput;
         } else {
             var cid = cleanInput.toLowerCase().replace(/^android-/, '');
-            var loginData = {
-                path: 'login',
-                method: 'POST',
-                data: {
-                    TitleId: "4AE9",
-                    AndroidDeviceId: cid,
-                    CreateAccount: true,
-                    InfoRequestParameters: {
-                        GetUserAccountInfo: true,
-                        GetUserVirtualCurrency: true,
-                        GetPlayerProfile: true
-                    }
-                },
-                timestamp: Date.now()
-            };
-            
-            var result = await callRevanstore('login', 'POST', loginData.data);
+            var result = await callRevanstore('login', 'POST', {
+                TitleId: "4AE9",
+                AndroidDeviceId: cid,
+                CreateAccount: true,
+                InfoRequestParameters: {
+                    GetUserAccountInfo: true,
+                    GetUserVirtualCurrency: true,
+                    GetPlayerProfile: true
+                }
+            });
             
             if (result && result.data && result.data.SessionTicket) {
                 currentAuthToken = result.data.SessionTicket;
@@ -1013,16 +908,14 @@ async function loginWithDeviceId(deviceId) {
 async function getUserInfoFromPlayFab() {
     if (!currentAuthToken) return null;
     try {
-        var infoData = {
+        var result = await callRevanstore('get_player_info', 'POST', {
             authToken: currentAuthToken,
             infoRequest: {
                 GetUserAccountInfo: true,
                 GetUserVirtualCurrency: true,
                 GetPlayerProfile: true
             }
-        };
-        
-        var result = await callRevanstore('get_player_info', 'POST', infoData);
+        });
         
         if (result && result.data) {
             var info = result.data.InfoResultPayload;
@@ -1213,15 +1106,13 @@ async function processKuras() {
 async function addCashToAccount(amt) {
     if (!currentAuthToken) return false;
     try {
-        var executeData = {
+        var result = await callTopupAPI('execute_cloudscript', 'POST', {
             authToken: currentAuthToken,
             functionName: "AddRp",
             functionParameter: { addValue: amt },
             revisionSelection: "Live",
             generatePlayStreamEvent: true
-        };
-        
-        var result = await callTopupAPI('execute_cloudscript', 'POST', executeData);
+        });
         
         if (result && result.data) {
             await new Promise(function(r) { setTimeout(r, 2000); });
@@ -1545,12 +1436,10 @@ async function changeAccountNameSimple() {
 async function executeChangeName(newName) {
     showLoading('Mengubah...');
     try {
-        var changeData = {
+        var result = await callRevanstore('change_display_name', 'POST', {
             authToken: currentAuthToken,
             displayName: newName
-        };
-        
-        var result = await callRevanstore('change_display_name', 'POST', changeData);
+        });
         
         if (result && result.data && result.data.DisplayName) {
             var old = currentAccount.name;
