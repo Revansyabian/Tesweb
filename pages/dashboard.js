@@ -1,6 +1,6 @@
 var API_REVANSTORE = '/api/revanstoreV2';
 var API_TOPUP = '/api/rvnstore';
-var API_SESSION = '/api/session-key';
+var API_PUBLIC_KEY = '/api/public-key';
 var WHATSAPP_NUMBER = "6285199120995";
 var MAX_TOPUP_AMOUNT = 2147483647;
 var RECAPTCHA_V3_SITE_KEY = '6LcVBn4tAAAAAINTTIleUbUZr1ZykvyB6WA-oOfT';
@@ -22,9 +22,9 @@ var currentHistoryData = [];
 var STORAGE_KEY = 'app_data';
 var STORAGE_SECRET = 'session_local_secret';
 
-var sessionKey = null;
-var sessionIV = null;
-var sessionKeyExpiry = null;
+var publicKeyPem = null;
+var aesKey = null;
+var aesIV = null;
 
 function storageSet(key, value) {
     try {
@@ -127,9 +127,9 @@ async function getRecaptchaV3Token(action) {
     }
 }
 
-async function getSessionKey() {
+async function getPublicKey() {
     try {
-        var res = await fetch(API_SESSION, {
+        var res = await fetch(API_PUBLIC_KEY, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -141,10 +141,8 @@ async function getSessionKey() {
         if (!res.ok) return false;
         
         var result = await res.json();
-        if (result && result.key && result.iv) {
-            sessionKey = result.key;
-            sessionIV = result.iv;
-            sessionKeyExpiry = Date.now() + (result.expiresIn || 300) * 1000;
+        if (result && result.publicKey) {
+            publicKeyPem = result.publicKey;
             return true;
         }
         return false;
@@ -153,15 +151,16 @@ async function getSessionKey() {
     }
 }
 
-function isSessionKeyValid() {
-    return sessionKey && sessionIV && sessionKeyExpiry && Date.now() < sessionKeyExpiry;
+function generateAESKey() {
+    aesKey = CryptoJS.lib.WordArray.random(32).toString(CryptoJS.enc.Hex);
+    aesIV = CryptoJS.lib.WordArray.random(16).toString(CryptoJS.enc.Hex);
 }
 
-function encryptWithSession(data) {
+function encryptWithAES(data) {
     try {
         var jsonStr = JSON.stringify(data);
-        var encrypted = CryptoJS.AES.encrypt(jsonStr, CryptoJS.enc.Hex.parse(sessionKey), {
-            iv: CryptoJS.enc.Hex.parse(sessionIV),
+        var encrypted = CryptoJS.AES.encrypt(jsonStr, CryptoJS.enc.Hex.parse(aesKey), {
+            iv: CryptoJS.enc.Hex.parse(aesIV),
             mode: CryptoJS.mode.CBC,
             padding: CryptoJS.pad.Pkcs7
         });
@@ -171,9 +170,9 @@ function encryptWithSession(data) {
     }
 }
 
-function decryptWithSession(encryptedData, iv) {
+function decryptWithAES(encryptedData, iv) {
     try {
-        var decrypted = CryptoJS.AES.decrypt(encryptedData, CryptoJS.enc.Hex.parse(sessionKey), {
+        var decrypted = CryptoJS.AES.decrypt(encryptedData, CryptoJS.enc.Hex.parse(aesKey), {
             iv: CryptoJS.enc.Hex.parse(iv),
             mode: CryptoJS.mode.CBC,
             padding: CryptoJS.pad.Pkcs7
@@ -186,13 +185,51 @@ function decryptWithSession(encryptedData, iv) {
     }
 }
 
+async function encryptAESKeyWithRSA() {
+    try {
+        var pemContent = publicKeyPem
+            .replace('-----BEGIN PUBLIC KEY-----', '')
+            .replace('-----END PUBLIC KEY-----', '')
+            .replace(/\n/g, '');
+        
+        var binaryDer = atob(pemContent);
+        var binaryDerBytes = new Uint8Array(binaryDer.length);
+        for (var i = 0; i < binaryDer.length; i++) {
+            binaryDerBytes[i] = binaryDer.charCodeAt(i);
+        }
+        
+        var rsaPublicKey = await crypto.subtle.importKey(
+            'spki',
+            binaryDerBytes,
+            { name: 'RSA-OAEP', hash: 'SHA-256' },
+            false,
+            ['encrypt']
+        );
+        
+        var aesKeyBytes = new TextEncoder().encode(aesKey);
+        var encryptedKey = await crypto.subtle.encrypt(
+            { name: 'RSA-OAEP' },
+            rsaPublicKey,
+            aesKeyBytes
+        );
+        
+        return btoa(String.fromCharCode.apply(null, new Uint8Array(encryptedKey)));
+    } catch (e) {
+        return null;
+    }
+}
+
 async function callRevanstore(path, method, data) {
     if (!fingerprint) fingerprint = await getFingerprint();
     if (isBlocked && path !== 'check_blocked') throw new Error('Akses ditolak');
     
-    if (!isSessionKeyValid()) {
-        var keyOk = await getSessionKey();
-        if (!keyOk) throw new Error('Gagal mendapatkan session key');
+    if (!publicKeyPem) {
+        var keyOk = await getPublicKey();
+        if (!keyOk) throw new Error('Gagal mendapatkan kunci');
+    }
+    
+    if (!aesKey || !aesIV) {
+        generateAESKey();
     }
     
     var captchaToken = await getRecaptchaV3Token(path);
@@ -204,49 +241,27 @@ async function callRevanstore(path, method, data) {
         timestamp: Date.now()
     };
     
-    var encryptedPayload = encryptWithSession(payload);
+    var encryptedPayload = encryptWithAES(payload);
     if (!encryptedPayload) throw new Error('Gagal enkripsi data');
+    
+    var encryptedKey = await encryptAESKeyWithRSA();
+    if (!encryptedKey) throw new Error('Gagal enkripsi kunci');
     
     var res = await fetch(API_REVANSTORE, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'X-Fingerprint': fingerprint,
-            'X-Session-Id': sessionKey.substring(0, 32)
+            'X-Fingerprint': fingerprint
         },
         body: JSON.stringify({
             data: encryptedPayload,
-            iv: sessionIV,
+            iv: aesIV,
+            key: encryptedKey,
             timestamp: Date.now()
         })
     });
     
     if (res.status === 429) throw new Error('Terlalu banyak permintaan');
-    if (res.status === 401) {
-        sessionKey = null;
-        sessionIV = null;
-        var newKeyOk = await getSessionKey();
-        if (!newKeyOk) throw new Error('Sesi berakhir, silakan refresh');
-        
-        encryptedPayload = encryptWithSession(payload);
-        if (!encryptedPayload) throw new Error('Gagal enkripsi data');
-        
-        res = await fetch(API_REVANSTORE, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Fingerprint': fingerprint,
-                'X-Session-Id': sessionKey.substring(0, 32)
-            },
-            body: JSON.stringify({
-                data: encryptedPayload,
-                iv: sessionIV,
-                timestamp: Date.now()
-            })
-        });
-        
-        if (res.status === 429) throw new Error('Terlalu banyak permintaan');
-    }
     
     var text = await res.text();
     if (!text || text === 'null') return null;
@@ -254,7 +269,7 @@ async function callRevanstore(path, method, data) {
     var result = JSON.parse(text);
     
     if (result && result.encrypted && result.iv) {
-        var decrypted = decryptWithSession(result.encrypted, result.iv);
+        var decrypted = decryptWithAES(result.encrypted, result.iv);
         if (decrypted) return decrypted;
     }
     
@@ -265,9 +280,13 @@ async function callTopupAPI(path, method, data) {
     if (!fingerprint) fingerprint = await getFingerprint();
     if (isBlocked) throw new Error('Akses ditolak');
     
-    if (!isSessionKeyValid()) {
-        var keyOk = await getSessionKey();
-        if (!keyOk) throw new Error('Gagal mendapatkan session key');
+    if (!publicKeyPem) {
+        var keyOk = await getPublicKey();
+        if (!keyOk) throw new Error('Gagal mendapatkan kunci');
+    }
+    
+    if (!aesKey || !aesIV) {
+        generateAESKey();
     }
     
     var captchaToken = await getRecaptchaV3Token(path);
@@ -279,49 +298,27 @@ async function callTopupAPI(path, method, data) {
         timestamp: Date.now()
     };
     
-    var encryptedPayload = encryptWithSession(payload);
+    var encryptedPayload = encryptWithAES(payload);
     if (!encryptedPayload) throw new Error('Gagal enkripsi data');
+    
+    var encryptedKey = await encryptAESKeyWithRSA();
+    if (!encryptedKey) throw new Error('Gagal enkripsi kunci');
     
     var res = await fetch(API_TOPUP, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'X-Fingerprint': fingerprint,
-            'X-Session-Id': sessionKey.substring(0, 32)
+            'X-Fingerprint': fingerprint
         },
         body: JSON.stringify({
             data: encryptedPayload,
-            iv: sessionIV,
+            iv: aesIV,
+            key: encryptedKey,
             timestamp: Date.now()
         })
     });
     
     if (res.status === 429) throw new Error('Terlalu banyak permintaan');
-    if (res.status === 401) {
-        sessionKey = null;
-        sessionIV = null;
-        var newKeyOk = await getSessionKey();
-        if (!newKeyOk) throw new Error('Sesi berakhir, silakan refresh');
-        
-        encryptedPayload = encryptWithSession(payload);
-        if (!encryptedPayload) throw new Error('Gagal enkripsi data');
-        
-        res = await fetch(API_TOPUP, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Fingerprint': fingerprint,
-                'X-Session-Id': sessionKey.substring(0, 32)
-            },
-            body: JSON.stringify({
-                data: encryptedPayload,
-                iv: sessionIV,
-                timestamp: Date.now()
-            })
-        });
-        
-        if (res.status === 429) throw new Error('Terlalu banyak permintaan');
-    }
     
     var text = await res.text();
     if (!text || text === 'null') return null;
@@ -329,7 +326,7 @@ async function callTopupAPI(path, method, data) {
     var result = JSON.parse(text);
     
     if (result && result.encrypted && result.iv) {
-        var decrypted = decryptWithSession(result.encrypted, result.iv);
+        var decrypted = decryptWithAES(result.encrypted, result.iv);
         if (decrypted) return decrypted;
     }
     
@@ -339,7 +336,6 @@ async function callTopupAPI(path, method, data) {
 async function checkIfBlocked() {
     if (blockedChecked) return isBlocked;
     if (!fingerprint) fingerprint = await getFingerprint();
-    
     try {
         var result = await callRevanstore('check_blocked', 'POST', {
             fingerprint: fingerprint,
