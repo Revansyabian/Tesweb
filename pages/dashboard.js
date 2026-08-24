@@ -125,7 +125,6 @@ async function getRecaptchaV3Token(action) {
     }
 }
 
-// Ambil public key untuk hybrid encryption
 async function getPublicKey() {
     try {
         var res = await fetch(API_PUBLIC_KEY, {
@@ -215,19 +214,16 @@ async function encryptAESKeyWithRSA(aesKeyToEncrypt) {
     }
 }
 
-// HYBRID ENCRYPTED - ke /api/revanstoreV2
+// HYBRID ke /api/revanstoreV2
 async function callRevanstore(path, method, data) {
     if (!fingerprint) fingerprint = await getFingerprint();
     if (isBlocked && path !== 'check_blocked') throw new Error('Akses ditolak');
-    
     if (!publicKeyPem) {
         var keyOk = await getPublicKey();
         if (!keyOk) throw new Error('Gagal mendapatkan kunci');
     }
-    
     var aesKey = generateAESKey();
     var aesIV = generateAESIV();
-    
     var captchaToken = await getRecaptchaV3Token(path);
     var payload = {
         path: path,
@@ -236,13 +232,10 @@ async function callRevanstore(path, method, data) {
         captchaToken: captchaToken,
         timestamp: Date.now()
     };
-    
     var encryptedPayload = encryptWithAES(payload, aesKey, aesIV);
     if (!encryptedPayload) throw new Error('Gagal enkripsi data');
-    
     var encryptedKey = await encryptAESKeyWithRSA(aesKey);
     if (!encryptedKey) throw new Error('Gagal enkripsi kunci');
-    
     var res = await fetch(API_REVANSTORE, {
         method: 'POST',
         headers: {
@@ -256,21 +249,18 @@ async function callRevanstore(path, method, data) {
             timestamp: Date.now()
         })
     });
-    
     if (res.status === 429) throw new Error('Terlalu banyak permintaan');
     var text = await res.text();
     if (!text || text === 'null') return null;
     var result = JSON.parse(text);
-    
     if (result && result.encrypted && result.iv) {
         var decrypted = decryptWithAES(result.encrypted, aesKey, result.iv);
         if (decrypted) return decrypted;
     }
-    
     return result;
 }
 
-// PLAIN - ke /api/rvnstore (BUSSID/PlayFab)
+// PLAIN ke /api/rvnstore
 async function callRvnstore(endpoint, method, body, authToken) {
     var res = await fetch(API_RVNSTORE, {
         method: 'POST',
@@ -664,22 +654,14 @@ async function checkAccountStatus() {
             return;
         }
         if (result && result.banAkses) {
-            var untilTextA = (result.banAksesUntil || 0) === 0 ? 'PERMANEN' : ('sampai ' + new Date(result.banAksesUntil).toLocaleString('id-ID'));
-            Swal.fire({
-                icon: 'error',
-                title: 'AKSES DIBLOKIR',
-                html: 'Maaf, akses Anda diblokir oleh admin.<br><br>Durasi: ' + sanitize(untilTextA),
-                confirmButtonText: 'OK',
-                confirmButtonColor: '#ef4444',
-                allowOutsideClick: false
-            }).then(function() { autoLogout(); });
+            showBanAccessPage(result.banAksesUntil || 0);
             return;
         }
         if (result && result.forceLogout) {
             Swal.fire({
                 icon: 'warning',
                 title: 'AKUN DITANGGUHKAN',
-                html: 'Akun Anda ditangguhkan karena indikasi aktivitas mencurigakan.<br><br>Silakan hubungi admin.',
+                html: 'Akun Anda ditangguhkan.<br><br>Silakan hubungi admin.',
                 confirmButtonText: 'OK',
                 confirmButtonColor: '#ef4444',
                 allowOutsideClick: false
@@ -733,7 +715,6 @@ function navigateBottom(page) {
     else if (page === 'pengaturan') showSettings();
 }
 
-// CARI AKUN BUSSID - PLAIN ke /api/rvnstore
 async function loginWithDeviceId(deviceId) {
     var blocked = await checkIfBlocked();
     if (blocked) { showBlockedScreen(); return false; }
@@ -783,7 +764,6 @@ async function loginWithDeviceId(deviceId) {
     }
 }
 
-// GET INFO PLAIN ke /api/rvnstore
 async function getUserInfoFromPlayFab() {
     if (!currentAuthToken) return null;
     try {
@@ -945,7 +925,6 @@ async function processKuras() {
     showConfirm('KURAS', 'Kuras ' + formatCurrency(amt) + '?', 'kuras', { amount: amt });
 }
 
-// TOPUP PLAIN ke /api/rvnstore
 async function addCashToAccount(amt) {
     if (!currentAuthToken) return false;
     try {
@@ -1217,7 +1196,6 @@ async function changeAccountNameSimple() {
     showConfirm('GANTI NAMA', 'Ganti ke "' + name + '"?', 'changename', name);
 }
 
-// GANTI NAMA PLAIN ke /api/rvnstore
 async function executeChangeName(newName) {
     showLoading('Mengubah...');
     try {
