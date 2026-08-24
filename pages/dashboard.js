@@ -1,6 +1,6 @@
 var API_REVANSTORE = '/api/revanstoreV2';
 var API_TOPUP = '/api/rvnstore';
-var API_PUBLIC_KEY = '/api/public-key';
+var API_SECRET = '1417-1426-1527-1517';
 var WHATSAPP_NUMBER = "6285199120995";
 var MAX_TOPUP_AMOUNT = 2147483647;
 var RECAPTCHA_V3_SITE_KEY = '6LcVBn4tAAAAAINTTIleUbUZr1ZykvyB6WA-oOfT';
@@ -21,8 +21,6 @@ var currentHistoryData = [];
 
 var STORAGE_KEY = 'app_data';
 var STORAGE_SECRET = 'session_local_secret';
-
-var publicKeyPem = null;
 
 function storageSet(key, value) {
     try {
@@ -125,112 +123,10 @@ async function getRecaptchaV3Token(action) {
     }
 }
 
-async function getPublicKey() {
-    try {
-        var res = await fetch(API_PUBLIC_KEY, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Fingerprint': fingerprint || 'unknown'
-            },
-            body: JSON.stringify({ timestamp: Date.now() })
-        });
-        
-        if (!res.ok) return false;
-        
-        var result = await res.json();
-        if (result && result.publicKey) {
-            publicKeyPem = result.publicKey;
-            return true;
-        }
-        return false;
-    } catch (e) {
-        return false;
-    }
-}
-
-function generateAESKey() {
-    return CryptoJS.lib.WordArray.random(32).toString(CryptoJS.enc.Hex);
-}
-
-function generateAESIV() {
-    return CryptoJS.lib.WordArray.random(16).toString(CryptoJS.enc.Hex);
-}
-
-function encryptWithAES(data, key, iv) {
-    try {
-        var jsonStr = JSON.stringify(data);
-        var encrypted = CryptoJS.AES.encrypt(jsonStr, CryptoJS.enc.Hex.parse(key), {
-            iv: CryptoJS.enc.Hex.parse(iv),
-            mode: CryptoJS.mode.CBC,
-            padding: CryptoJS.pad.Pkcs7
-        });
-        return encrypted.toString();
-    } catch (e) {
-        return null;
-    }
-}
-
-function decryptWithAES(encryptedData, key, iv) {
-    try {
-        var decrypted = CryptoJS.AES.decrypt(encryptedData, CryptoJS.enc.Hex.parse(key), {
-            iv: CryptoJS.enc.Hex.parse(iv),
-            mode: CryptoJS.mode.CBC,
-            padding: CryptoJS.pad.Pkcs7
-        });
-        var jsonStr = decrypted.toString(CryptoJS.enc.Utf8);
-        if (!jsonStr) return null;
-        return JSON.parse(jsonStr);
-    } catch (e) {
-        return null;
-    }
-}
-
-async function encryptAESKeyWithRSA(aesKeyToEncrypt) {
-    try {
-        var pemContent = publicKeyPem
-            .replace('-----BEGIN PUBLIC KEY-----', '')
-            .replace('-----END PUBLIC KEY-----', '')
-            .replace(/\s/g, '');
-        
-        var binaryDer = atob(pemContent);
-        var binaryDerBytes = new Uint8Array(binaryDer.length);
-        for (var i = 0; i < binaryDer.length; i++) {
-            binaryDerBytes[i] = binaryDer.charCodeAt(i);
-        }
-        
-        var rsaPublicKey = await crypto.subtle.importKey(
-            'spki',
-            binaryDerBytes,
-            { name: 'RSA-OAEP', hash: 'SHA-256' },
-            false,
-            ['encrypt']
-        );
-        
-        var aesKeyBytes = new TextEncoder().encode(aesKeyToEncrypt);
-        var encryptedKey = await crypto.subtle.encrypt(
-            { name: 'RSA-OAEP' },
-            rsaPublicKey,
-            aesKeyBytes
-        );
-        
-        return btoa(String.fromCharCode.apply(null, new Uint8Array(encryptedKey)));
-    } catch (e) {
-        return null;
-    }
-}
-
-async function sendEncryptedRequest(apiUrl, path, method, data) {
+// Ke /api/revanstoreV2 - TERENKRIPSI
+async function callRevanstore(path, method, data) {
     if (!fingerprint) fingerprint = await getFingerprint();
-    
-    if (!publicKeyPem) {
-        var keyOk = await getPublicKey();
-        if (!keyOk) throw new Error('Gagal mendapatkan kunci');
-    }
-    
-    var aesKey = generateAESKey();
-    var aesIV = generateAESIV();
-    
+    if (isBlocked && path !== 'check_blocked') throw new Error('Akses ditolak');
     var captchaToken = await getRecaptchaV3Token(path);
     var payload = {
         path: path,
@@ -239,57 +135,50 @@ async function sendEncryptedRequest(apiUrl, path, method, data) {
         captchaToken: captchaToken,
         timestamp: Date.now()
     };
-    
-    var encryptedPayload = encryptWithAES(payload, aesKey, aesIV);
-    if (!encryptedPayload) throw new Error('Gagal enkripsi data');
-    
-    var encryptedKey = await encryptAESKeyWithRSA(aesKey);
-    if (!encryptedKey) throw new Error('Gagal enkripsi kunci');
-    
-    var res = await fetch(apiUrl, {
+    var encryptedPayload = CryptoJS.AES.encrypt(JSON.stringify(payload), API_SECRET).toString();
+    var res = await fetch(API_REVANSTORE, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'X-Fingerprint': fingerprint
         },
-        body: JSON.stringify({
-            key: encryptedKey,
-            data: encryptedPayload,
-            iv: aesIV,
-            timestamp: Date.now()
-        })
+        body: JSON.stringify({ data: encryptedPayload })
     });
-    
     if (res.status === 429) throw new Error('Terlalu banyak permintaan');
-    
     var text = await res.text();
     if (!text || text === 'null') return null;
-    
     var result = JSON.parse(text);
-    
-    if (result && result.encrypted && result.iv) {
-        var decrypted = decryptWithAES(result.encrypted, aesKey, result.iv);
-        if (decrypted) return decrypted;
-    }
-    
     if (result && result.data && typeof result.data === 'string') {
-        try {
-            var dec = CryptoJS.AES.decrypt(result.data, aesKey).toString(CryptoJS.enc.Utf8);
-            if (dec) return JSON.parse(dec);
-        } catch(e) {}
+        var dec = CryptoJS.AES.decrypt(result.data, API_SECRET).toString(CryptoJS.enc.Utf8);
+        if (dec) return JSON.parse(dec);
     }
-    
     return result;
 }
 
-async function callRevanstore(path, method, data) {
-    if (isBlocked && path !== 'check_blocked') throw new Error('Akses ditolak');
-    return await sendEncryptedRequest(API_REVANSTORE, path, method, data);
-}
-
+// Ke /api/rvnstore - PLAIN
 async function callTopupAPI(path, method, data) {
+    if (!fingerprint) fingerprint = await getFingerprint();
     if (isBlocked) throw new Error('Akses ditolak');
-    return await sendEncryptedRequest(API_TOPUP, path, method, data);
+    var captchaToken = await getRecaptchaV3Token(path);
+    var payload = {
+        path: path,
+        method: method || 'POST',
+        data: data || null,
+        captchaToken: captchaToken,
+        timestamp: Date.now()
+    };
+    var res = await fetch(API_TOPUP, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Fingerprint': fingerprint
+        },
+        body: JSON.stringify(payload)
+    });
+    if (res.status === 429) throw new Error('Terlalu banyak permintaan');
+    var text = await res.text();
+    if (!text || text === 'null') return null;
+    return JSON.parse(text);
 }
 
 async function checkIfBlocked() {
@@ -300,7 +189,6 @@ async function checkIfBlocked() {
             fingerprint: fingerprint,
             captchaToken: await getRecaptchaV3Token('check_blocked')
         });
-        
         if (result && result.blocked) {
             isBlocked = true;
             storageSet('perangkat_diblokir', 'true');
@@ -462,61 +350,39 @@ function backToAccount() {
 function parseDate(dateStr) {
     if (!dateStr) return null;
     if (String(dateStr).includes('9999')) return null;
-    
     var dateString = String(dateStr).trim();
-    
     if (/^\d{4}-\d{2}-\d{2}/.test(dateString)) {
         dateString = dateString.substring(0, 10);
         var parts = dateString.split('-');
         var year = parseInt(parts[0], 10);
         var month = parseInt(parts[1], 10) - 1;
         var day = parseInt(parts[2], 10);
-        
         if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
         if (year < 2000 || year > 2100) return null;
         if (month < 0 || month > 11) return null;
         if (day < 1 || day > 31) return null;
-        
         var date = new Date(year, month, day);
-        if (date.getFullYear() !== year || date.getMonth() !== month || date.getDate() !== day) {
-            return null;
-        }
+        if (date.getFullYear() !== year || date.getMonth() !== month || date.getDate() !== day) return null;
         return date;
     }
-    
     if (/^\d{1,2}\/\d{1,2}\/\d{4}/.test(dateString)) {
         dateString = dateString.substring(0, 10);
         var slashParts = dateString.split('/');
         var d1 = parseInt(slashParts[0], 10);
         var d2 = parseInt(slashParts[1], 10);
         var yr = parseInt(slashParts[2], 10);
-        
         if (isNaN(d1) || isNaN(d2) || isNaN(yr)) return null;
         if (yr < 2000 || yr > 2100) return null;
-        
         var day2, month2;
-        
-        if (d1 > 12) {
-            day2 = d1;
-            month2 = d2 - 1;
-        } else if (d2 > 12) {
-            month2 = d1 - 1;
-            day2 = d2;
-        } else {
-            day2 = d1;
-            month2 = d2 - 1;
-        }
-        
+        if (d1 > 12) { day2 = d1; month2 = d2 - 1; }
+        else if (d2 > 12) { month2 = d1 - 1; day2 = d2; }
+        else { day2 = d1; month2 = d2 - 1; }
         if (month2 < 0 || month2 > 11) return null;
         if (day2 < 1 || day2 > 31) return null;
-        
         var dateObj = new Date(yr, month2, day2);
-        if (dateObj.getFullYear() !== yr || dateObj.getMonth() !== month2 || dateObj.getDate() !== day2) {
-            return null;
-        }
+        if (dateObj.getFullYear() !== yr || dateObj.getMonth() !== month2 || dateObj.getDate() !== day2) return null;
         return dateObj;
     }
-    
     return null;
 }
 
@@ -673,17 +539,13 @@ function checkAuth() {
             full_name: session.full_name || session.username,
             expiry_date: session.expiry_date || ''
         };
-        
         if (currentUser.expiry_date) {
             var expiryCheck = checkAccountExpiry(currentUser);
             if (!expiryCheck.valid) {
-                setTimeout(function() {
-                    showInvalidExpiryError();
-                }, 500);
+                setTimeout(function() { showInvalidExpiryError(); }, 500);
                 return false;
             }
         }
-        
         return true;
     } catch (e) {
         storageRemove('sesi_pengguna');
@@ -700,53 +562,31 @@ async function checkAccountStatus() {
             user_id: currentUser.id,
             fingerprint: fingerprint
         });
-        
         if (result && result.banned) {
             var untilText = (result.bannedUntil || 0) === 0 ? 'PERMANEN' : ('sampai ' + new Date(result.bannedUntil).toLocaleString('id-ID'));
             Swal.fire({
-                icon: 'error',
-                title: 'AKUN DIBANNED',
+                icon: 'error', title: 'AKUN DIBANNED',
                 html: 'Maaf, akun Anda telah dibanned oleh admin.<br><br>Durasi: ' + sanitize(untilText),
-                confirmButtonText: 'OK',
-                confirmButtonColor: '#ef4444',
-                allowOutsideClick: false
-            }).then(function() {
-                autoLogout();
-            });
+                confirmButtonText: 'OK', confirmButtonColor: '#ef4444', allowOutsideClick: false
+            }).then(function() { autoLogout(); });
             return;
         }
-        if (result && result.banAkses) {
-            tampilkanHalamanBlokir();
-            return;
-        }
+        if (result && result.banAkses) { tampilkanHalamanBlokir(); return; }
         if (result && result.forceLogout) {
             Swal.fire({
-                icon: 'warning',
-                title: 'AKUN DITANGGUHKAN',
+                icon: 'warning', title: 'AKUN DITANGGUHKAN',
                 html: 'Akun Anda ditangguhkan karena indikasi aktivitas mencurigakan.<br><br>Silakan hubungi admin.',
-                confirmButtonText: 'OK',
-                confirmButtonColor: '#ef4444',
-                allowOutsideClick: false
-            }).then(function() {
-                autoLogout();
-            });
+                confirmButtonText: 'OK', confirmButtonColor: '#ef4444', allowOutsideClick: false
+            }).then(function() { autoLogout(); });
             return;
         }
         if (result && result.valid && result.user) {
             currentUser.role = result.user.role || currentUser.role;
             currentUser.full_name = result.user.full_name || currentUser.full_name;
             currentUser.expiry_date = result.user.expiry_date || currentUser.expiry_date;
-            
             var expiryCheck = checkAccountExpiry(currentUser);
-            if (!expiryCheck.valid) {
-                showInvalidExpiryError();
-                return;
-            }
-            if (expiryCheck.expired) {
-                showExpiredBanner();
-                return;
-            }
-            
+            if (!expiryCheck.valid) { showInvalidExpiryError(); return; }
+            if (expiryCheck.expired) { showExpiredBanner(); return; }
             var saved = storageGet('sesi_pengguna');
             if (saved) {
                 try {
@@ -784,7 +624,6 @@ function updateProfileInfo() {
     if (elUsername) elUsername.textContent = currentUser.username;
     if (elName) elName.textContent = currentUser.full_name || currentUser.username;
     if (elRole) elRole.textContent = currentUser.role || 'User';
-    
     if (elExpiry) {
         var expiryCheck = checkAccountExpiry(currentUser);
         if (!expiryCheck.valid) {
@@ -798,9 +637,7 @@ function updateProfileInfo() {
 }
 
 function navigateBottom(page) {
-    document.querySelectorAll('.bottom-nav a').forEach(function(a) {
-        a.classList.remove('active');
-    });
+    document.querySelectorAll('.bottom-nav a').forEach(function(a) { a.classList.remove('active'); });
     if (event && event.target) event.target.classList.add('active');
     if (page === 'home') showHome();
     else if (page === 'riwayat') showHistory();
@@ -809,10 +646,7 @@ function navigateBottom(page) {
 
 async function loginWithDeviceId(deviceId) {
     var blocked = await checkIfBlocked();
-    if (blocked) {
-        showBlockedScreen();
-        return false;
-    }
+    if (blocked) { showBlockedScreen(); return false; }
     showLoading('Menghubungkan...');
     try {
         var cleanInput = sanitize(deviceId.trim());
@@ -830,7 +664,6 @@ async function loginWithDeviceId(deviceId) {
                     GetPlayerProfile: true
                 }
             });
-            
             if (result && result.data && result.data.SessionTicket) {
                 currentAuthToken = result.data.SessionTicket;
             } else {
@@ -871,36 +704,19 @@ async function getUserInfoFromPlayFab() {
                 GetPlayerProfile: true
             }
         });
-        
         if (result && result.data) {
             var info = result.data.InfoResultPayload;
             var acc = info.AccountInfo;
             var name = (acc && acc.TitleInfo) ? (acc.TitleInfo.DisplayName || 'Unknown') : 'Unknown';
             var balance = info.UserVirtualCurrency ? info.UserVirtualCurrency.RP : 0;
             var pfid = acc ? (acc.PlayFabId || '-') : '-';
-            var fb = {
-                id: null,
-                name: 'Tidak tertaut',
-                email: null,
-                isConnected: false
-            };
+            var fb = { id: null, name: 'Tidak tertaut', email: null, isConnected: false };
             var fbAvatar = null;
             if (acc && acc.FacebookInfo) {
-                fb = {
-                    id: acc.FacebookInfo.FacebookId || null,
-                    name: acc.FacebookInfo.FullName || 'Tidak tertaut',
-                    email: acc.FacebookInfo.Email || null,
-                    isConnected: true
-                };
+                fb = { id: acc.FacebookInfo.FacebookId || null, name: acc.FacebookInfo.FullName || 'Tidak tertaut', email: acc.FacebookInfo.Email || null, isConnected: true };
                 if (fb.id) fbAvatar = 'https://graph.facebook.com/' + fb.id + '/picture?type=large';
             }
-            return {
-                name: name,
-                balance: balance,
-                facebook: fb,
-                facebookAvatarUrl: fbAvatar,
-                playFabId: pfid
-            };
+            return { name: name, balance: balance, facebook: fb, facebookAvatarUrl: fbAvatar, playFabId: pfid };
         }
     } catch (e) {}
     return null;
@@ -908,10 +724,7 @@ async function getUserInfoFromPlayFab() {
 
 async function searchAccount() {
     var id = document.getElementById('deviceId').value.trim();
-    if (!id) {
-        showAlert('Masukkan Device ID!', 'error');
-        return;
-    }
+    if (!id) { showAlert('Masukkan Device ID!', 'error'); return; }
     var ok = await loginWithDeviceId(id);
     if (ok) {
         lastDeviceId = id;
@@ -935,12 +748,8 @@ function tampilkanFotoProfile(acc) {
         img.style.height = '100%';
         img.style.objectFit = 'cover';
         img.style.borderRadius = '50%';
-        img.onload = function() {
-            c.appendChild(img);
-        };
-        img.onerror = function() {
-            c.innerHTML = '<i class="fas fa-user"></i>';
-        };
+        img.onload = function() { c.appendChild(img); };
+        img.onerror = function() { c.innerHTML = '<i class="fas fa-user"></i>'; };
     } else {
         c.innerHTML = '<i class="fas fa-user"></i>';
     }
@@ -970,10 +779,7 @@ function showAccountInfo(acc) {
 }
 
 function refreshAccountInfo() {
-    if (!currentAccount) {
-        showAlert('Cari akun dulu!', 'error');
-        return;
-    }
+    if (!currentAccount) { showAlert('Cari akun dulu!', 'error'); return; }
     showLoading('Menyegarkan...');
     setTimeout(async function() {
         var info = await getUserInfoFromPlayFab();
@@ -994,10 +800,7 @@ function refreshAccountInfo() {
 
 function setAmount(a) {
     var el = document.getElementById('topupAmount');
-    if (el) {
-        el.value = a;
-        validateTopupAmount();
-    }
+    if (el) { el.value = a; validateTopupAmount(); }
 }
 
 function setupQuickAmounts() {
@@ -1040,10 +843,7 @@ async function processTopup() {
     var el = document.getElementById('topupAmount');
     if (!el) return;
     var amt = parseAmount(el.value.trim());
-    if (amt <= 0) {
-        showAlert('Jumlah tidak valid!', 'error');
-        return;
-    }
+    if (amt <= 0) { showAlert('Jumlah tidak valid!', 'error'); return; }
     showConfirm('TOP UP', 'Top up ' + formatCurrency(amt) + '?', 'topup', { amount: amt });
 }
 
@@ -1051,10 +851,7 @@ async function processKuras() {
     if (!currentAccount) return;
     var el = document.getElementById('kurasAmount');
     var amt = el ? parseAmount(el.value.trim()) || currentAccount.balance : currentAccount.balance;
-    if (amt <= 0 || amt > currentAccount.balance) {
-        showAlert('Saldo tidak cukup!', 'error');
-        return;
-    }
+    if (amt <= 0 || amt > currentAccount.balance) { showAlert('Saldo tidak cukup!', 'error'); return; }
     showConfirm('KURAS', 'Kuras ' + formatCurrency(amt) + '?', 'kuras', { amount: amt });
 }
 
@@ -1068,7 +865,6 @@ async function addCashToAccount(amt) {
             revisionSelection: "Live",
             generatePlayStreamEvent: true
         });
-        
         if (result && result.data) {
             await new Promise(function(r) { setTimeout(r, 2000); });
             var info = await getUserInfoFromPlayFab();
@@ -1106,12 +902,7 @@ async function executeTopup(amt) {
         var trxResult = await callRevanstore('transactions', 'POST', trx);
         hideLoading();
         if (trxResult && trxResult.success === false) {
-            Swal.fire({
-                icon: 'warning',
-                title: 'Perhatian',
-                text: trxResult.message || 'Transaksi gagal dicatat.',
-                confirmButtonColor: '#f59e0b'
-            });
+            Swal.fire({ icon: 'warning', title: 'Perhatian', text: trxResult.message || 'Transaksi gagal dicatat.', confirmButtonColor: '#f59e0b' });
             return;
         }
         if (trxResult && trxResult.trxId) trx.trxId = trxResult.trxId;
@@ -1142,12 +933,7 @@ async function executeKuras(amt) {
         var trxResult = await callRevanstore('transactions', 'POST', trx);
         hideLoading();
         if (trxResult && trxResult.success === false) {
-            Swal.fire({
-                icon: 'warning',
-                title: 'Perhatian',
-                text: trxResult.message || 'Transaksi gagal dicatat.',
-                confirmButtonColor: '#f59e0b'
-            });
+            Swal.fire({ icon: 'warning', title: 'Perhatian', text: trxResult.message || 'Transaksi gagal dicatat.', confirmButtonColor: '#f59e0b' });
             return;
         }
         if (trxResult && trxResult.trxId) trx.trxId = trxResult.trxId;
@@ -1172,31 +958,17 @@ function showReceipt(trx) {
 
 window._showTrxModal = function() {
     var modal = document.getElementById('trxLagiModal');
-    if (modal) {
-        modal.style.display = 'flex';
-        modal.style.opacity = '1';
-        modal.style.visibility = 'visible';
-    }
+    if (modal) { modal.style.display = 'flex'; modal.style.opacity = '1'; modal.style.visibility = 'visible'; }
 };
 window._tutupTrxModal = function() {
     var modal = document.getElementById('trxLagiModal');
     if (modal) modal.style.display = 'none';
 };
-window._pilihTopup = function() {
-    window._tutupTrxModal();
-    showTopupFromAccount();
-};
-window._pilihKuras = function() {
-    window._tutupTrxModal();
-    showKurasFromAccount();
-};
-window._goHome = function() {
-    showHome();
-};
+window._pilihTopup = function() { window._tutupTrxModal(); showTopupFromAccount(); };
+window._pilihKuras = function() { window._tutupTrxModal(); showKurasFromAccount(); };
+window._goHome = function() { showHome(); };
 
-function backToHome() {
-    showHome();
-}
+function backToHome() { showHome(); }
 
 async function showHistory() {
     hideAllSections();
@@ -1228,9 +1000,7 @@ async function showHistory() {
                 user: data[k].user || data[k].operator || '',
                 timestamp: data[k].timestamp || Date.now()
             };
-        }).sort(function(a, b) {
-            return (b.timestamp || 0) - (a.timestamp || 0);
-        });
+        }).sort(function(a, b) { return (b.timestamp || 0) - (a.timestamp || 0); });
         currentHistoryData = arr;
         var html = '';
         arr.forEach(function(t, idx) {
@@ -1277,12 +1047,7 @@ function showTransactionDetail(idx) {
             '<p><b>Tanggal:</b> ' + dateDisplay + '</p>' +
             '</div>';
     }
-    Swal.fire({
-        title: 'Detail Transaksi',
-        html: html,
-        confirmButtonText: 'Tutup',
-        confirmButtonColor: '#0ea5e9'
-    });
+    Swal.fire({ title: 'Detail Transaksi', html: html, confirmButtonText: 'Tutup', confirmButtonColor: '#0ea5e9' });
 }
 window.showTransactionDetail = showTransactionDetail;
 
@@ -1296,9 +1061,7 @@ function showDeleteHistoryConfirm() {
         cancelButtonColor: "#64748b",
         confirmButtonText: "HAPUS SEMUA",
         cancelButtonText: "BATAL"
-    }).then((result) => {
-        if (result.isConfirmed) deleteAllHistory();
-    });
+    }).then((result) => { if (result.isConfirmed) deleteAllHistory(); });
 }
 
 async function deleteAllHistory() {
@@ -1307,30 +1070,14 @@ async function deleteAllHistory() {
         var result = await callRevanstore('transactions', 'DELETE', { username: currentUser.username });
         hideLoading();
         if (result && result.success) {
-            Swal.fire({
-                icon: "success",
-                title: "Berhasil!",
-                text: "Semua riwayat dihapus!",
-                timer: 2000,
-                showConfirmButton: false
-            });
+            Swal.fire({ icon: "success", title: "Berhasil!", text: "Semua riwayat dihapus!", timer: 2000, showConfirmButton: false });
             if (document.getElementById('historySection').style.display === 'block') showHistory();
         } else {
-            Swal.fire({
-                icon: "info",
-                title: "Info",
-                text: "Tidak ada riwayat!",
-                confirmButtonColor: "#0ea5e9"
-            });
+            Swal.fire({ icon: "info", title: "Info", text: "Tidak ada riwayat!", confirmButtonColor: "#0ea5e9" });
         }
     } catch (error) {
         hideLoading();
-        Swal.fire({
-            icon: "error",
-            title: "Oops...",
-            text: "Gagal menghapus!",
-            confirmButtonColor: "#ef4444"
-        });
+        Swal.fire({ icon: "error", title: "Oops...", text: "Gagal menghapus!", confirmButtonColor: "#ef4444" });
     }
 }
 
@@ -1370,23 +1117,15 @@ async function checkNameAvailability() {
     var d = document.getElementById('nameAvailability');
     d.innerHTML = 'Mengecek...';
     d.style.display = 'block';
-    setTimeout(function() {
-        d.innerHTML = '✅ Tersedia!';
-    }, 1000);
+    setTimeout(function() { d.innerHTML = '✅ Tersedia!'; }, 1000);
 }
 
 async function changeAccountNameSimple() {
     var nameEl = document.getElementById('newAccountName');
     if (!nameEl) return;
     var name = sanitize(nameEl.value.trim());
-    if (!name) {
-        showAlert('Masukkan nama!', 'error');
-        return;
-    }
-    if (!currentAccount || !currentAuthToken) {
-        showAlert('Cari akun dulu!', 'error');
-        return;
-    }
+    if (!name) { showAlert('Masukkan nama!', 'error'); return; }
+    if (!currentAccount || !currentAuthToken) { showAlert('Cari akun dulu!', 'error'); return; }
     showConfirm('GANTI NAMA', 'Ganti ke "' + name + '"?', 'changename', name);
 }
 
@@ -1397,7 +1136,6 @@ async function executeChangeName(newName) {
             authToken: currentAuthToken,
             displayName: newName
         });
-        
         if (result && result.data && result.data.DisplayName) {
             var old = currentAccount.name;
             currentAccount.name = newName;
@@ -1413,12 +1151,7 @@ async function executeChangeName(newName) {
             });
             hideLoading();
             if (trxResult && trxResult.success === false) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Perhatian',
-                    text: trxResult.message || 'Transaksi gagal dicatat.',
-                    confirmButtonColor: '#f59e0b'
-                });
+                Swal.fire({ icon: 'warning', title: 'Perhatian', text: trxResult.message || 'Transaksi gagal dicatat.', confirmButtonColor: '#f59e0b' });
                 return;
             }
             var idRow = (trxResult && trxResult.trxId) ? '<div class="receipt-row"><span>ID Transaksi:</span><span style="font-family:monospace;">' + sanitize(trxResult.trxId) + '</span></div>' : '';
@@ -1438,9 +1171,7 @@ async function executeChangeName(newName) {
     }
 }
 
-window._goBackAccount = function() {
-    backToAccount();
-};
+window._goBackAccount = function() { backToAccount(); };
 
 function showNameChangeModal(msg, type) {
     var m = document.getElementById('nameChangeModal');
@@ -1449,57 +1180,35 @@ function showNameChangeModal(msg, type) {
     m.classList.add('active');
 }
 
-function closeNameChangeModal() {
-    document.getElementById('nameChangeModal').classList.remove('active');
-}
+function closeNameChangeModal() { document.getElementById('nameChangeModal').classList.remove('active'); }
 
 function setupEventListeners() {
     var t = document.getElementById('topupAmount');
-    if (t) t.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') processTopup();
-    });
+    if (t) t.addEventListener('keypress', function(e) { if (e.key === 'Enter') processTopup(); });
     var d = document.getElementById('deviceId');
-    if (d) d.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') searchAccount();
-    });
+    if (d) d.addEventListener('keypress', function(e) { if (e.key === 'Enter') searchAccount(); });
 }
 
 document.addEventListener('DOMContentLoaded', async function() {
     if (!checkAuth()) return;
-
     var maintenance = await periksaMaintenance();
     if (maintenance) { tampilkanHalamanMaintenance(maintenance); return; }
-
     setupEventListeners();
     setupQuickAmounts();
     document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
     document.addEventListener('keydown', function(e) {
-        if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && e.key === 'I') || (e.ctrlKey && e.key === 'U')) {
-            e.preventDefault();
-            return false;
-        }
+        if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && e.key === 'I') || (e.ctrlKey && e.key === 'U')) { e.preventDefault(); return false; }
     });
     if (!fingerprint) fingerprint = await getFingerprint();
     var blocked = await checkIfBlocked();
-    if (blocked) {
-        showBlockedScreen();
-        return;
-    }
+    if (blocked) { showBlockedScreen(); return; }
     var mainApp = document.getElementById('mainApp');
     var bottomNav = document.getElementById('bottomNav');
     if (mainApp) mainApp.style.display = 'block';
     if (bottomNav) bottomNav.style.display = 'flex';
-    
     var expiryCheck = checkAccountExpiry(currentUser);
-    if (!expiryCheck.valid) {
-        showInvalidExpiryError();
-        return;
-    }
-    if (expiryCheck.expired) {
-        showExpiredBanner();
-        return;
-    }
-    
+    if (!expiryCheck.valid) { showInvalidExpiryError(); return; }
+    if (expiryCheck.expired) { showExpiredBanner(); return; }
     showHome();
     if (typeof grecaptcha !== 'undefined') {
         grecaptcha.ready(async function() {
