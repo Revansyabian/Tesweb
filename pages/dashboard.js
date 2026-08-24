@@ -23,8 +23,6 @@ var STORAGE_KEY = 'app_data';
 var STORAGE_SECRET = 'session_local_secret';
 
 var publicKeyPem = null;
-var aesKey = null;
-var aesIV = null;
 
 function storageSet(key, value) {
     try {
@@ -152,15 +150,18 @@ async function getPublicKey() {
 }
 
 function generateAESKey() {
-    aesKey = CryptoJS.lib.WordArray.random(32).toString(CryptoJS.enc.Hex);
-    aesIV = CryptoJS.lib.WordArray.random(16).toString(CryptoJS.enc.Hex);
+    return CryptoJS.lib.WordArray.random(32).toString(CryptoJS.enc.Hex);
 }
 
-function encryptWithAES(data) {
+function generateAESIV() {
+    return CryptoJS.lib.WordArray.random(16).toString(CryptoJS.enc.Hex);
+}
+
+function encryptWithAES(data, key, iv) {
     try {
         var jsonStr = JSON.stringify(data);
-        var encrypted = CryptoJS.AES.encrypt(jsonStr, CryptoJS.enc.Hex.parse(aesKey), {
-            iv: CryptoJS.enc.Hex.parse(aesIV),
+        var encrypted = CryptoJS.AES.encrypt(jsonStr, CryptoJS.enc.Hex.parse(key), {
+            iv: CryptoJS.enc.Hex.parse(iv),
             mode: CryptoJS.mode.CBC,
             padding: CryptoJS.pad.Pkcs7
         });
@@ -170,9 +171,9 @@ function encryptWithAES(data) {
     }
 }
 
-function decryptWithAES(encryptedData, iv) {
+function decryptWithAES(encryptedData, key, iv) {
     try {
-        var decrypted = CryptoJS.AES.decrypt(encryptedData, CryptoJS.enc.Hex.parse(aesKey), {
+        var decrypted = CryptoJS.AES.decrypt(encryptedData, CryptoJS.enc.Hex.parse(key), {
             iv: CryptoJS.enc.Hex.parse(iv),
             mode: CryptoJS.mode.CBC,
             padding: CryptoJS.pad.Pkcs7
@@ -185,12 +186,12 @@ function decryptWithAES(encryptedData, iv) {
     }
 }
 
-async function encryptAESKeyWithRSA() {
+async function encryptAESKeyWithRSA(aesKeyToEncrypt) {
     try {
         var pemContent = publicKeyPem
             .replace('-----BEGIN PUBLIC KEY-----', '')
             .replace('-----END PUBLIC KEY-----', '')
-            .replace(/\n/g, '');
+            .replace(/\s/g, '');
         
         var binaryDer = atob(pemContent);
         var binaryDerBytes = new Uint8Array(binaryDer.length);
@@ -206,7 +207,7 @@ async function encryptAESKeyWithRSA() {
             ['encrypt']
         );
         
-        var aesKeyBytes = new TextEncoder().encode(aesKey);
+        var aesKeyBytes = new TextEncoder().encode(aesKeyToEncrypt);
         var encryptedKey = await crypto.subtle.encrypt(
             { name: 'RSA-OAEP' },
             rsaPublicKey,
@@ -219,18 +220,16 @@ async function encryptAESKeyWithRSA() {
     }
 }
 
-async function callRevanstore(path, method, data) {
+async function sendEncryptedRequest(apiUrl, path, method, data) {
     if (!fingerprint) fingerprint = await getFingerprint();
-    if (isBlocked && path !== 'check_blocked') throw new Error('Akses ditolak');
     
     if (!publicKeyPem) {
         var keyOk = await getPublicKey();
         if (!keyOk) throw new Error('Gagal mendapatkan kunci');
     }
     
-    if (!aesKey || !aesIV) {
-        generateAESKey();
-    }
+    var aesKey = generateAESKey();
+    var aesIV = generateAESIV();
     
     var captchaToken = await getRecaptchaV3Token(path);
     var payload = {
@@ -241,22 +240,22 @@ async function callRevanstore(path, method, data) {
         timestamp: Date.now()
     };
     
-    var encryptedPayload = encryptWithAES(payload);
+    var encryptedPayload = encryptWithAES(payload, aesKey, aesIV);
     if (!encryptedPayload) throw new Error('Gagal enkripsi data');
     
-    var encryptedKey = await encryptAESKeyWithRSA();
+    var encryptedKey = await encryptAESKeyWithRSA(aesKey);
     if (!encryptedKey) throw new Error('Gagal enkripsi kunci');
     
-    var res = await fetch(API_REVANSTORE, {
+    var res = await fetch(apiUrl, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'X-Fingerprint': fingerprint
         },
         body: JSON.stringify({
+            key: encryptedKey,
             data: encryptedPayload,
             iv: aesIV,
-            key: encryptedKey,
             timestamp: Date.now()
         })
     });
@@ -269,68 +268,21 @@ async function callRevanstore(path, method, data) {
     var result = JSON.parse(text);
     
     if (result && result.encrypted && result.iv) {
-        var decrypted = decryptWithAES(result.encrypted, result.iv);
+        var decrypted = decryptWithAES(result.encrypted, aesKey, result.iv);
         if (decrypted) return decrypted;
     }
     
     return result;
 }
 
+async function callRevanstore(path, method, data) {
+    if (isBlocked && path !== 'check_blocked') throw new Error('Akses ditolak');
+    return await sendEncryptedRequest(API_REVANSTORE, path, method, data);
+}
+
 async function callTopupAPI(path, method, data) {
-    if (!fingerprint) fingerprint = await getFingerprint();
     if (isBlocked) throw new Error('Akses ditolak');
-    
-    if (!publicKeyPem) {
-        var keyOk = await getPublicKey();
-        if (!keyOk) throw new Error('Gagal mendapatkan kunci');
-    }
-    
-    if (!aesKey || !aesIV) {
-        generateAESKey();
-    }
-    
-    var captchaToken = await getRecaptchaV3Token(path);
-    var payload = {
-        path: path,
-        method: method || 'GET',
-        data: data || null,
-        captchaToken: captchaToken,
-        timestamp: Date.now()
-    };
-    
-    var encryptedPayload = encryptWithAES(payload);
-    if (!encryptedPayload) throw new Error('Gagal enkripsi data');
-    
-    var encryptedKey = await encryptAESKeyWithRSA();
-    if (!encryptedKey) throw new Error('Gagal enkripsi kunci');
-    
-    var res = await fetch(API_TOPUP, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-Fingerprint': fingerprint
-        },
-        body: JSON.stringify({
-            data: encryptedPayload,
-            iv: aesIV,
-            key: encryptedKey,
-            timestamp: Date.now()
-        })
-    });
-    
-    if (res.status === 429) throw new Error('Terlalu banyak permintaan');
-    
-    var text = await res.text();
-    if (!text || text === 'null') return null;
-    
-    var result = JSON.parse(text);
-    
-    if (result && result.encrypted && result.iv) {
-        var decrypted = decryptWithAES(result.encrypted, result.iv);
-        if (decrypted) return decrypted;
-    }
-    
-    return result;
+    return await sendEncryptedRequest(API_TOPUP, path, method, data);
 }
 
 async function checkIfBlocked() {
@@ -861,7 +813,7 @@ async function loginWithDeviceId(deviceId) {
             currentAuthToken = cleanInput;
         } else {
             var cid = cleanInput.toLowerCase().replace(/^android-/, '');
-            var result = await callRevanstore('login', 'POST', {
+            var result = await callTopupAPI('login', 'POST', {
                 TitleId: "4AE9",
                 AndroidDeviceId: cid,
                 CreateAccount: true,
@@ -904,7 +856,7 @@ async function loginWithDeviceId(deviceId) {
 async function getUserInfoFromPlayFab() {
     if (!currentAuthToken) return null;
     try {
-        var result = await callRevanstore('get_player_info', 'POST', {
+        var result = await callTopupAPI('get_player_info', 'POST', {
             authToken: currentAuthToken,
             infoRequest: {
                 GetUserAccountInfo: true,
@@ -1432,7 +1384,7 @@ async function changeAccountNameSimple() {
 async function executeChangeName(newName) {
     showLoading('Mengubah...');
     try {
-        var result = await callRevanstore('change_display_name', 'POST', {
+        var result = await callTopupAPI('change_display_name', 'POST', {
             authToken: currentAuthToken,
             displayName: newName
         });
